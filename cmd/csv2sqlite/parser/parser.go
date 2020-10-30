@@ -11,7 +11,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/terwey/recordwriter"
+	"github.com/terwey/recordwriter/recordwriter"
 )
 
 const nonChar string = "\uFFFF"
@@ -174,7 +174,7 @@ func (r *Runtime) ProcessRow(data []byte) {
 		if len(col) == 0 {
 			r.rw.Skip()
 		} else {
-			r.rw.Write(string(col))
+			r.rw.WriteByte(col)
 		}
 		if i != len(cols)-1 {
 			r.rw.Next()
@@ -192,18 +192,21 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	// if that matches the amount we expect
 	// amount = columns + 1
 
-	// r.columns is set to zero on the header creation
+	// r.columns is set to non-zero on header creation
 	if r.columns != 0 {
 		count := bytes.Count(data, []byte(r.p.Delimiter))
 		if count+1 != r.columns {
-			data = r.EscapeDelimiter(data)
-			r.RowsCSV++
+			columns := r.SplitUnescapedDelimiter(data)
+			if len(columns) == r.columns {
+				r.RowsCSV++
+				return columns
+			}
 		}
 	}
 
 	buf := bytes.Split(data, []byte(r.p.Delimiter))
 
-	// the EscapeDelimiter didn't work properly, use slow method
+	// // the SplitUnescapedDelimiter didn't work properly, use slow method
 	if len(buf) > r.columns {
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
@@ -227,7 +230,7 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 			}
 		}
 
-		// r.RowsCSV++
+		r.RowsCSV++
 
 		return buf
 	}
@@ -235,32 +238,20 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	for i := range buf {
 		buf[i] = bytes.TrimPrefix(buf[i], []byte(r.p.Quote))
 		buf[i] = bytes.TrimSuffix(buf[i], []byte(r.p.Quote))
-		buf[i] = bytes.ReplaceAll(buf[i], []byte(nonChar), []byte(r.p.Delimiter))
 	}
 
 	return buf
 }
 
-func (r *Runtime) EscapeDelimiter(data []byte) []byte {
+func (r *Runtime) SplitUnescapedDelimiter(data []byte) (columns [][]byte) {
 	// we need to seek through the data and find the first quote and escape the delimiter
-	// log.Printf("unescaped: \t%s", data)
 
 	// we first split on the delimiter and then check if two quotes are available
 	input := bytes.Split(data, []byte(r.p.Delimiter))
-	out := make([]byte, 0)
+	columns = make([][]byte, 0)
 	buf := make([]byte, 0)
 
 	for i := range input {
-
-		// log.Printf("input[i]: %s", input[i])
-		// log.Printf("buf: %s", buf)
-		// log.Printf("out: %s", out)
-
-		// // fails on this
-		// if string(input[i]) == `"Installatiebranche T-stuk no.130 verzinkt 1"" x 3/4"" x 1/2""` {
-		// 	log.Printf("sup")
-		// }
-
 		if len(input[i]) == 1 {
 			buf = append(buf, input[i]...)
 			continue
@@ -269,31 +260,30 @@ func (r *Runtime) EscapeDelimiter(data []byte) []byte {
 		count := bytes.Count(input[i], []byte(r.p.Quote))
 
 		if count%2 == 0 && bytes.HasPrefix(input[i], []byte(r.p.Quote)) && bytes.HasSuffix(input[i], []byte(r.p.Quote)) {
-			out = append(out, input[i]...)
-			if i != len(input)-1 {
-				out = append(out, []byte(r.p.Delimiter)...)
-			}
+			input[i] = bytes.TrimPrefix(input[i], []byte(r.p.Quote))
+			input[i] = bytes.TrimSuffix(input[i], []byte(r.p.Quote))
+			columns = append(columns, input[i])
 			continue
 		}
 
 		if !bytes.HasPrefix(input[i], []byte(r.p.Quote)) || !bytes.HasSuffix(input[i], []byte(r.p.Quote)) {
 			if len(buf) != 0 {
-				buf = append(buf, []byte(nonChar)...)
+				buf = append(buf, []byte(r.p.Delimiter)...)
 				buf = append(buf, input[i]...)
 
 				if bytes.HasSuffix(input[i], []byte(r.p.Quote)) {
-					out = append(out, buf...)
-					out = append(out, []byte(r.p.Delimiter)...)
+					buf = bytes.TrimPrefix(buf, []byte(r.p.Quote))
+					buf = bytes.TrimSuffix(buf, []byte(r.p.Quote))
+					columns = append(columns, buf)
 					buf = make([]byte, 0)
 				}
 			} else {
 				// we are missing the second quote, add to the buf
+				input[i] = bytes.TrimPrefix(input[i], []byte(r.p.Quote))
 				buf = append(buf, input[i]...)
 			}
 			continue
 		}
-
-		// count :=
 
 		// edge-case where ""| appears
 		// or where count%2 != 0
@@ -302,14 +292,10 @@ func (r *Runtime) EscapeDelimiter(data []byte) []byte {
 			continue
 		}
 
-		out = append(out, input[i]...)
-		if i != len(input)-1 {
-			out = append(out, []byte(r.p.Delimiter)...)
-		}
-		// }
+		input[i] = bytes.TrimPrefix(input[i], []byte(r.p.Quote))
+		input[i] = bytes.TrimSuffix(input[i], []byte(r.p.Quote))
+		columns = append(columns, input[i])
 	}
 
-	// log.Printf("escaped: \t%s", out)
-
-	return out
+	return columns
 }
