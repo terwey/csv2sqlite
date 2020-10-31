@@ -11,6 +11,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"sync"
 	"syscall"
 	"time"
 
@@ -107,7 +108,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	parse(r)
+	var wg sync.WaitGroup
+	go parse(r)
+	wg.Add(1)
+	go func(rows <-chan [][]byte, wg *sync.WaitGroup) {
+		defer wg.Done()
+		for cols := range rows {
+			r.ProcessRow(cols)
+		}
+	}(r.Data, &wg)
+	wg.Wait()
 	r.Close()
 
 	elapsed := time.Since(start)
@@ -158,12 +168,16 @@ func parse(r *parser.Runtime) {
 	for scanner.Scan() {
 		if err = scanner.Err(); err != nil {
 			log.Fatal(err)
+			close(r.Data)
 		}
 
-		r.ProcessRow(scanner.Bytes())
+		r.ParseRow(scanner.Bytes())
 	}
 
 	if err = scanner.Err(); err != nil {
 		log.Fatal(err)
+		close(r.Data)
 	}
+
+	close(r.Data)
 }

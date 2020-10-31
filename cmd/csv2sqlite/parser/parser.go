@@ -63,6 +63,8 @@ type Runtime struct {
 	inside          bool
 	doubleEnclosure []byte
 
+	Data chan [][]byte
+
 	Debug bool
 }
 
@@ -73,6 +75,8 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		splitFunc:     fn,
 		Benchmark:     false,
 	}
+
+	r.Data = make(chan [][]byte, 1000)
 
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
@@ -159,7 +163,7 @@ func (r *Runtime) NewScanner() *bufio.Scanner {
 	return scanner
 }
 
-func (r *Runtime) ProcessRow(data []byte) {
+func (r *Runtime) ParseRow(data []byte) {
 	cols := r.SplitRow(data)
 	if len(cols) == 0 {
 		return
@@ -177,6 +181,10 @@ func (r *Runtime) ProcessRow(data []byte) {
 		return
 	}
 
+	r.Data <- cols
+}
+
+func (r *Runtime) ProcessRow(cols [][]byte) {
 	for i, col := range cols {
 		if len(col) == 0 {
 			r.rw.Skip()
