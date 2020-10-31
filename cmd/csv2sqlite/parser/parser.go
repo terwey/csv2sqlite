@@ -22,8 +22,8 @@ type Params struct {
 	FlushSize  int
 	Buffersize int
 	Sqlite     bool
-	Delimiter  string
-	Quote      string
+	Delimiter  []byte
+	Enclosure  []byte
 }
 
 func NewParameters() *Params {
@@ -32,8 +32,8 @@ func NewParameters() *Params {
 		Buffersize: 4096,
 		Input:      "",
 		Output:     "",
-		Delimiter:  "|",
-		Quote:      `"`,
+		Delimiter:  []byte(`|`),
+		Enclosure:  []byte(`"`),
 	}
 
 	return p
@@ -56,10 +56,14 @@ type Runtime struct {
 	scanner *bufio.Scanner
 	w       io.StringWriter
 
-	Rows          uint64
-	RowsCSV       uint64
-	headerPrinted bool
-	columns       int
+	Rows            uint64
+	RowsCSV         uint64
+	headerPrinted   bool
+	columns         int
+	inside          bool
+	doubleEnclosure []byte
+
+	Debug bool
 }
 
 func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
@@ -69,6 +73,9 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		splitFunc:     fn,
 		Benchmark:     false,
 	}
+
+	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
+	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 
 	return r
 }
@@ -194,7 +201,7 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 
 	// r.columns is set to non-zero on header creation
 	if r.columns != 0 {
-		count := bytes.Count(data, []byte(r.p.Delimiter))
+		count := bytes.Count(data, r.p.Delimiter)
 		if count+1 != r.columns {
 			columns := r.SplitUnescapedDelimiter(data)
 			if len(columns) == r.columns {
@@ -204,15 +211,15 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 		}
 	}
 
-	buf := bytes.Split(data, []byte(r.p.Delimiter))
+	buf := bytes.Split(data, r.p.Delimiter)
 
-	// // the SplitUnescapedDelimiter didn't work properly, use slow method
+	// the SplitUnescapedDelimiter didn't work properly, use slow method
 	if len(buf) > r.columns {
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
 		csvReader := csv.NewReader(bytes.NewReader(data))
-		csvReader.Comma = []rune(r.p.Delimiter)[0]
+		csvReader.Comma = []rune(string(r.p.Delimiter))[0]
 
 		buf := make([][]byte, 0)
 
@@ -236,52 +243,125 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	}
 
 	for i := range buf {
-		buf[i] = bytes.TrimPrefix(buf[i], []byte(r.p.Quote))
-		buf[i] = bytes.TrimSuffix(buf[i], []byte(r.p.Quote))
+		buf[i] = bytes.TrimPrefix(buf[i], r.p.Enclosure)
+		buf[i] = bytes.TrimSuffix(buf[i], r.p.Enclosure)
 	}
 
 	return buf
 }
 
-func (r *Runtime) SplitUnescapedDelimiter(data []byte) (columns [][]byte) {
-	// we need to seek through the data and find the first quote and escape the delimiter
+func (r *Runtime) debug(format string, v ...interface{}) {
+	if r.Debug {
+		log.Printf(format, v...)
+	}
+}
 
-	// we first split on the delimiter and then check if two quotes are available
-	input := bytes.Split(data, []byte(r.p.Delimiter))
+func (r *Runtime) SplitUnescapedDelimiter(data []byte) (columns [][]byte) {
+	// we need to seek through the data and find the first Enclosure and escape the delimiter
+
+	// we first split on the delimiter and then check if two Enclosures are available
+	input := bytes.Split(data, r.p.Delimiter)
 	columns = make([][]byte, 0)
 	buf := make([]byte, 0)
+	enclosurecheck := false
 
 	for i := range input {
-		if len(input[i]) == 1 {
-			buf = append(buf, input[i]...)
-			continue
+		r.debug("input[i]: %s", input[i])
+		r.debug("buf: %s", buf)
+		r.debug("columns: %s", columns)
+		count := 0
+		if !r.inside {
+			count = bytes.Count(input[i], r.p.Enclosure)
+			if count != 0 {
+				r.inside = true
+			}
 		}
 
-		count := bytes.Count(input[i], []byte(r.p.Quote))
+		r.debug("inside: %v, enclosurecheck: %v", r.inside, enclosurecheck)
 
-		if count%2 == 0 && bytes.HasPrefix(input[i], []byte(r.p.Quote)) && bytes.HasSuffix(input[i], []byte(r.p.Quote)) {
-			input[i] = bytes.TrimPrefix(input[i], []byte(r.p.Quote))
-			input[i] = bytes.TrimSuffix(input[i], []byte(r.p.Quote))
+		// there is a case where the last buf can end with """ or similar
+		// we need to check if the NEXT starts with a " if so, move buf to columns and continue happily with life
+		if enclosurecheck {
+			if len(input[i]) == 1 {
+				// data was something like `|"foo|"|`
+				buf = append(buf, r.p.Delimiter...)
+			}
+			if bytes.HasPrefix(input[i], r.p.Enclosure) {
+				buf = bytes.TrimPrefix(buf, r.p.Enclosure)
+				buf = bytes.TrimSuffix(buf, r.p.Enclosure)
+				// we need to clean double enclosures to single
+				buf = bytes.ReplaceAll(buf, r.doubleEnclosure, r.p.Enclosure)
+				columns = append(columns, buf)
+				buf = make([]byte, 0)
+				r.inside = false
+				enclosurecheck = false
+			}
+			if len(input[i]) == 1 {
+				continue
+			}
+		}
+
+		// unEnclosured column
+		if len(input[i]) == 0 {
+			// delimiter inside an enclosure
+			if r.inside {
+				buf = append(buf, r.p.Delimiter...)
+				continue
+			}
 			columns = append(columns, input[i])
 			continue
 		}
 
-		if !bytes.HasPrefix(input[i], []byte(r.p.Quote)) || !bytes.HasSuffix(input[i], []byte(r.p.Quote)) {
+		if len(input[i]) == 1 {
+			if len(buf) != 0 && bytes.Equal(input[i], r.p.Enclosure) {
+				// the delimiter appears at the end, finalize the column
+				buf = append(buf, r.p.Delimiter...)
+
+				// we need to clean double enclosures to single
+				buf = bytes.ReplaceAll(buf, r.doubleEnclosure, r.p.Enclosure)
+				columns = append(columns, buf)
+				buf = make([]byte, 0)
+				continue
+			}
+			buf = append(buf, input[i]...)
+			continue
+		}
+
+		if !bytes.HasPrefix(input[i], r.p.Enclosure) || !bytes.HasSuffix(input[i], r.p.Enclosure) {
 			if len(buf) != 0 {
-				buf = append(buf, []byte(r.p.Delimiter)...)
+				buf = append(buf, r.p.Delimiter...)
 				buf = append(buf, input[i]...)
 
-				if bytes.HasSuffix(input[i], []byte(r.p.Quote)) {
-					buf = bytes.TrimPrefix(buf, []byte(r.p.Quote))
-					buf = bytes.TrimSuffix(buf, []byte(r.p.Quote))
+				result := bytes.HasSuffix(input[i], r.p.Enclosure) && !bytes.HasSuffix(input[i], r.doubleEnclosure)
+				r.debug("bytes.HasSuffix(input[i], r.p.Enclosure): %v\n!bytes.HasSuffix(input[i], r.doubleEnclosure: %v\n statement: %v", bytes.HasSuffix(input[i], r.p.Enclosure), !bytes.HasSuffix(input[i], r.doubleEnclosure), result)
+				if bytes.HasSuffix(input[i], r.p.Enclosure) && !bytes.HasSuffix(input[i], r.doubleEnclosure) {
+					buf = bytes.TrimPrefix(buf, r.p.Enclosure)
+					buf = bytes.TrimSuffix(buf, r.p.Enclosure)
+					// we need to clean double enclosures to single
+					buf = bytes.ReplaceAll(buf, r.doubleEnclosure, r.p.Enclosure)
 					columns = append(columns, buf)
 					buf = make([]byte, 0)
+					r.inside = false
+					enclosurecheck = false
+				} else {
+					enclosurecheck = true
 				}
 			} else {
-				// we are missing the second quote, add to the buf
-				input[i] = bytes.TrimPrefix(input[i], []byte(r.p.Quote))
+				// we are missing the second Enclosure, add to the buf
 				buf = append(buf, input[i]...)
+				// buf = bytes.TrimPrefix(buf, r.p.Enclosure)
 			}
+			continue
+		}
+
+		if count%2 == 0 && bytes.HasPrefix(input[i], r.p.Enclosure) && bytes.HasSuffix(input[i], r.p.Enclosure) {
+			input[i] = bytes.TrimPrefix(input[i], r.p.Enclosure)
+			input[i] = bytes.TrimSuffix(input[i], r.p.Enclosure)
+
+			// we need to clean double enclosures to single
+			input[i] = bytes.ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
+			columns = append(columns, input[i])
+			r.inside = false
 			continue
 		}
 
@@ -292,10 +372,14 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) (columns [][]byte) {
 			continue
 		}
 
-		input[i] = bytes.TrimPrefix(input[i], []byte(r.p.Quote))
-		input[i] = bytes.TrimSuffix(input[i], []byte(r.p.Quote))
+		input[i] = bytes.TrimPrefix(input[i], r.p.Enclosure)
+		input[i] = bytes.TrimSuffix(input[i], r.p.Enclosure)
+		// we need to clean double enclosures to single
+		input[i] = bytes.ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
 		columns = append(columns, input[i])
 	}
+
+	r.debug("columns: %d", len(columns))
 
 	return columns
 }

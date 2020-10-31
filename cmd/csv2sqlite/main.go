@@ -27,6 +27,9 @@ var (
 	cpuprofile  string
 	heapprofile string
 
+	delimiter string
+	enclosure string
+
 	p *parser.Params
 	r *parser.Runtime
 
@@ -41,8 +44,8 @@ func init() {
 	flags.BoolVar(&showVersion, "version", false, "Prints the version")
 	flags.StringVarP(&p.Input, "input", "i", "", "Input JSON file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
-	flags.StringVarP(&p.Delimiter, "delimiter", "d", "|", "Delimiter used")
-	flags.StringVar(&p.Quote, "quote", `"`, "Quote used")
+	flags.StringVarP(&delimiter, "delimiter", "d", "|", "Delimiter used")
+	flags.StringVar(&enclosure, "enclosure", `"`, "Enclosure used")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.IntVarP(&p.FlushSize, "flush-rate", "r", 32768, "Flush rate for syncing to disk in kilobytes")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
@@ -70,6 +73,9 @@ func main() {
 		flags.PrintDefaults()
 		os.Exit(100)
 	}
+
+	p.Enclosure = []byte(enclosure)
+	p.Delimiter = []byte(delimiter)
 
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
