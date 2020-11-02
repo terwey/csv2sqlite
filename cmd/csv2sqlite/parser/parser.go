@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -63,7 +64,10 @@ type Runtime struct {
 	inside          bool
 	doubleEnclosure []byte
 
-	Data chan [][]byte
+	Header [][]byte
+
+	Data  chan [][]byte
+	Count int
 
 	Debug bool
 }
@@ -74,9 +78,10 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		headerPrinted: false,
 		splitFunc:     fn,
 		Benchmark:     false,
+		Count:         0,
 	}
 
-	r.Data = make(chan [][]byte, 1000)
+	r.Data = make(chan [][]byte, 200)
 
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
@@ -99,6 +104,13 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 	r.p.FlushSize *= 1024
 	r.p.Buffersize *= 1024
 
+	var output string
+	if r.Count == 0 {
+		output = r.p.Output
+	} else {
+		output = fmt.Sprintf("%s.%d", r.p.Output, r.Count)
+	}
+
 	if !r.p.Sqlite {
 		if len(r.p.Output) == 0 {
 			r.w = os.Stdout
@@ -106,7 +118,9 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 				r.w = bufio.NewWriterSize(bytes.NewBuffer([]byte{}), r.p.FlushSize)
 			}
 		} else {
-			r.fout, err = os.Create(r.p.Output)
+
+			r.fout, err = os.Create(output)
+
 			if err != nil {
 				log.Fatalf("Cannot open file for writing: %s", err)
 			}
@@ -115,10 +129,14 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 
 		r.rw = recordwriter.NewCSVWriter(r.w)
 	} else {
-		r.rw = recordwriter.NewSQLWriter(r.p.Output, r.p.FlushSize)
+		r.rw = recordwriter.NewSQLWriter(output, r.p.FlushSize)
 	}
 
-	r.scanner = r.NewScanner()
+	if r.Count == 0 {
+		r.scanner = r.NewScanner()
+	}
+
+	log.Printf("output: %s", output)
 
 	return nil
 }
@@ -169,19 +187,24 @@ func (r *Runtime) ParseRow(data []byte) {
 		return
 	}
 	if !r.headerPrinted {
-		for i, col := range cols {
-			r.rw.WriteHeader(string(col))
-			if i != len(cols)-1 {
-				r.rw.Next()
-			}
-		}
-		r.columns = len(cols)
-		r.rw.FinalizeHeader()
-		r.headerPrinted = true
+		r.ProcessHeader(cols)
 		return
 	}
 
 	r.Data <- cols
+}
+
+func (r *Runtime) ProcessHeader(cols [][]byte) {
+	for i, col := range cols {
+		r.rw.WriteHeader(string(col))
+		if i != len(cols)-1 {
+			r.rw.Next()
+		}
+	}
+	r.Header = cols // needed for the second runtime
+	r.columns = len(cols)
+	r.rw.FinalizeHeader()
+	r.headerPrinted = true
 }
 
 func (r *Runtime) ProcessRow(cols [][]byte) {

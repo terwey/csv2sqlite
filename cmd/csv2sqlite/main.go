@@ -31,8 +31,10 @@ var (
 	delimiter string
 	enclosure string
 
-	p *parser.Params
-	r *parser.Runtime
+	p  *parser.Params
+	p2 *parser.Params
+	r  *parser.Runtime
+	r2 *parser.Runtime
 
 	// version is set during build
 	version    = "undefined"
@@ -98,7 +100,10 @@ func main() {
 	start := time.Now()
 
 	var err error
+	// init two runtimes, only one will scan
 	r = parser.NewRuntime(p, bufio.ScanLines)
+	r2 = parser.NewRuntime(p, bufio.ScanLines)
+	r2.Count = 1
 	var file io.ReadSeeker
 	file, err = os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
 	if err != nil {
@@ -107,18 +112,51 @@ func main() {
 	if err = r.Init(file); err != nil {
 		log.Fatal(err)
 	}
+	if err = r2.Init(file); err != nil {
+		log.Fatal(err)
+	}
 
 	var wg sync.WaitGroup
+	second := make(chan bool)
 	go parse(r)
+
+	// second runtime
 	wg.Add(1)
 	go func(rows <-chan [][]byte, wg *sync.WaitGroup) {
-		defer wg.Done()
-		for cols := range rows {
-			r.ProcessRow(cols)
+		if <-second {
+			log.Printf("second")
+			r2.ProcessHeader(r2.Header)
+
+			defer wg.Done()
+			for cols := range rows {
+				r2.ProcessRow(cols)
+			}
 		}
 	}(r.Data, &wg)
+
+	wg.Add(1)
+	go func(rows <-chan [][]byte, wg *sync.WaitGroup, set chan bool) {
+		defer wg.Done()
+		headerPassed := false
+		for cols := range rows {
+			r.ProcessRow(cols)
+			if !headerPassed {
+				if len(r.Header) != 0 {
+					r2.Header = r.Header
+
+					log.Printf("before set")
+					set <- true
+					log.Printf("after set")
+					headerPassed = true
+				}
+			}
+		}
+	}(r.Data, &wg, second)
+
+	wg.Wait()
 	wg.Wait()
 	r.Close()
+	r2.Close()
 
 	elapsed := time.Since(start)
 	var ops time.Duration
