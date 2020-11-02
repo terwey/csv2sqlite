@@ -80,6 +80,10 @@ func main() {
 	p.Enclosure = []byte(enclosure)
 	p.Delimiter = []byte(delimiter)
 
+	// convert to kb
+	p.FlushSize *= 1024
+	p.Buffersize *= 1024
+
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
 		if err != nil {
@@ -161,6 +165,7 @@ func main() {
 	elapsed := time.Since(start)
 	var ops time.Duration
 	var rows float64
+	r.Rows += r2.Rows
 	if r.Rows != 0 {
 		r.Rows++ // account for zero based index
 		ops = time.Duration(elapsed.Nanoseconds() / int64(r.Rows))

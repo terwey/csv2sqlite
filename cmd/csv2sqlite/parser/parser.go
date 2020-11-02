@@ -100,10 +100,6 @@ func (r *Runtime) GetScanner() *bufio.Scanner {
 func (r *Runtime) Init(input io.Reader) (err error) {
 	r.f = input
 
-	// convert to kb
-	r.p.FlushSize *= 1024
-	r.p.Buffersize *= 1024
-
 	var output string
 	if r.Count == 0 {
 		output = r.p.Output
