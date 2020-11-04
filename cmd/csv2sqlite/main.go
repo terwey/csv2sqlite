@@ -77,6 +77,11 @@ func main() {
 		os.Exit(100)
 	}
 
+	if p.Input == p.Output {
+		fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
+		os.Exit(100)
+	}
+
 	p.Enclosure = []byte(enclosure)
 	p.Delimiter = []byte(delimiter)
 
