@@ -27,6 +27,7 @@ var (
 	showVersion bool
 	cpuprofile  string
 	heapprofile string
+	merge       bool
 
 	delimiter string
 	enclosure string
@@ -54,6 +55,7 @@ func init() {
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
+	flags.BoolVar(&merge, "merge-output", false, "Merges the output files")
 	flags.SortFlags = false
 }
 
@@ -133,7 +135,6 @@ func main() {
 	wg.Add(1)
 	go func(rows <-chan [][]byte, wg *sync.WaitGroup) {
 		if <-second {
-			log.Printf("second")
 			r2.ProcessHeader(r2.Header)
 
 			defer wg.Done()
@@ -153,9 +154,7 @@ func main() {
 				if len(r.Header) != 0 {
 					r2.Header = r.Header
 
-					log.Printf("before set")
 					set <- true
-					log.Printf("after set")
 					headerPassed = true
 				}
 			}
@@ -191,6 +190,13 @@ func main() {
 		rows,
 		r.RowsCSV,
 	)
+
+	if p.Sqlite && merge {
+		start = time.Now()
+		r.Merge()
+		elapsed = time.Since(start)
+		log.Printf("Merge Time: %s", elapsed)
+	}
 }
 
 func logData(name string, data []byte, max int) {
