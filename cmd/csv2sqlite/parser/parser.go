@@ -67,7 +67,7 @@ type Runtime struct {
 
 	Header [][]byte
 
-	Data  chan [][]byte
+	Data  chan []byte
 	Count int
 
 	Debug bool
@@ -89,7 +89,7 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		Count:         0,
 	}
 
-	r.Data = make(chan [][]byte, 200)
+	r.Data = make(chan []byte, 200)
 
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
@@ -97,9 +97,9 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	return r
 }
 
-func (r *Runtime) Merge() {
+func (r *Runtime) Merge(other ...int) {
 	if sqlwriter, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
-		sqlwriter.Merge(1)
+		sqlwriter.Merge(other...)
 	}
 }
 
@@ -146,7 +146,7 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 		r.scanner = r.NewScanner()
 	}
 
-	log.Printf("output: %s", output)
+	// log.Printf("output: %s", output)
 
 	return nil
 }
@@ -191,17 +191,21 @@ func (r *Runtime) NewScanner() *bufio.Scanner {
 	return scanner
 }
 
-func (r *Runtime) ParseRow(data []byte) {
+func (r *Runtime) ParseRow(data []byte) [][]byte {
+	// log.Printf("ParseRow, data:\n%s\n----", data)
 	cols := r.SplitRow(data)
 	if len(cols) == 0 {
-		return
+		return [][]byte{}
 	}
 	if !r.headerPrinted {
+		if len(cols) == 1 {
+			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
+		}
 		r.ProcessHeader(cols)
-		return
+
 	}
 
-	r.Data <- cols
+	return cols
 }
 
 func (r *Runtime) ProcessHeader(cols [][]byte) {
@@ -218,6 +222,10 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 }
 
 func (r *Runtime) ProcessRow(cols [][]byte) {
+	// log.Printf("ProcessRow, cols:\v%s\n----", cols)
+	if len(cols) == 0 {
+		return
+	}
 	for i, col := range cols {
 		if len(col) == 0 {
 			r.rw.Skip()
@@ -246,7 +254,6 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 		if count+1 != r.colCount {
 			columns := r.SplitUnescapedDelimiter(data)
 			if len(columns) == r.colCount {
-				r.RowsCSV++
 				return columns
 			}
 		}
@@ -270,7 +277,7 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 				break
 			}
 			if err != nil {
-				log.Fatalf("csv reading failed: %s", err)
+				log.Fatalf("csv reading failed: %s, data: \n%s", err, data)
 			}
 
 			for _, col := range record {

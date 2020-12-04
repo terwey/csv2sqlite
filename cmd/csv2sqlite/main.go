@@ -32,10 +32,12 @@ var (
 	delimiter string
 	enclosure string
 
-	p  *parser.Params
-	p2 *parser.Params
-	r  *parser.Runtime
-	r2 *parser.Runtime
+	p *parser.Params
+	r *parser.Runtime
+
+	routines int
+
+	parseRoutines []*parser.Runtime
 
 	// version is set during build
 	version    = "undefined"
@@ -55,7 +57,8 @@ func init() {
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
-	flags.BoolVar(&merge, "merge-output", false, "Merges the output files")
+	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
+	flags.IntVar(&routines, "threads", 4, "Threads to use when writing output")
 	flags.SortFlags = false
 }
 
@@ -111,65 +114,75 @@ func main() {
 	start := time.Now()
 
 	var err error
-	// init two runtimes, only one will scan
+	// init the first runtimes, only one will scan
 	r = parser.NewRuntime(p, bufio.ScanLines)
-	r2 = parser.NewRuntime(p, bufio.ScanLines)
-	r2.Count = 1
 	var file io.ReadSeeker
 	file, err = os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
 	if err != nil {
 		log.Fatalf("Cannot open file: %s", err)
 	}
+
 	if err = r.Init(file); err != nil {
-		log.Fatal(err)
-	}
-	if err = r2.Init(file); err != nil {
 		log.Fatal(err)
 	}
 
 	var wg sync.WaitGroup
-	second := make(chan bool)
+	headerSet := make(chan bool)
 	go parse(r)
 
-	// second runtime
 	wg.Add(1)
-	go func(rows <-chan [][]byte, wg *sync.WaitGroup) {
-		if <-second {
-			r2.ProcessHeader(r2.Header)
-
-			defer wg.Done()
-			for cols := range rows {
-				r2.ProcessRow(cols)
+	go func(rows <-chan []byte, wg *sync.WaitGroup) {
+		defer wg.Done()
+		headerPassed := false
+		for row := range rows {
+			r.ProcessRow(r.ParseRow(row))
+			if !headerPassed {
+				if len(r.Header) != 0 {
+					headerPassed = true
+					for i := 1; i < routines; i++ {
+						headerSet <- true
+					}
+				}
 			}
 		}
 	}(r.Data, &wg)
 
-	wg.Add(1)
-	go func(rows <-chan [][]byte, wg *sync.WaitGroup, set chan bool) {
-		defer wg.Done()
-		headerPassed := false
-		for cols := range rows {
-			r.ProcessRow(cols)
-			if !headerPassed {
-				if len(r.Header) != 0 {
-					r2.Header = r.Header
-
-					set <- true
-					headerPassed = true
-				}
-			}
+	for i := 1; i < routines; i++ {
+		pr := parser.NewRuntime(p, bufio.ScanLines)
+		pr.Count = i
+		if err = pr.Init(file); err != nil {
+			log.Fatal(err)
 		}
-	}(r.Data, &wg, second)
+		parseRoutines = append(parseRoutines, pr)
+	}
 
-	wg.Wait()
+	for _, pr := range parseRoutines {
+		wg.Add(1)
+		go func(rows <-chan []byte, wg *sync.WaitGroup, routine *parser.Runtime) {
+			if <-headerSet {
+				routine.ProcessHeader(r.Header)
+
+				for row := range rows {
+					routine.ProcessRow(routine.ParseRow(row))
+				}
+
+				wg.Done()
+			}
+		}(r.Data, &wg, pr)
+	}
+
 	wg.Wait()
 	r.Close()
-	r2.Close()
+
+	for _, pr := range parseRoutines {
+		pr.Close()
+		r.Rows += pr.Rows
+	}
 
 	elapsed := time.Since(start)
 	var ops time.Duration
 	var rows float64
-	r.Rows += r2.Rows
+	// r.Rows += r2.Rows
 	if r.Rows != 0 {
 		r.Rows++ // account for zero based index
 		ops = time.Duration(elapsed.Nanoseconds() / int64(r.Rows))
@@ -188,12 +201,17 @@ func main() {
 		r.Rows,
 		ops,
 		rows,
+		delimBytes,
 		r.RowsCSV,
 	)
 
-	if p.Sqlite && merge {
+	if p.Sqlite && merge && routines > 1 {
 		start = time.Now()
-		r.Merge()
+		var other []int
+		for i := 1; i < routines; i++ {
+			other = append(other, i)
+		}
+		r.Merge(other...)
 		elapsed = time.Since(start)
 		log.Printf("Merge Time: %s", elapsed)
 	}
