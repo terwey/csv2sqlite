@@ -52,14 +52,14 @@ func Test_detectDelimiter(t *testing.T) {
 			want: Delimiter_POUND,
 		},
 		{
-			name: "Detect record seperator",
+			name: "Detect record SEPARATOR",
 			data: []byte("fielda\x241Efieldb\x241Efieldc"),
-			want: Delimiter_RECORD_SEPERATOR,
+			want: Delimiter_RECORD_SEPARATOR,
 		},
 		{
-			name: "Detect unit seperator",
+			name: "Detect unit SEPARATOR",
 			data: []byte("fielda\x241Ffieldb\x241Ffieldc"),
-			want: Delimiter_UNIT_SEPERATOR,
+			want: Delimiter_UNIT_SEPARATOR,
 		},
 	}
 	for _, tt := range tests {

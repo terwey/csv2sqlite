@@ -22,19 +22,19 @@ var (
 	Delimiter_CARET     Delimiter = []byte("^")
 	Delimiter_POUND     Delimiter = []byte("#")
 
-	// Delimiter_RECORD_SEPERATOR http://www.fileformat.info/info/unicode/char/241e/index.htm
-	Delimiter_RECORD_SEPERATOR Delimiter = []byte("\x241E")
+	// Delimiter_RECORD_SEPARATOR http://www.fileformat.info/info/unicode/char/241e/index.htm
+	Delimiter_RECORD_SEPARATOR Delimiter = []byte("\x241E")
 
-	// Delimiter_UNIT_SEPERATOR http://www.fileformat.info/info/unicode/char/241f/index.htm
-	Delimiter_UNIT_SEPERATOR Delimiter = []byte("\x241F")
+	// Delimiter_UNIT_SEPARATOR http://www.fileformat.info/info/unicode/char/241f/index.htm
+	Delimiter_UNIT_SEPARATOR Delimiter = []byte("\x241F")
 )
 
 func knownDelimiters() []Delimiter {
 	return []Delimiter{
-		// NB: Delimiter_RECORD_SEPERATOR and Delimiter_UNIT_SEPERATOR need to be first
+		// NB: Delimiter_RECORD_SEPARATOR and Delimiter_UNIT_SEPARATOR need to be first
 		// as the character might appear byte wise in another following one
-		Delimiter_RECORD_SEPERATOR,
-		Delimiter_UNIT_SEPERATOR,
+		Delimiter_RECORD_SEPARATOR,
+		Delimiter_UNIT_SEPARATOR,
 		Delimiter_TAB,
 		Delimiter_PIPE,
 		Delimiter_TILDE,
@@ -48,8 +48,8 @@ func knownDelimiters() []Delimiter {
 
 func GetDelimiterNames() []string {
 	return []string{
-		"RECORD_SEPERATOR",
-		"UNIT_SEPERATOR",
+		"RECORD_SEPARATOR",
+		"UNIT_SEPARATOR",
 		"TAB",
 		"PIPE",
 		"TILDE",
@@ -63,10 +63,10 @@ func GetDelimiterNames() []string {
 
 func DelimiterFromString(name string) (Delimiter, error) {
 	switch strings.ToUpper(name) {
-	case "RECORD_SEPERATOR":
-		return Delimiter_RECORD_SEPERATOR, nil
-	case "UNIT_SEPERATOR":
-		return Delimiter_UNIT_SEPERATOR, nil
+	case "RECORD_SEPARATOR":
+		return Delimiter_RECORD_SEPARATOR, nil
+	case "UNIT_SEPARATOR":
+		return Delimiter_UNIT_SEPARATOR, nil
 	case "TAB":
 		return Delimiter_TAB, nil
 	case "PIPE":
