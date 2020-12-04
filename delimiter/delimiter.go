@@ -61,6 +61,45 @@ func GetDelimiterNames() []string {
 	}
 }
 
+func stringValueForDelimiter(d Delimiter) string {
+	if bytes.Compare(d, Delimiter_RECORD_SEPARATOR) == 0 {
+		return "RECORD_SEPARATOR"
+	}
+	if bytes.Compare(d, Delimiter_UNIT_SEPARATOR) == 0 {
+		return "UNIT_SEPARATOR"
+	}
+	if bytes.Compare(d, Delimiter_TAB) == 0 {
+		return "TAB"
+	}
+	if bytes.Compare(d, Delimiter_PIPE) == 0 {
+		return "PIPE"
+	}
+	if bytes.Compare(d, Delimiter_TILDE) == 0 {
+		return "TILDE"
+	}
+	if bytes.Compare(d, Delimiter_COMMA) == 0 {
+		return "COMMA"
+	}
+	if bytes.Compare(d, Delimiter_SEMICOLON) == 0 {
+		return "SEMICOLON"
+	}
+	if bytes.Compare(d, Delimiter_DOLLAR) == 0 {
+		return "DOLLAR"
+	}
+	if bytes.Compare(d, Delimiter_CARET) == 0 {
+		return "CARET"
+	}
+	if bytes.Compare(d, Delimiter_POUND) == 0 {
+		return "POUND"
+	}
+
+	return "UNKNOWN"
+}
+
+func (d Delimiter) String() string {
+	return stringValueForDelimiter(d)
+}
+
 func DelimiterFromString(name string) (Delimiter, error) {
 	switch strings.ToUpper(name) {
 	case "RECORD_SEPARATOR":

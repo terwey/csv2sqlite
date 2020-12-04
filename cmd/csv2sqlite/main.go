@@ -220,7 +220,6 @@ func main() {
 	var ops time.Duration
 	var rows float64
 	if r.Rows != 0 {
-		r.Rows++ // account for zero based index
 		ops = time.Duration(elapsed.Nanoseconds() / int64(r.Rows))
 		rows = float64(r.Rows) / elapsed.Seconds()
 	} else {
@@ -229,7 +228,7 @@ func main() {
 
 	m := &runtime.MemStats{}
 	runtime.ReadMemStats(m)
-	log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter >>> %s <<<, go-csv-reader: %d",
+	log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d",
 		elapsed,
 		m.Sys/1024/1024,
 		p.Buffersize/1024,
