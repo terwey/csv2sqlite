@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/terwey/csv2sqlite/delimiter"
 	"github.com/terwey/recordwriter/recordwriter"
 )
 
@@ -23,7 +24,7 @@ type Params struct {
 	FlushSize  int
 	Buffersize int
 	Sqlite     bool
-	Delimiter  []byte
+	Delimiter  delimiter.Delimiter
 	Enclosure  []byte
 }
 
@@ -33,7 +34,7 @@ func NewParameters() *Params {
 		Buffersize: 4096,
 		Input:      "",
 		Output:     "",
-		Delimiter:  []byte(`|`),
+		Delimiter:  delimiter.Delimiter_COMMA,
 		Enclosure:  []byte(`"`),
 	}
 
@@ -95,6 +96,10 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 
 	return r
+}
+
+func (r *Runtime) SetDelimiter(delim delimiter.Delimiter) {
+	r.p.Delimiter = delim
 }
 
 func (r *Runtime) Merge(other ...int) {

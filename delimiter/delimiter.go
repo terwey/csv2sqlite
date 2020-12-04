@@ -1,0 +1,103 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2020 Yorick Terweijden
+
+package delimiter
+
+import (
+	"bytes"
+	"fmt"
+	"strings"
+)
+
+// Delimiter is used to denote which character is used to delimit the field in the CSV
+type Delimiter []byte
+
+var (
+	Delimiter_TAB       Delimiter = []byte("\t")
+	Delimiter_PIPE      Delimiter = []byte("|")
+	Delimiter_TILDE     Delimiter = []byte("~")
+	Delimiter_COMMA     Delimiter = []byte(",")
+	Delimiter_SEMICOLON Delimiter = []byte(";")
+	Delimiter_DOLLAR    Delimiter = []byte("$")
+	Delimiter_CARET     Delimiter = []byte("^")
+	Delimiter_POUND     Delimiter = []byte("#")
+
+	// Delimiter_RECORD_SEPERATOR http://www.fileformat.info/info/unicode/char/241e/index.htm
+	Delimiter_RECORD_SEPERATOR Delimiter = []byte("\x241E")
+
+	// Delimiter_UNIT_SEPERATOR http://www.fileformat.info/info/unicode/char/241f/index.htm
+	Delimiter_UNIT_SEPERATOR Delimiter = []byte("\x241F")
+)
+
+func knownDelimiters() []Delimiter {
+	return []Delimiter{
+		// NB: Delimiter_RECORD_SEPERATOR and Delimiter_UNIT_SEPERATOR need to be first
+		// as the character might appear byte wise in another following one
+		Delimiter_RECORD_SEPERATOR,
+		Delimiter_UNIT_SEPERATOR,
+		Delimiter_TAB,
+		Delimiter_PIPE,
+		Delimiter_TILDE,
+		Delimiter_COMMA,
+		Delimiter_SEMICOLON,
+		Delimiter_DOLLAR,
+		Delimiter_CARET,
+		Delimiter_POUND,
+	}
+}
+
+func GetDelimiterNames() []string {
+	return []string{
+		"RECORD_SEPERATOR",
+		"UNIT_SEPERATOR",
+		"TAB",
+		"PIPE",
+		"TILDE",
+		"COMMA",
+		"SEMICOLON",
+		"DOLLAR",
+		"CARET",
+		"POUND",
+	}
+}
+
+func DelimiterFromString(name string) (Delimiter, error) {
+	switch strings.ToUpper(name) {
+	case "RECORD_SEPERATOR":
+		return Delimiter_RECORD_SEPERATOR, nil
+	case "UNIT_SEPERATOR":
+		return Delimiter_UNIT_SEPERATOR, nil
+	case "TAB":
+		return Delimiter_TAB, nil
+	case "PIPE":
+		return Delimiter_PIPE, nil
+	case "TILDE":
+		return Delimiter_TILDE, nil
+	case "COMMA":
+		return Delimiter_COMMA, nil
+	case "SEMICOLON":
+		return Delimiter_SEMICOLON, nil
+	case "DOLLAR":
+		return Delimiter_DOLLAR, nil
+	case "CARET":
+		return Delimiter_CARET, nil
+	case "POUND":
+		return Delimiter_POUND, nil
+	}
+
+	return Delimiter{}, fmt.Errorf("Delimiter with name \"%s\" is not recognised", name)
+}
+
+func DetectDelimiter(data []byte) Delimiter {
+	var highestCount int
+	var highestDelimiter Delimiter
+	for _, delim := range knownDelimiters() {
+		count := bytes.Count(data, delim)
+		if count > highestCount {
+			highestCount = count
+			highestDelimiter = delim
+		}
+	}
+
+	return highestDelimiter
+}
