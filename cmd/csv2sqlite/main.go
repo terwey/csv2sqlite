@@ -56,7 +56,7 @@ func init() {
 	p = parser.NewParameters()
 	flags = pflag.NewFlagSet("csv2sqlite", pflag.ContinueOnError)
 	flags.BoolVar(&showVersion, "version", false, "Prints the version")
-	flags.StringVarP(&p.Input, "input", "i", "", "Input JSON file")
+	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Must be one of: \n - "+strings.Join(delimiter.GetDelimiterNames(), "\n - "))
 	flags.StringVar(&enclosure, "enclosure", `"`, "Enclosure used")
@@ -82,7 +82,7 @@ func main() {
 	}
 
 	if showVersion {
-		fmt.Printf("json2csv\nVersion: %s\nBuild date: %s (UTC)\n", version, minversion)
+		fmt.Printf("csv2sqlite\nVersion: %s\nBuild date: %s (UTC)\n", version, minversion)
 		os.Exit(0)
 	}
 
