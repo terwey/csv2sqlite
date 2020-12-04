@@ -68,7 +68,7 @@ func init() {
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
-	flags.IntVar(&routines, "threads", 4, "Threads to use when writing output")
+	flags.IntVar(&routines, "threads", 1, "Threads to use when writing output, default is set to one.")
 	flags.SortFlags = false
 }
 
@@ -118,7 +118,7 @@ func main() {
 	}
 
 	// detect if the output is a sqlite
-	if strings.HasSuffix(p.Input, ".sqlite") {
+	if strings.HasSuffix(p.Output, ".sqlite") {
 		p.Sqlite = true
 	}
 
