@@ -11,6 +11,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"sync"
 	"syscall"
 	"time"
 
@@ -26,12 +27,17 @@ var (
 	showVersion bool
 	cpuprofile  string
 	heapprofile string
+	merge       bool
 
 	delimiter string
 	enclosure string
 
 	p *parser.Params
 	r *parser.Runtime
+
+	routines int
+
+	parseRoutines []*parser.Runtime
 
 	// version is set during build
 	version    = "undefined"
@@ -51,6 +57,8 @@ func init() {
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
+	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
+	flags.IntVar(&routines, "threads", 4, "Threads to use when writing output")
 	flags.SortFlags = false
 }
 
@@ -74,8 +82,17 @@ func main() {
 		os.Exit(100)
 	}
 
+	if p.Input == p.Output {
+		fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
+		os.Exit(100)
+	}
+
 	p.Enclosure = []byte(enclosure)
 	p.Delimiter = []byte(delimiter)
+
+	// convert to kb
+	p.FlushSize *= 1024
+	p.Buffersize *= 1024
 
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
@@ -97,22 +114,75 @@ func main() {
 	start := time.Now()
 
 	var err error
+	// init the first runtimes, only one will scan
 	r = parser.NewRuntime(p, bufio.ScanLines)
 	var file io.ReadSeeker
 	file, err = os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
 	if err != nil {
 		log.Fatalf("Cannot open file: %s", err)
 	}
+
 	if err = r.Init(file); err != nil {
 		log.Fatal(err)
 	}
 
-	parse(r)
+	var wg sync.WaitGroup
+	headerSet := make(chan bool)
+	go parse(r)
+
+	wg.Add(1)
+	go func(rows <-chan []byte, wg *sync.WaitGroup) {
+		defer wg.Done()
+		headerPassed := false
+		for row := range rows {
+			r.ProcessRow(r.ParseRow(row))
+			if !headerPassed {
+				if len(r.Header) != 0 {
+					headerPassed = true
+					for i := 1; i < routines; i++ {
+						headerSet <- true
+					}
+				}
+			}
+		}
+	}(r.Data, &wg)
+
+	for i := 1; i < routines; i++ {
+		pr := parser.NewRuntime(p, bufio.ScanLines)
+		pr.Count = i
+		if err = pr.Init(file); err != nil {
+			log.Fatal(err)
+		}
+		parseRoutines = append(parseRoutines, pr)
+	}
+
+	for _, pr := range parseRoutines {
+		wg.Add(1)
+		go func(rows <-chan []byte, wg *sync.WaitGroup, routine *parser.Runtime) {
+			if <-headerSet {
+				routine.ProcessHeader(r.Header)
+
+				for row := range rows {
+					routine.ProcessRow(routine.ParseRow(row))
+				}
+
+				wg.Done()
+			}
+		}(r.Data, &wg, pr)
+	}
+
+	wg.Wait()
 	r.Close()
+
+	for _, pr := range parseRoutines {
+		pr.Close()
+		r.Rows += pr.Rows
+	}
 
 	elapsed := time.Since(start)
 	var ops time.Duration
 	var rows float64
+	// r.Rows += r2.Rows
 	if r.Rows != 0 {
 		r.Rows++ // account for zero based index
 		ops = time.Duration(elapsed.Nanoseconds() / int64(r.Rows))
@@ -131,8 +201,20 @@ func main() {
 		r.Rows,
 		ops,
 		rows,
+		delimBytes,
 		r.RowsCSV,
 	)
+
+	if p.Sqlite && merge && routines > 1 {
+		start = time.Now()
+		var other []int
+		for i := 1; i < routines; i++ {
+			other = append(other, i)
+		}
+		r.Merge(other...)
+		elapsed = time.Since(start)
+		log.Printf("Merge Time: %s", elapsed)
+	}
 }
 
 func logData(name string, data []byte, max int) {
@@ -158,12 +240,16 @@ func parse(r *parser.Runtime) {
 	for scanner.Scan() {
 		if err = scanner.Err(); err != nil {
 			log.Fatal(err)
+			close(r.Data)
 		}
 
-		r.ProcessRow(scanner.Bytes())
+		r.ParseRow(scanner.Bytes())
 	}
 
 	if err = scanner.Err(); err != nil {
 		log.Fatal(err)
+		close(r.Data)
 	}
+
+	close(r.Data)
 }
