@@ -215,21 +215,22 @@ func main() {
 		r.Rows += pr.Rows
 	}
 
-	elapsed := time.Since(start)
+	conversionElapsed := time.Since(start)
 
 	var ops time.Duration
 	var rows float64
 	if r.Rows != 0 {
-		ops = time.Duration(elapsed.Nanoseconds() / int64(r.Rows))
-		rows = float64(r.Rows) / elapsed.Seconds()
+		ops = time.Duration(conversionElapsed.Nanoseconds() / int64(r.Rows))
+		rows = float64(r.Rows) / conversionElapsed.Seconds()
 	} else {
 		ops = time.Duration(0)
 	}
 
 	m := &runtime.MemStats{}
 	runtime.ReadMemStats(m)
-	log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d",
-		elapsed,
+
+	statsOut := make([]interface{}, 0)
+	statsOut = append(statsOut,
 		m.Sys/1024/1024,
 		p.Buffersize/1024,
 		p.FlushSize/1024,
@@ -247,8 +248,18 @@ func main() {
 			other = append(other, i)
 		}
 		r.Merge(other...)
-		elapsed = time.Since(start)
-		log.Printf("Merge Time: %s", elapsed)
+		mergeElapsed := time.Since(start)
+		totalTime := conversionElapsed + mergeElapsed
+		info := make([]interface{}, 0)
+		info = append(info, totalTime, conversionElapsed, mergeElapsed)
+		info = append(info, statsOut...)
+		// log.Printf("Merge Time: %s", elapsed)
+		log.Printf("Time: %s, Conversion time: %s, Merge Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
+	} else {
+		info := make([]interface{}, 0)
+		info = append(info, conversionElapsed)
+		info = append(info, statsOut...)
+		log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", statsOut...)
 	}
 }
 
