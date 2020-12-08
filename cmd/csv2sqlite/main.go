@@ -31,7 +31,6 @@ var (
 	merge       bool
 	nd          bool
 
-	hasHeader    = true
 	headerLength = 0
 
 	paramDelimiter string
@@ -259,7 +258,7 @@ func main() {
 		info := make([]interface{}, 0)
 		info = append(info, conversionElapsed)
 		info = append(info, statsOut...)
-		log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", statsOut...)
+		log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
 	}
 }
 
@@ -298,10 +297,17 @@ func parse(r *parser.Runtime) {
 			delimSet = true
 		}
 
+		// header has to be set once
+		if headerLength == 0 {
+			// we have to count the delimiters in the header to know for row scanning
+			// how many fields we need
+			headerLength = bytes.Count(scanner.Bytes(), delimBytes)
+		}
+
 		buf = make([]byte, len(scanner.Bytes()))
 		copy(buf, scanner.Bytes())
+
 		r.Data <- buf
-		// r.ParseRow(scanner.Bytes())
 	}
 
 	if err = scanner.Err(); err != nil {
@@ -347,13 +353,9 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 		return 0, nil, nil
 	}
 
-	if hasHeader && headerLength == 0 {
+	if headerLength == 0 {
 		// the optional header always ends with a newline
 		if eolIndex != -1 {
-			// we have to count the delimiters in the header to know for row scanning
-			// how many fields we need
-			headerLength = bytes.Count(in[:eolIndex], delimBytes)
-
 			// we have to return the found data MINUS the length of the eolBytes
 			return eolIndex + len(eolBytes), in[:eolIndex], nil
 		}
