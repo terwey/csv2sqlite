@@ -306,7 +306,6 @@ func parse(r *parser.Runtime) {
 
 		buf = make([]byte, len(scanner.Bytes()))
 		copy(buf, scanner.Bytes())
-
 		r.Data <- buf
 	}
 
@@ -319,7 +318,6 @@ func parse(r *parser.Runtime) {
 }
 
 var (
-	// eolBytes   []byte = []byte("\r\n")
 	eolBytes   []byte
 	delimBytes delimiter.Delimiter = delimiter.Delimiter_COMMA
 	encloBytes []byte              = []byte("\"")

@@ -205,7 +205,8 @@ func (r *Runtime) ParseRow(data []byte) [][]byte {
 			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
 		}
 		r.ProcessHeader(cols)
-
+		// we should not output the header to the sqlite file, return nothing as it'll be skipped
+		return [][]byte{}
 	}
 
 	return cols
@@ -225,7 +226,6 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 }
 
 func (r *Runtime) ProcessRow(cols [][]byte) {
-	// log.Printf("ProcessRow, cols:\v%s\n----", cols)
 	if len(cols) == 0 {
 		return
 	}
@@ -300,6 +300,8 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 
 		// we need to clean double quotes
 		columns[i] = bytes.ReplaceAll(columns[i], r.doubleEnclosure, r.p.Enclosure)
+
+		columns[i] = bytes.ReplaceAll(columns[i], carriageReturn, lineFeed)
 	}
 
 	return columns
@@ -340,9 +342,10 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 	enclosurecheck := false
 
 	for i := range r.sinput {
-		// r.debug("input[i]: %s", input[i])
-		// r.debug("buf: %s", buf)
-		// r.debug("columns: %s", columns)
+		r.debug("input[i]: >>>%s<<", r.sinput[i])
+		r.debug("buf: %s", r.sbuf)
+		// r.debug("columns: %s", r.scolumns)
+		r.debugColumns(r.scolumns)
 		count := 0
 		if !r.inside {
 			count = bytes.Count(r.sinput[i], r.p.Enclosure)
@@ -388,7 +391,7 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 				continue
 			}
-			r.sbuf = bytes.ReplaceAll(r.sbuf, carriageReturn, lineFeed)
+			r.sinput[i] = bytes.ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
 			r.scolumns = append(r.scolumns, r.sinput[i])
 			continue
 		}
@@ -453,7 +456,7 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 
 			// we need to clean double enclosures to single
 			r.sinput[i] = bytes.ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
-			r.sbuf = bytes.ReplaceAll(r.sbuf, carriageReturn, lineFeed)
+			r.sinput[i] = bytes.ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
 			r.scolumns = append(r.scolumns, r.sinput[i])
 			r.inside = false
 			continue
@@ -470,7 +473,7 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 		r.sinput[i] = bytes.TrimSuffix(r.sinput[i], r.p.Enclosure)
 		// we need to clean double enclosures to single
 		r.sinput[i] = bytes.ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
-		r.sbuf = bytes.ReplaceAll(r.sbuf, carriageReturn, lineFeed)
+		r.sinput[i] = bytes.ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
 		r.scolumns = append(r.scolumns, r.sinput[i])
 	}
 
