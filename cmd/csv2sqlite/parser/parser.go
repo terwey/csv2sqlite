@@ -17,13 +17,14 @@ import (
 )
 
 type Params struct {
-	Input      string
-	Output     string
-	FlushSize  int
-	Buffersize int
-	Sqlite     bool
-	Delimiter  delimiter.Delimiter
-	Enclosure  []byte
+	Input           string
+	Output          string
+	FlushSize       int
+	Buffersize      int
+	Sqlite          bool
+	Delimiter       delimiter.Delimiter
+	Enclosure       []byte
+	ChannelCapacity int
 }
 
 func NewParameters() *Params {
@@ -88,7 +89,7 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		Count:         0,
 	}
 
-	r.Data = make(chan []byte, 200)
+	r.Data = make(chan []byte, p.ChannelCapacity)
 
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)

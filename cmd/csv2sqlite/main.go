@@ -68,6 +68,7 @@ func init() {
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&routines, "threads", 1, "Threads to use when writing output, default is set to one.")
+	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 2000, "Buffered channels capacity")
 	flags.SortFlags = false
 }
 
@@ -150,6 +151,9 @@ func main() {
 		r = parser.NewRuntime(p, bufio.ScanLines)
 	} else {
 		r = parser.NewRuntime(p, splitCsvInput)
+	}
+	if debugLog {
+		r.Debug = true
 	}
 	var file io.ReadSeeker
 	file, err = os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
