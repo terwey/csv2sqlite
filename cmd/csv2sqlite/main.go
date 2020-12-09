@@ -30,6 +30,7 @@ var (
 	heapprofile string
 	merge       bool
 	nd          bool
+	stdin       bool
 
 	headerLength = 0
 
@@ -55,6 +56,7 @@ func init() {
 	p = parser.NewParameters()
 	flags = pflag.NewFlagSet("csv2sqlite", pflag.ContinueOnError)
 	flags.BoolVar(&showVersion, "version", false, "Prints the version")
+	flags.BoolVar(&stdin, "from-stdin", false, "Read from stdin and not from an input file")
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Must be one of: \n - "+strings.Join(delimiter.GetDelimiterNames(), "\n - "))
@@ -86,15 +88,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(p.Input) == 0 {
-		fmt.Fprintf(os.Stderr, "Input file missing\n")
-		flags.PrintDefaults()
-		os.Exit(100)
-	}
+	if !stdin {
+		if len(p.Input) == 0 {
+			fmt.Fprintf(os.Stderr, "Input file missing\n")
+			flags.PrintDefaults()
+			os.Exit(100)
+		}
 
-	if p.Input == p.Output {
-		fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
-		os.Exit(100)
+		if p.Input == p.Output {
+			fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
+			os.Exit(100)
+		}
 	}
 
 	if paramDelimiter != "" {
@@ -156,9 +160,13 @@ func main() {
 		r.Debug = true
 	}
 	var file io.ReadSeeker
-	file, err = os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
-	if err != nil {
-		log.Fatalf("Cannot open file: %s", err)
+	if !stdin {
+		file, err = os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
+		if err != nil {
+			log.Fatalf("Cannot open file: %s", err)
+		}
+	} else {
+		file = os.Stdin
 	}
 
 	if err = r.Init(file); err != nil {
