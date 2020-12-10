@@ -65,7 +65,8 @@ type Runtime struct {
 	inside          bool
 	doubleEnclosure []byte
 
-	Header [][]byte
+	Header    [][]byte
+	HeaderSet chan bool
 
 	Data  chan []byte
 	Count int
@@ -87,6 +88,23 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		splitFunc:     fn,
 		Benchmark:     false,
 		Count:         0,
+	}
+
+	r.HeaderSet = make(chan bool)
+	r.Data = make(chan []byte, p.ChannelCapacity)
+
+	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
+	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
+
+	return r
+}
+
+func NewParser(p *Params, count int) *Runtime {
+	r := &Runtime{
+		p:             p,
+		headerPrinted: false,
+		Benchmark:     false,
+		Count:         count,
 	}
 
 	r.Data = make(chan []byte, p.ChannelCapacity)
@@ -116,7 +134,9 @@ func (r *Runtime) GetScanner() *bufio.Scanner {
 }
 
 func (r *Runtime) Init(input io.Reader) (err error) {
-	r.f = input
+	if input != nil {
+		r.f = input
+	}
 
 	var output string
 	if r.Count == 0 {
@@ -155,11 +175,20 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 	return nil
 }
 
-func (r *Runtime) Close() {
-	var err error
+func (r *Runtime) Close() error {
+	log.Printf("Closing: %d", r.Count)
+
 	if file, ok := r.f.(io.ReadCloser); ok {
 		file.Close()
 	}
+
+	return r.CloseDB()
+}
+
+// CloseDB is only used for multi-threaded parsing
+func (r *Runtime) CloseDB() error {
+	log.Printf("Closing DB")
+	var err error
 	if !r.p.Sqlite {
 		if out, ok := r.GetWriter().(*bufio.Writer); ok {
 			if err = out.Flush(); err != nil {
@@ -172,11 +201,13 @@ func (r *Runtime) Close() {
 				log.Fatal(err)
 			}
 
-			r.fout.Close()
+			return r.fout.Close()
 		}
 	} else {
-		r.rw.Close()
+		return r.rw.Close()
 	}
+
+	return nil
 }
 
 func (r *Runtime) NewScanner() *bufio.Scanner {
@@ -196,7 +227,10 @@ func (r *Runtime) NewScanner() *bufio.Scanner {
 }
 
 func (r *Runtime) ParseRow(data []byte) [][]byte {
-	// log.Printf("ParseRow, data:\n%s\n----", data)
+	if len(data) == 0 {
+		return [][]byte{}
+	}
+
 	cols := r.SplitRow(data)
 	if len(cols) == 0 {
 		return [][]byte{}
@@ -220,7 +254,10 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 			r.rw.Next()
 		}
 	}
-	r.Header = cols // needed for the second runtime
+	if r.Count == 0 {
+		r.Header = cols // needed for the second runtime
+		r.HeaderSet <- true
+	}
 	r.colCount = len(cols)
 	r.rw.FinalizeHeader()
 	r.headerPrinted = true
@@ -251,6 +288,8 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	// we can count the amount of occurences of the delimiter and compare
 	// if that matches the amount we expect
 	// amount = columns + 1
+
+	r.debug("data: \n%s", data)
 
 	// r.colCount is set to non-zero on header creation
 	if r.colCount != 0 {

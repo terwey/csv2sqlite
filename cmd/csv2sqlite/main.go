@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -20,6 +21,7 @@ import (
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
 	"github.com/terwey/csv2sqlite/delimiter"
 	"github.com/spf13/pflag"
+	"golang.org/x/sync/semaphore"
 )
 
 var (
@@ -41,9 +43,11 @@ var (
 	p *parser.Params
 	r *parser.Runtime
 
-	routines int
+	threads int
 
 	parseRoutines []*parser.Runtime
+	readyForMerge chan int
+	stopWorkers   chan bool
 
 	// version is set during build
 	version    = "undefined"
@@ -69,7 +73,7 @@ func init() {
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
-	flags.IntVar(&routines, "threads", 1, "Threads to use when writing output, default is set to one.")
+	flags.IntVar(&threads, "threads", 1, "Threads to use when writing output, default is set to one.")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 2000, "Buffered channels capacity")
 	flags.SortFlags = false
 }
@@ -110,6 +114,9 @@ func main() {
 		}
 		p.Delimiter = delimBytes
 	}
+
+	readyForMerge = make(chan int, 1000)
+	stopWorkers = make(chan bool)
 
 	encloBytes = []byte(enclosure)
 	p.Enclosure = encloBytes
@@ -174,57 +181,151 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
-	headerSet := make(chan bool)
-	go parse(r)
+	// headerSet := make(chan bool)
+	wg.Add(1)
+	go parse(r, &wg, stopWorkers)
 
 	wg.Add(1)
 	go func(rows <-chan []byte, wg *sync.WaitGroup) {
 		defer wg.Done()
-		headerPassed := false
+		// headerPassed := false
 		for row := range rows {
 			r.ProcessRow(r.ParseRow(row))
-			if !headerPassed {
-				if len(r.Header) != 0 {
-					headerPassed = true
-					for i := 1; i < routines; i++ {
-						headerSet <- true
-					}
-				}
+			if threads > 1 {
+				r.CloseDB()
+				return
 			}
 		}
 	}(r.Data, &wg)
 
-	for i := 1; i < routines; i++ {
-		pr := parser.NewRuntime(p, bufio.ScanLines)
-		pr.Count = i
-		if err = pr.Init(file); err != nil {
-			log.Fatal(err)
+	wg.Add(1)
+	var mergeElapsed time.Duration
+	go func(ready <-chan int, wg *sync.WaitGroup) {
+		defer wg.Done()
+		for done := range ready {
+			startMerge := time.Now()
+			// var other []int
+			// for i := 1; i <= parserCount; i++ {
+			// 	other = append(other, i)
+			// }
+			log.Printf("merging: %d", done)
+			r.Merge(done)
+			log.Printf("merged: %d", done)
+			mergeElapsed += time.Since(startMerge)
 		}
-		parseRoutines = append(parseRoutines, pr)
-	}
+	}(readyForMerge, &wg)
 
-	for _, pr := range parseRoutines {
-		wg.Add(1)
-		go func(rows <-chan []byte, wg *sync.WaitGroup, routine *parser.Runtime) {
-			if <-headerSet {
-				routine.ProcessHeader(r.Header)
+	var parserCount int
+	var threadWorkers sync.WaitGroup
+	if threads > 1 && <-r.HeaderSet {
 
-				for row := range rows {
-					routine.ProcessRow(routine.ParseRow(row))
+		// we use a semaphore to release/acquire threads so we can start and shutdown
+		// the parsers as needed while merging
+		// threads-1 because we need 1 thread for merging ;)
+		sem := semaphore.NewWeighted(int64(threads - 1))
+		ctx := context.Background()
+
+	twLoop:
+		for {
+			select {
+			case <-stopWorkers:
+				break twLoop
+			default:
+				// if len(r.Data) > 1 {
+
+				// log.Printf("Looping to create threads")
+				// ctx, cancel := context.WithTimeout(ctx, time.Second)
+				// defer cancel()
+				if err := sem.Acquire(ctx, 1); err != nil {
+					log.Printf("Cannot acquire semaphore")
+					continue
 				}
 
-				wg.Done()
+				// if len(r.Data) == 0 {
+				// 	log.Printf("r.Data is empty")
+				// 	break
+				// }
+
+				parserCount++
+				// log.Printf("Creating parser for thread, count: %d", parserCount)
+				pr := parser.NewParser(p, parserCount)
+				if err = pr.Init(nil); err != nil {
+					log.Fatal(err)
+				}
+				pr.ProcessHeader(r.Header)
+				// prevent GC
+				parseRoutines = append(parseRoutines, pr)
+
+				threadWorkers.Add(1)
+				go func(rows <-chan []byte, wg *sync.WaitGroup, sem *semaphore.Weighted,
+					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan int) {
+					defer wg.Done()
+
+					ticker := time.NewTicker(15 * time.Second)
+
+				selectLoop:
+					for {
+						select {
+						case row := <-rows:
+							if len(row) == 0 {
+								break selectLoop
+							}
+							routine.ProcessRow(routine.ParseRow(row))
+						case <-ticker.C:
+							break selectLoop
+						}
+					}
+
+					readRuntime.Rows += pr.Rows
+					err := pr.Close()
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					ready <- pr.Count
+
+					sem.Release(1)
+					return
+
+				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge)
 			}
-		}(r.Data, &wg, pr)
+		}
 	}
 
+	// for i := 1; i < threads; i++ {
+	// 	pr := parser.NewRuntime(p, bufio.ScanLines)
+	// 	pr.Count = i
+	// 	if err = pr.Init(nil); err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	parseRoutines = append(parseRoutines, pr)
+	// }
+
+	// for _, pr := range parseRoutines {
+	// 	wg.Add(1)
+	// 	go func(rows <-chan []byte, wg *sync.WaitGroup, routine *parser.Runtime) {
+	// 		if <-headerSet {
+	// 			routine.ProcessHeader(r.Header)
+
+	// 			for row := range rows {
+	// 				routine.ProcessRow(routine.ParseRow(row))
+	// 			}
+
+	// 			wg.Done()
+	// 		}
+	// 	}(r.Data, &wg, pr)
+	// }
+
+	threadWorkers.Wait()
+	close(readyForMerge)
 	wg.Wait()
+
 	r.Close()
 
-	for _, pr := range parseRoutines {
-		pr.Close()
-		r.Rows += pr.Rows
-	}
+	// for _, pr := range parseRoutines {
+	// 	pr.Close()
+	// 	r.Rows += pr.Rows
+	// }
 
 	conversionElapsed := time.Since(start)
 
@@ -252,14 +353,8 @@ func main() {
 		r.RowsCSV,
 	)
 
-	if p.Sqlite && merge && routines > 1 {
-		start = time.Now()
-		var other []int
-		for i := 1; i < routines; i++ {
-			other = append(other, i)
-		}
-		r.Merge(other...)
-		mergeElapsed := time.Since(start)
+	if p.Sqlite && merge && parserCount >= 1 {
+
 		totalTime := conversionElapsed + mergeElapsed
 		info := make([]interface{}, 0)
 		info = append(info, totalTime, conversionElapsed, mergeElapsed)
@@ -291,15 +386,17 @@ func debug(format string, v ...interface{}) {
 	}
 }
 
-func parse(r *parser.Runtime) {
+func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
+	defer wg.Done()
 	var err error
 	var buf []byte
 	delimSet := false
 	scanner := r.GetScanner()
 	for scanner.Scan() {
 		if err = scanner.Err(); err != nil {
-			log.Fatal(err)
 			close(r.Data)
+			done <- true
+			log.Fatal(err)
 		}
 
 		// if no delimiter was set we detect it once
@@ -322,11 +419,13 @@ func parse(r *parser.Runtime) {
 	}
 
 	if err = scanner.Err(); err != nil {
-		log.Fatal(err)
 		close(r.Data)
+		done <- true
+		log.Fatal(err)
 	}
 
 	close(r.Data)
+	done <- true
 }
 
 var (

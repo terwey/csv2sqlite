@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 input=$1
 
