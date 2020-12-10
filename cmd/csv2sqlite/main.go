@@ -182,14 +182,12 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
-	// headerSet := make(chan bool)
 	wg.Add(1)
 	go parse(r, &wg, stopWorkers)
 
 	wg.Add(1)
 	go func(rows <-chan []byte, wg *sync.WaitGroup) {
 		defer wg.Done()
-		// headerPassed := false
 		for row := range rows {
 			r.ProcessRow(r.ParseRow(row))
 			if threads > 1 {
@@ -226,11 +224,6 @@ func main() {
 			case <-stopWorkers:
 				break twLoop
 			default:
-				// if len(r.Data) > 1 {
-
-				// log.Printf("Looping to create threads")
-				// ctx, cancel := context.WithTimeout(ctx, time.Second)
-				// defer cancel()
 				if err := sem.Acquire(ctx, 1); err != nil {
 					log.Printf("Cannot acquire semaphore")
 					continue
@@ -239,14 +232,12 @@ func main() {
 				// to prevent from starting a new thread when it's not needed
 				// check if r.data is empty and just go back to the select
 				if len(r.Data) == 0 {
-					log.Printf("r.Data is empty")
 					time.Sleep(5 * time.Millisecond)
 					sem.Release(1)
 					continue
 				}
 
 				parserCount++
-				// log.Printf("Creating parser for thread, count: %d", parserCount)
 				pr := parser.NewParser(p, parserCount)
 				if err = pr.Init(nil); err != nil {
 					log.Fatal(err)
@@ -272,19 +263,6 @@ func main() {
 					}
 					conversionElapsed += time.Since(start)
 
-					// selectLoop:
-					// 	for {
-					// 		select {
-					// 		case row := <-rows:
-					// 			// if len(row) == 0 {
-					// 			// 	break selectLoop
-					// 			// }
-					// 			routine.ProcessRow(routine.ParseRow(row))
-					// 		case <-tick.C:
-					// 			break selectLoop
-					// 		}
-					// 	}
-
 					readRuntime.Rows += pr.Rows
 					err := pr.Close()
 					if err != nil {
@@ -300,40 +278,11 @@ func main() {
 		}
 	}
 
-	// for i := 1; i < threads; i++ {
-	// 	pr := parser.NewRuntime(p, bufio.ScanLines)
-	// 	pr.Count = i
-	// 	if err = pr.Init(nil); err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	parseRoutines = append(parseRoutines, pr)
-	// }
-
-	// for _, pr := range parseRoutines {
-	// 	wg.Add(1)
-	// 	go func(rows <-chan []byte, wg *sync.WaitGroup, routine *parser.Runtime) {
-	// 		if <-headerSet {
-	// 			routine.ProcessHeader(r.Header)
-
-	// 			for row := range rows {
-	// 				routine.ProcessRow(routine.ParseRow(row))
-	// 			}
-
-	// 			wg.Done()
-	// 		}
-	// 	}(r.Data, &wg, pr)
-	// }
-
 	threadWorkers.Wait()
 	close(readyForMerge)
 	wg.Wait()
 
 	r.Close()
-
-	// for _, pr := range parseRoutines {
-	// 	pr.Close()
-	// 	r.Rows += pr.Rows
-	// }
 
 	totalTime := time.Since(start)
 
@@ -362,12 +311,9 @@ func main() {
 	)
 
 	if p.Sqlite && merge && parserCount >= 1 {
-
-		// totalTime := conversionElapsed + mergeElapsed
 		info := make([]interface{}, 0)
 		info = append(info, totalTime, time.Duration(conversionElapsed.Nanoseconds()/int64(parserCount)), mergeElapsed)
 		info = append(info, statsOut...)
-		// log.Printf("Merge Time: %s", elapsed)
 		log.Printf("Time: %s, Conversion time: %s, Merge Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
 	} else {
 		info := make([]interface{}, 0)
