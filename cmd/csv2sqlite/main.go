@@ -155,6 +155,7 @@ func main() {
 	}
 
 	start := time.Now()
+	var conversionElapsed time.Duration
 
 	var err error
 	// init the first runtimes, only one will scan
@@ -204,13 +205,7 @@ func main() {
 		defer wg.Done()
 		for done := range ready {
 			startMerge := time.Now()
-			// var other []int
-			// for i := 1; i <= parserCount; i++ {
-			// 	other = append(other, i)
-			// }
-			log.Printf("merging: %d", done)
 			r.Merge(done)
-			log.Printf("merged: %d", done)
 			mergeElapsed += time.Since(startMerge)
 		}
 	}(readyForMerge, &wg)
@@ -241,10 +236,14 @@ func main() {
 					continue
 				}
 
-				// if len(r.Data) == 0 {
-				// 	log.Printf("r.Data is empty")
-				// 	break
-				// }
+				// to prevent from starting a new thread when it's not needed
+				// check if r.data is empty and just go back to the select
+				if len(r.Data) == 0 {
+					log.Printf("r.Data is empty")
+					time.Sleep(5 * time.Millisecond)
+					sem.Release(1)
+					continue
+				}
 
 				parserCount++
 				// log.Printf("Creating parser for thread, count: %d", parserCount)
@@ -257,24 +256,34 @@ func main() {
 				parseRoutines = append(parseRoutines, pr)
 
 				threadWorkers.Add(1)
-				go func(rows <-chan []byte, wg *sync.WaitGroup, sem *semaphore.Weighted,
+				go func(rows <-chan []byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
 					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan int) {
-					defer wg.Done()
+					defer tw.Done()
 
-					ticker := time.NewTicker(15 * time.Second)
+					count := 0
 
-				selectLoop:
-					for {
-						select {
-						case row := <-rows:
-							if len(row) == 0 {
-								break selectLoop
-							}
-							routine.ProcessRow(routine.ParseRow(row))
-						case <-ticker.C:
-							break selectLoop
+					start := time.Now()
+					for row := range rows {
+						routine.ProcessRow(routine.ParseRow(row))
+						count++
+						if count > 100000 {
+							break
 						}
 					}
+					conversionElapsed += time.Since(start)
+
+					// selectLoop:
+					// 	for {
+					// 		select {
+					// 		case row := <-rows:
+					// 			// if len(row) == 0 {
+					// 			// 	break selectLoop
+					// 			// }
+					// 			routine.ProcessRow(routine.ParseRow(row))
+					// 		case <-tick.C:
+					// 			break selectLoop
+					// 		}
+					// 	}
 
 					readRuntime.Rows += pr.Rows
 					err := pr.Close()
@@ -286,7 +295,6 @@ func main() {
 
 					sem.Release(1)
 					return
-
 				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge)
 			}
 		}
@@ -327,13 +335,13 @@ func main() {
 	// 	r.Rows += pr.Rows
 	// }
 
-	conversionElapsed := time.Since(start)
+	totalTime := time.Since(start)
 
 	var ops time.Duration
 	var rows float64
 	if r.Rows != 0 {
-		ops = time.Duration(conversionElapsed.Nanoseconds() / int64(r.Rows))
-		rows = float64(r.Rows) / conversionElapsed.Seconds()
+		ops = time.Duration(totalTime.Nanoseconds() / int64(r.Rows))
+		rows = float64(r.Rows) / totalTime.Seconds()
 	} else {
 		ops = time.Duration(0)
 	}
@@ -355,15 +363,15 @@ func main() {
 
 	if p.Sqlite && merge && parserCount >= 1 {
 
-		totalTime := conversionElapsed + mergeElapsed
+		// totalTime := conversionElapsed + mergeElapsed
 		info := make([]interface{}, 0)
-		info = append(info, totalTime, conversionElapsed, mergeElapsed)
+		info = append(info, totalTime, time.Duration(conversionElapsed.Nanoseconds()/int64(parserCount)), mergeElapsed)
 		info = append(info, statsOut...)
 		// log.Printf("Merge Time: %s", elapsed)
 		log.Printf("Time: %s, Conversion time: %s, Merge Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
 	} else {
 		info := make([]interface{}, 0)
-		info = append(info, conversionElapsed)
+		info = append(info, totalTime)
 		info = append(info, statsOut...)
 		log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
 	}

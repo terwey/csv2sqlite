@@ -176,8 +176,6 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 }
 
 func (r *Runtime) Close() error {
-	log.Printf("Closing: %d", r.Count)
-
 	if file, ok := r.f.(io.ReadCloser); ok {
 		file.Close()
 	}
@@ -187,7 +185,6 @@ func (r *Runtime) Close() error {
 
 // CloseDB is only used for multi-threaded parsing
 func (r *Runtime) CloseDB() error {
-	log.Printf("Closing DB")
 	var err error
 	if !r.p.Sqlite {
 		if out, ok := r.GetWriter().(*bufio.Writer); ok {
