@@ -254,8 +254,6 @@ func main() {
 				threadWorkers.Add(1)
 				go func(rows <-chan []byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
 					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan int) {
-					defer tw.Done()
-
 					count := 0
 
 					start := time.Now()
@@ -277,6 +275,7 @@ func main() {
 					ready <- pr.Count
 
 					sem.Release(1)
+					tw.Done()
 					return
 				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge)
 			}
@@ -347,7 +346,6 @@ func debug(format string, v ...interface{}) {
 }
 
 func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
-	defer wg.Done()
 	var err error
 	var buf []byte
 	delimSet := false
@@ -356,6 +354,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
 		if err = scanner.Err(); err != nil {
 			close(r.Data)
 			done <- true
+			wg.Done()
 			log.Fatal(err)
 		}
 
@@ -381,11 +380,13 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
 	if err = scanner.Err(); err != nil {
 		close(r.Data)
 		done <- true
+		wg.Done()
 		log.Fatal(err)
 	}
 
 	close(r.Data)
 	done <- true
+	wg.Done()
 }
 
 var (

@@ -381,8 +381,11 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 		// r.debug("columns: %s", r.scolumns)
 		// r.debugColumns(r.scolumns)
 		count := 0
+		counted := false
+
 		if !r.inside {
 			count = Count(r.sinput[i], r.p.Enclosure)
+			counted = true
 			if count != 0 {
 				r.inside = true
 			}
@@ -453,8 +456,16 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 			continue
 		}
 
-		r.hasPrefixEnclosure = bytes.HasPrefix(r.sinput[i], r.p.Enclosure)
-		r.hasSuffixEnclosure = bytes.HasSuffix(r.sinput[i], r.p.Enclosure)
+		// if we counted the enclosures before we don't have to check if there is a prefix or suffix
+		if counted && count == 0 {
+			r.hasPrefixEnclosure = false
+			r.hasSuffixEnclosure = false
+		} else {
+			r.hasPrefixEnclosure = bytes.HasPrefix(r.sinput[i], r.p.Enclosure)
+			r.hasSuffixEnclosure = bytes.HasSuffix(r.sinput[i], r.p.Enclosure)
+		}
+
+		// log.Printf("r.hasPrefixEnclosure: %v, r.hasSuffixEnclosure: %v, count: %d", r.hasPrefixEnclosure, r.hasSuffixEnclosure, count)
 
 		if !r.hasPrefixEnclosure || !r.hasSuffixEnclosure {
 			if len(r.sbuf) != 0 {
@@ -465,7 +476,8 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 				// r.debug("bytes.HasSuffix(input[i], r.p.Enclosure): %v\n!bytes.HasSuffix(input[i], r.doubleEnclosure: %v\n statement: %v", bytes.HasSuffix(input[i], r.p.Enclosure), !bytes.HasSuffix(input[i], r.doubleEnclosure), result)
 				if r.hasSuffixEnclosure && !bytes.HasSuffix(r.sinput[i], r.doubleEnclosure) {
 					r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
-					r.sbuf = bytes.TrimSuffix(r.sbuf, r.p.Enclosure)
+					// we know for sure that the suffix exists
+					r.sbuf = TrimSuffixSkipCheck(r.sbuf, r.p.Enclosure)
 					// we need to clean double enclosures to single
 					r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 					r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
@@ -484,8 +496,9 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 		}
 
 		if count%2 == 0 && r.hasPrefixEnclosure && r.hasSuffixEnclosure {
-			r.sinput[i] = bytes.TrimPrefix(r.sinput[i], r.p.Enclosure)
-			r.sinput[i] = bytes.TrimSuffix(r.sinput[i], r.p.Enclosure)
+			// we know for sure it has a prefix and suffix
+			r.sinput[i] = TrimPrefixSkipCheck(r.sinput[i], r.p.Enclosure)
+			r.sinput[i] = TrimSuffixSkipCheck(r.sinput[i], r.p.Enclosure)
 
 			// we need to clean double enclosures to single
 			r.sinput[i] = ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
@@ -531,4 +544,13 @@ func ReplaceAll(s, old, new []byte) []byte {
 		return s
 	}
 	return bytes.ReplaceAll(s, old, new)
+}
+
+// TrimSuffixSkipCheck skips the check if the suffix exists
+func TrimSuffixSkipCheck(s, suffix []byte) []byte {
+	return s[:len(s)-len(suffix)]
+}
+
+func TrimPrefixSkipCheck(s, prefix []byte) []byte {
+	return s[len(prefix):]
 }
