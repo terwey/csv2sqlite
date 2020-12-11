@@ -73,7 +73,7 @@ func init() {
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
-	flags.IntVar(&threads, "threads", 1, "Threads to use when writing output, default is set to one.")
+	flags.IntVar(&threads, "threads", 2, "Threads to use when writing output, default is set to two.")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 2000, "Buffered channels capacity")
 	flags.SortFlags = false
 }
@@ -113,6 +113,11 @@ func main() {
 			os.Exit(100)
 		}
 		p.Delimiter = delimBytes
+	}
+
+	if threads < 2 {
+		log.Printf("Threads is set below 2, changing to 2")
+		threads = 2
 	}
 
 	readyForMerge = make(chan int, 1000)
@@ -197,20 +202,20 @@ func main() {
 		}
 	}(r.Data, &wg)
 
-	wg.Add(1)
-	var mergeElapsed time.Duration
-	go func(ready <-chan int, wg *sync.WaitGroup) {
-		defer wg.Done()
-		for done := range ready {
-			startMerge := time.Now()
-			r.Merge(done)
-			mergeElapsed += time.Since(startMerge)
-		}
-	}(readyForMerge, &wg)
-
 	var parserCount int
 	var threadWorkers sync.WaitGroup
+	var mergeElapsed time.Duration
 	if threads > 1 && <-r.HeaderSet {
+		wg.Add(1)
+
+		go func(ready <-chan int, wg *sync.WaitGroup) {
+			defer wg.Done()
+			for done := range ready {
+				startMerge := time.Now()
+				r.Merge(done)
+				mergeElapsed += time.Since(startMerge)
+			}
+		}(readyForMerge, &wg)
 
 		// we use a semaphore to release/acquire threads so we can start and shutdown
 		// the parsers as needed while merging
@@ -257,7 +262,7 @@ func main() {
 					for row := range rows {
 						routine.ProcessRow(routine.ParseRow(row))
 						count++
-						if count > 100000 {
+						if count > 50000 {
 							break
 						}
 					}
@@ -276,10 +281,11 @@ func main() {
 				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge)
 			}
 		}
+
+		threadWorkers.Wait()
+		close(readyForMerge)
 	}
 
-	threadWorkers.Wait()
-	close(readyForMerge)
 	wg.Wait()
 
 	r.Close()

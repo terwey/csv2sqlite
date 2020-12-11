@@ -286,11 +286,9 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	// if that matches the amount we expect
 	// amount = columns + 1
 
-	r.debug("data: \n%s", data)
-
 	// r.colCount is set to non-zero on header creation
 	if r.colCount != 0 {
-		count := bytes.Count(data, r.p.Delimiter)
+		count := Count(data, r.p.Delimiter)
 		// if the count is correct we can just simply do a normal split and skip this logic
 		if count+1 != r.colCount {
 			columns := r.SplitUnescapedDelimiter(data)
@@ -336,9 +334,8 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 		columns[i] = bytes.TrimSuffix(columns[i], r.p.Enclosure)
 
 		// we need to clean double quotes
-		columns[i] = bytes.ReplaceAll(columns[i], r.doubleEnclosure, r.p.Enclosure)
-
-		columns[i] = bytes.ReplaceAll(columns[i], carriageReturn, lineFeed)
+		columns[i] = ReplaceAll(columns[i], r.doubleEnclosure, r.p.Enclosure)
+		columns[i] = ReplaceAll(columns[i], carriageReturn, lineFeed)
 	}
 
 	return columns
@@ -379,13 +376,13 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 	enclosurecheck := false
 
 	for i := range r.sinput {
-		r.debug("input[i]: >>>%s<<", r.sinput[i])
-		r.debug("buf: %s", r.sbuf)
+		// r.debug("input[i]: >>>%s<<", r.sinput[i])
+		// r.debug("buf: %s", r.sbuf)
 		// r.debug("columns: %s", r.scolumns)
-		r.debugColumns(r.scolumns)
+		// r.debugColumns(r.scolumns)
 		count := 0
 		if !r.inside {
-			count = bytes.Count(r.sinput[i], r.p.Enclosure)
+			count = Count(r.sinput[i], r.p.Enclosure)
 			if count != 0 {
 				r.inside = true
 			}
@@ -409,8 +406,8 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 				r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 				r.sbuf = bytes.TrimSuffix(r.sbuf, r.p.Enclosure)
 				// we need to clean double enclosures to single
-				r.sbuf = bytes.ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
-				r.sbuf = bytes.ReplaceAll(r.sbuf, carriageReturn, lineFeed)
+				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
+				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
 				r.scolumns = append(r.scolumns, r.sbuf)
 				r.sbuf = make([]byte, 0)
 				r.inside = false
@@ -428,7 +425,7 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 				continue
 			}
-			r.sinput[i] = bytes.ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
+			r.sinput[i] = ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
 			r.scolumns = append(r.scolumns, r.sinput[i])
 			continue
 		}
@@ -439,9 +436,9 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 
 				// we need to clean double enclosures to single
-				r.sbuf = bytes.ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
+				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 				r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
-				r.sbuf = bytes.ReplaceAll(r.sbuf, carriageReturn, lineFeed)
+				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
 				r.scolumns = append(r.scolumns, r.sbuf)
 				r.sbuf = make([]byte, 0)
 				continue
@@ -470,8 +467,8 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 					r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 					r.sbuf = bytes.TrimSuffix(r.sbuf, r.p.Enclosure)
 					// we need to clean double enclosures to single
-					r.sbuf = bytes.ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
-					r.sbuf = bytes.ReplaceAll(r.sbuf, carriageReturn, lineFeed)
+					r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
+					r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
 					r.scolumns = append(r.scolumns, r.sbuf)
 					r.sbuf = make([]byte, 0)
 					r.inside = false
@@ -482,7 +479,6 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 			} else {
 				// we are missing the second Enclosure, add to the r.sbuf
 				r.sbuf = append(r.sbuf, r.sinput[i]...)
-				// r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 			}
 			continue
 		}
@@ -492,8 +488,8 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 			r.sinput[i] = bytes.TrimSuffix(r.sinput[i], r.p.Enclosure)
 
 			// we need to clean double enclosures to single
-			r.sinput[i] = bytes.ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
-			r.sinput[i] = bytes.ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
+			r.sinput[i] = ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
+			r.sinput[i] = ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
 			r.scolumns = append(r.scolumns, r.sinput[i])
 			r.inside = false
 			continue
@@ -509,12 +505,30 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 		r.sinput[i] = bytes.TrimPrefix(r.sinput[i], r.p.Enclosure)
 		r.sinput[i] = bytes.TrimSuffix(r.sinput[i], r.p.Enclosure)
 		// we need to clean double enclosures to single
-		r.sinput[i] = bytes.ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
-		r.sinput[i] = bytes.ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
+		r.sinput[i] = ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
+		r.sinput[i] = ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
 		r.scolumns = append(r.scolumns, r.sinput[i])
 	}
 
 	// r.debug("columns: %d", len(columns))
 
 	return r.scolumns
+}
+
+// Count calls bytes.IndexByte before Count
+func Count(s, sep []byte) int {
+	if len(sep) == 1 {
+		if bytes.IndexByte(s, sep[0]) == -1 {
+			return 0
+		}
+	}
+	return bytes.Count(s, sep)
+}
+
+// ReplaceAll calls bytes.Count beforehand preventing alloc
+func ReplaceAll(s, old, new []byte) []byte {
+	if Count(s, old) == 0 {
+		return s
+	}
+	return bytes.ReplaceAll(s, old, new)
 }
