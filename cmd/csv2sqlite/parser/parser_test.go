@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"bytes"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -19,7 +20,7 @@ func Benchmark_SplitUnescapedDelimiter(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		for _, test := range testData {
-			r.SplitUnescapedDelimiter(test.args.data)
+			r.ParseUnescapedDelimiter(bytes.Split(test.args.data, p.Delimiter))
 		}
 	}
 }
@@ -1738,7 +1739,7 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 			r.Debug = tt.debug
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
-			if got := r.SplitUnescapedDelimiter(tt.args.data); !cmp.Equal(got, tt.want) {
+			if got := r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Delimiter)); !cmp.Equal(got, tt.want) {
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					// t.Errorf("SplitUnescapedDelimiter() named %s mismatch (-want +got):\n%s", tt.name, diff)
 					for i := range got {

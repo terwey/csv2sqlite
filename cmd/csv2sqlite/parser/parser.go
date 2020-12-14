@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/terwey/csv2sqlite/delimiter"
 	"github.com/terwey/recordwriter/recordwriter"
@@ -19,17 +20,18 @@ import (
 type Params struct {
 	Input           string
 	Output          string
-	FlushSize       int
+	CommitRate      int
 	Buffersize      int
 	Sqlite          bool
 	Delimiter       delimiter.Delimiter
 	Enclosure       []byte
 	ChannelCapacity int
+	BulkSize        int
 }
 
 func NewParameters() *Params {
 	p := &Params{
-		FlushSize:  32768,
+		CommitRate: 32768,
 		Buffersize: 4096,
 		Input:      "",
 		Output:     "",
@@ -44,7 +46,6 @@ type Runtime struct {
 	p       *Params
 	readbuf []byte
 	reader  *bufio.Reader
-	buf     [][]byte
 
 	Benchmark bool
 
@@ -73,9 +74,9 @@ type Runtime struct {
 
 	Debug bool
 
-	sinput   [][]byte
-	scolumns [][]byte
-	sbuf     []byte
+	sinput [][]byte
+	// scolumns [][]byte
+	sbuf []byte
 
 	hasPrefixEnclosure bool
 	hasSuffixEnclosure bool
@@ -107,8 +108,6 @@ func NewParser(p *Params, count int) *Runtime {
 		Count:         count,
 	}
 
-	r.Data = make(chan []byte, p.ChannelCapacity)
-
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 
@@ -119,10 +118,17 @@ func (r *Runtime) SetDelimiter(delim delimiter.Delimiter) {
 	r.p.Delimiter = delim
 }
 
-func (r *Runtime) Merge(other ...int) {
+func (r *Runtime) Merge(ready <-chan string, wg *sync.WaitGroup) {
 	if sqlwriter, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
-		sqlwriter.Merge(other...)
+		sqlwriter.Merge(ready, wg)
 	}
+}
+
+func (r *Runtime) GetPath() string {
+	if sqlwriter, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
+		return sqlwriter.GetPath()
+	}
+	return ""
 }
 
 func (r *Runtime) GetWriter() io.StringWriter {
@@ -149,7 +155,7 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 		if len(r.p.Output) == 0 {
 			r.w = os.Stdout
 			if r.Benchmark {
-				r.w = bufio.NewWriterSize(bytes.NewBuffer([]byte{}), r.p.FlushSize)
+				r.w = bufio.NewWriterSize(bytes.NewBuffer([]byte{}), r.p.CommitRate)
 			}
 		} else {
 
@@ -158,12 +164,12 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 			if err != nil {
 				log.Fatalf("Cannot open file for writing: %s", err)
 			}
-			r.w = bufio.NewWriterSize(r.fout, r.p.FlushSize)
+			r.w = bufio.NewWriterSize(r.fout, r.p.CommitRate)
 		}
 
 		r.rw = recordwriter.NewCSVWriter(r.w)
 	} else {
-		r.rw = recordwriter.NewSQLWriter(output, r.p.FlushSize)
+		r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, r.p.BulkSize)
 	}
 
 	if r.Count == 0 {
@@ -286,19 +292,19 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	// if that matches the amount we expect
 	// amount = columns + 1
 
+	columns = bytes.Split(data, r.p.Delimiter)
+
 	// r.colCount is set to non-zero on header creation
 	if r.colCount != 0 {
 		count := Count(data, r.p.Delimiter)
 		// if the count is correct we can just simply do a normal split and skip this logic
 		if count+1 != r.colCount {
-			columns := r.SplitUnescapedDelimiter(data)
+			columns := r.ParseUnescapedDelimiter(columns)
 			if len(columns) == r.colCount {
 				return columns
 			}
 		}
 	}
-
-	columns = bytes.Split(data, r.p.Delimiter)
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
 	if len(columns) > r.colCount {
@@ -366,16 +372,17 @@ var (
 	lineFeed       []byte = []byte("\x0a") // \n
 )
 
-func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
+func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
 	// we need to seek through the data and find the first Enclosure and escape the delimiter
 
 	// we first split on the delimiter and then check if two Enclosures are available
-	r.sinput = bytes.Split(data, r.p.Delimiter)
-	r.scolumns = make([][]byte, 0)
+	// r.sinput = bytes.Split(data, r.p.Delimiter)
+	// r.sinput = splitData
+	// r.scolumns = make([][]byte, 0)
 	r.sbuf = make([]byte, 0)
 	enclosurecheck := false
 
-	for i := range r.sinput {
+	for i := range input {
 		// r.debug("input[i]: >>>%s<<", r.sinput[i])
 		// r.debug("buf: %s", r.sbuf)
 		// r.debug("columns: %s", r.scolumns)
@@ -384,7 +391,7 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 		counted := false
 
 		if !r.inside {
-			count = Count(r.sinput[i], r.p.Enclosure)
+			count = Count(input[i], r.p.Enclosure)
 			counted = true
 			if count != 0 {
 				r.inside = true
@@ -396,45 +403,45 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 		// there is a case where the last buf can end with """ or similar
 		// we need to check if the NEXT starts with a " if so, move buf to columns and continue happily with life
 		if enclosurecheck {
-			if len(r.sinput[i]) == 1 {
+			if len(input[i]) == 1 {
 				// data was something like `|"foo|"|`
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 				// add the "empty" data, anti-slipmat func ;)
 				// check if input is r.p.Enclosure
-				if !bytes.Equal(r.sinput[i], r.p.Enclosure) {
-					r.sbuf = append(r.sbuf, r.sinput[i]...)
+				if !bytes.Equal(input[i], r.p.Enclosure) {
+					r.sbuf = append(r.sbuf, input[i]...)
 				}
 			}
-			if bytes.HasPrefix(r.sinput[i], r.p.Enclosure) {
+			if bytes.HasPrefix(input[i], r.p.Enclosure) {
 				r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 				r.sbuf = bytes.TrimSuffix(r.sbuf, r.p.Enclosure)
 				// we need to clean double enclosures to single
 				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
-				r.scolumns = append(r.scolumns, r.sbuf)
+				columns = append(columns, r.sbuf)
 				r.sbuf = make([]byte, 0)
 				r.inside = false
 				enclosurecheck = false
 			}
-			if len(r.sinput[i]) == 1 {
+			if len(input[i]) == 1 {
 				continue
 			}
 		}
 
 		// unEnclosured column
-		if len(r.sinput[i]) == 0 {
+		if len(input[i]) == 0 {
 			// delimiter inside an enclosure
 			if r.inside {
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 				continue
 			}
-			r.sinput[i] = ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
-			r.scolumns = append(r.scolumns, r.sinput[i])
+			input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
+			columns = append(columns, input[i])
 			continue
 		}
 
-		if len(r.sinput[i]) == 1 {
-			if len(r.sbuf) != 0 && bytes.Equal(r.sinput[i], r.p.Enclosure) {
+		if len(input[i]) == 1 {
+			if len(r.sbuf) != 0 && bytes.Equal(input[i], r.p.Enclosure) {
 				// the delimiter appears at the end, finalize the column
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 
@@ -442,16 +449,16 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 				r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
-				r.scolumns = append(r.scolumns, r.sbuf)
+				columns = append(columns, r.sbuf)
 				r.sbuf = make([]byte, 0)
 				continue
 			}
 
 			// in the case it is NOT an Enclosure, place a delimiter and append the buffer
-			if !bytes.Equal(r.sinput[i], r.p.Enclosure) {
+			if !bytes.Equal(input[i], r.p.Enclosure) {
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 			}
-			r.sbuf = append(r.sbuf, r.sinput[i]...)
+			r.sbuf = append(r.sbuf, input[i]...)
 
 			continue
 		}
@@ -461,8 +468,8 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 			r.hasPrefixEnclosure = false
 			r.hasSuffixEnclosure = false
 		} else {
-			r.hasPrefixEnclosure = bytes.HasPrefix(r.sinput[i], r.p.Enclosure)
-			r.hasSuffixEnclosure = bytes.HasSuffix(r.sinput[i], r.p.Enclosure)
+			r.hasPrefixEnclosure = bytes.HasPrefix(input[i], r.p.Enclosure)
+			r.hasSuffixEnclosure = bytes.HasSuffix(input[i], r.p.Enclosure)
 		}
 
 		// log.Printf("r.hasPrefixEnclosure: %v, r.hasSuffixEnclosure: %v, count: %d", r.hasPrefixEnclosure, r.hasSuffixEnclosure, count)
@@ -470,18 +477,18 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 		if !r.hasPrefixEnclosure || !r.hasSuffixEnclosure {
 			if len(r.sbuf) != 0 {
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
-				r.sbuf = append(r.sbuf, r.sinput[i]...)
+				r.sbuf = append(r.sbuf, input[i]...)
 
 				// result := bytes.HasSuffix(input[i], r.p.Enclosure) && !bytes.HasSuffix(input[i], r.doubleEnclosure)
 				// r.debug("bytes.HasSuffix(input[i], r.p.Enclosure): %v\n!bytes.HasSuffix(input[i], r.doubleEnclosure: %v\n statement: %v", bytes.HasSuffix(input[i], r.p.Enclosure), !bytes.HasSuffix(input[i], r.doubleEnclosure), result)
-				if r.hasSuffixEnclosure && !bytes.HasSuffix(r.sinput[i], r.doubleEnclosure) {
+				if r.hasSuffixEnclosure && !bytes.HasSuffix(input[i], r.doubleEnclosure) {
 					r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 					// we know for sure that the suffix exists
 					r.sbuf = TrimSuffixSkipCheck(r.sbuf, r.p.Enclosure)
 					// we need to clean double enclosures to single
 					r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 					r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
-					r.scolumns = append(r.scolumns, r.sbuf)
+					columns = append(columns, r.sbuf)
 					r.sbuf = make([]byte, 0)
 					r.inside = false
 					enclosurecheck = false
@@ -490,20 +497,20 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 				}
 			} else {
 				// we are missing the second Enclosure, add to the r.sbuf
-				r.sbuf = append(r.sbuf, r.sinput[i]...)
+				r.sbuf = append(r.sbuf, input[i]...)
 			}
 			continue
 		}
 
 		if count%2 == 0 && r.hasPrefixEnclosure && r.hasSuffixEnclosure {
 			// we know for sure it has a prefix and suffix
-			r.sinput[i] = TrimPrefixSkipCheck(r.sinput[i], r.p.Enclosure)
-			r.sinput[i] = TrimSuffixSkipCheck(r.sinput[i], r.p.Enclosure)
+			input[i] = TrimPrefixSkipCheck(input[i], r.p.Enclosure)
+			input[i] = TrimSuffixSkipCheck(input[i], r.p.Enclosure)
 
 			// we need to clean double enclosures to single
-			r.sinput[i] = ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
-			r.sinput[i] = ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
-			r.scolumns = append(r.scolumns, r.sinput[i])
+			input[i] = ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
+			input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
+			columns = append(columns, input[i])
 			r.inside = false
 			continue
 		}
@@ -511,21 +518,21 @@ func (r *Runtime) SplitUnescapedDelimiter(data []byte) [][]byte {
 		// edge-case where ""| appears
 		// or where count%2 != 0
 		if count != 2 {
-			r.sbuf = append(r.sbuf, r.sinput[i]...)
+			r.sbuf = append(r.sbuf, input[i]...)
 			continue
 		}
 
-		r.sinput[i] = bytes.TrimPrefix(r.sinput[i], r.p.Enclosure)
-		r.sinput[i] = bytes.TrimSuffix(r.sinput[i], r.p.Enclosure)
+		input[i] = bytes.TrimPrefix(input[i], r.p.Enclosure)
+		input[i] = bytes.TrimSuffix(input[i], r.p.Enclosure)
 		// we need to clean double enclosures to single
-		r.sinput[i] = ReplaceAll(r.sinput[i], r.doubleEnclosure, r.p.Enclosure)
-		r.sinput[i] = ReplaceAll(r.sinput[i], carriageReturn, lineFeed)
-		r.scolumns = append(r.scolumns, r.sinput[i])
+		input[i] = ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
+		input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
+		columns = append(columns, input[i])
 	}
 
 	// r.debug("columns: %d", len(columns))
 
-	return r.scolumns
+	return columns
 }
 
 // Count calls bytes.IndexByte before Count
