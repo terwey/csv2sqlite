@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
-	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -48,7 +48,10 @@ var (
 	parseRoutines []*parser.Runtime
 	readyForMerge chan string
 	stopWorkers   chan bool
+	inserted      chan uint64
+	insertedRows  uint64
 	stopCount     int
+	logHeader     int
 
 	// version is set during build
 	version    = "undefined"
@@ -71,17 +74,18 @@ func init() {
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
-	flags.IntVar(&stopCount, "break-count", 20000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
+	flags.IntVar(&stopCount, "break-count", 10000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", 2, "Threads to use when writing output, default is set to two.")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 2000, "Buffered channels capacity")
-	flags.IntVar(&p.BulkSize, "bulk-size", 1, "Amount to bulk insert to SQLite with")
+	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.SortFlags = false
 }
 
 func main() {
+	start := time.Now()
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		if err != pflag.ErrHelp {
 			fmt.Fprint(os.Stderr, err.Error()+"\n")
@@ -125,6 +129,7 @@ func main() {
 
 	readyForMerge = make(chan string, 1000)
 	stopWorkers = make(chan bool)
+	inserted = make(chan uint64)
 
 	encloBytes = []byte(enclosure)
 	p.Enclosure = encloBytes
@@ -161,7 +166,6 @@ func main() {
 		defer pprof.WriteHeapProfile(f)
 	}
 
-	start := time.Now()
 	var conversionElapsed time.Duration
 
 	var err error
@@ -193,6 +197,14 @@ func main() {
 	go parse(r, &wg, stopWorkers)
 
 	wg.Add(1)
+	go func(inserted <-chan uint64, wg *sync.WaitGroup) {
+		defer wg.Done()
+		for rows := range inserted {
+			insertedRows += rows
+		}
+	}(inserted, &wg)
+
+	wg.Add(1)
 	go func(rows <-chan []byte, wg *sync.WaitGroup) {
 		defer wg.Done()
 		for row := range rows {
@@ -206,11 +218,12 @@ func main() {
 
 	var parserCount int
 	var threadWorkers sync.WaitGroup
-	var mergeElapsed time.Duration
+	mergeElapsed := make(chan time.Duration, 1)
+	conversionStart := time.Now()
 	if threads > 1 && <-r.HeaderSet {
 		wg.Add(1)
 
-		go r.Merge(readyForMerge, &wg)
+		go r.Merge(readyForMerge, &wg, mergeElapsed)
 
 		// we use a semaphore to release/acquire threads so we can start and shutdown
 		// the parsers as needed while merging
@@ -219,6 +232,7 @@ func main() {
 		ctx := context.Background()
 
 		stop := stopCount
+
 	twLoop:
 		for {
 			select {
@@ -257,10 +271,8 @@ func main() {
 
 				threadWorkers.Add(1)
 				go func(rows <-chan []byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
-					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int) {
+					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
 					rowCount := 0
-
-					start := time.Now()
 
 					for row := range rows {
 						routine.ProcessRow(routine.ParseRow(row))
@@ -269,9 +281,8 @@ func main() {
 							break
 						}
 					}
-					conversionElapsed += time.Since(start)
 
-					readRuntime.Rows += routine.Rows
+					inserted <- routine.Rows
 					err := routine.Close()
 					if err != nil {
 						log.Fatal(err)
@@ -282,11 +293,13 @@ func main() {
 					sem.Release(1)
 					tw.Done()
 					return
-				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop)
+				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted)
 			}
 		}
 
 		threadWorkers.Wait()
+		conversionElapsed = time.Since(conversionStart)
+		close(inserted)
 		close(readyForMerge)
 	}
 
@@ -298,39 +311,31 @@ func main() {
 
 	var ops time.Duration
 	var rows float64
-	if r.Rows != 0 {
-		ops = time.Duration(totalTime.Nanoseconds() / int64(r.Rows))
-		rows = float64(r.Rows) / totalTime.Seconds()
+	if insertedRows != 0 {
+		ops = time.Duration(totalTime.Nanoseconds() / int64(insertedRows))
+		rows = float64(insertedRows) / totalTime.Seconds()
 	} else {
 		ops = time.Duration(0)
 	}
 
-	m := &runtime.MemStats{}
-	runtime.ReadMemStats(m)
-
-	statsOut := make([]interface{}, 0)
-	statsOut = append(statsOut,
-		m.Sys/1024/1024,
+	if logHeader == 1 {
+		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, delimiter, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
+	}
+	merged := <-mergeElapsed
+	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %d, %d, %d, %d, %d\n",
+		totalTime.Round(time.Millisecond),
+		conversionElapsed.Round(time.Millisecond),
+		merged.Round(time.Millisecond),
+		insertedRows,
+		ops.Round(time.Microsecond),
+		math.Floor(rows),
+		threads,
+		delimBytes,
 		p.Buffersize/1024,
 		p.CommitRate,
-		r.Rows,
-		ops,
-		rows,
-		delimBytes,
-		r.RowsCSV,
-	)
-
-	if p.Sqlite && merge && parserCount >= 1 {
-		info := make([]interface{}, 0)
-		info = append(info, totalTime, time.Duration(conversionElapsed.Nanoseconds()/int64(parserCount)), mergeElapsed)
-		info = append(info, statsOut...)
-		log.Printf("Time: %s, Conversion time: %s, Merge Time: %s, Memory: %v MB, buffer-size: %d kb, commit-rate: %d, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
-	} else {
-		info := make([]interface{}, 0)
-		info = append(info, totalTime)
-		info = append(info, statsOut...)
-		log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, commit-rate: %d, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
-	}
+		stopCount,
+		p.ChannelCapacity,
+		r.RowsCSV)
 }
 
 func logData(name string, data []byte, max int) {

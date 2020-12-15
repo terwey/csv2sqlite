@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/terwey/csv2sqlite/delimiter"
 	"github.com/terwey/recordwriter/recordwriter"
@@ -26,7 +27,6 @@ type Params struct {
 	Delimiter       delimiter.Delimiter
 	Enclosure       []byte
 	ChannelCapacity int
-	BulkSize        int
 }
 
 func NewParameters() *Params {
@@ -118,9 +118,9 @@ func (r *Runtime) SetDelimiter(delim delimiter.Delimiter) {
 	r.p.Delimiter = delim
 }
 
-func (r *Runtime) Merge(ready <-chan string, wg *sync.WaitGroup) {
+func (r *Runtime) Merge(ready <-chan string, wg *sync.WaitGroup, duration chan time.Duration) {
 	if sqlwriter, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
-		sqlwriter.Merge(ready, wg)
+		sqlwriter.Merge(ready, wg, duration)
 	}
 }
 
@@ -169,7 +169,7 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 
 		r.rw = recordwriter.NewCSVWriter(r.w)
 	} else {
-		r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, r.p.BulkSize)
+		r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate)
 	}
 
 	if r.Count == 0 {
@@ -295,6 +295,7 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	columns = bytes.Split(data, r.p.Delimiter)
 
 	// r.colCount is set to non-zero on header creation
+	// TODO: fix that the header gets parsed by our code too
 	if r.colCount != 0 {
 		count := Count(data, r.p.Delimiter)
 		// if the count is correct we can just simply do a normal split and skip this logic
@@ -330,7 +331,9 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 			}
 		}
 
-		r.RowsCSV++
+		if r.colCount != 0 {
+			r.RowsCSV++
+		}
 
 		return columns
 	}
