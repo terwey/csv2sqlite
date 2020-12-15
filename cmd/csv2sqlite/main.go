@@ -6,11 +6,12 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
-	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
 	"github.com/terwey/csv2sqlite/delimiter"
 	"github.com/spf13/pflag"
+	"golang.org/x/sync/semaphore"
 )
 
 var (
@@ -41,9 +43,15 @@ var (
 	p *parser.Params
 	r *parser.Runtime
 
-	routines int
+	threads int
 
 	parseRoutines []*parser.Runtime
+	readyForMerge chan string
+	stopWorkers   chan bool
+	inserted      chan uint64
+	insertedRows  uint64
+	stopCount     int
+	logHeader     int
 
 	// version is set during build
 	version    = "undefined"
@@ -64,17 +72,20 @@ func init() {
 	flags.StringVar(&newline, "newline", "", "Newline used, either crlf or lf, else auto-detected")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
-	flags.IntVarP(&p.FlushSize, "flush-rate", "r", 32768, "Flush rate for syncing to disk in kilobytes")
+	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
+	flags.IntVar(&stopCount, "break-count", 10000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
-	flags.IntVar(&routines, "threads", 1, "Threads to use when writing output, default is set to one.")
+	flags.IntVar(&threads, "threads", 2, "Threads to use when writing output, default is set to two.")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 2000, "Buffered channels capacity")
+	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.SortFlags = false
 }
 
 func main() {
+	start := time.Now()
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		if err != pflag.ErrHelp {
 			fmt.Fprint(os.Stderr, err.Error()+"\n")
@@ -111,6 +122,15 @@ func main() {
 		p.Delimiter = delimBytes
 	}
 
+	if threads < 2 {
+		log.Printf("Threads is set below 2, changing to 2")
+		threads = 2
+	}
+
+	readyForMerge = make(chan string, 1000)
+	stopWorkers = make(chan bool)
+	inserted = make(chan uint64)
+
 	encloBytes = []byte(enclosure)
 	p.Enclosure = encloBytes
 
@@ -127,7 +147,6 @@ func main() {
 	}
 
 	// convert to kb
-	p.FlushSize *= 1024
 	p.Buffersize *= 1024
 
 	if cpuprofile != "" {
@@ -147,7 +166,7 @@ func main() {
 		defer pprof.WriteHeapProfile(f)
 	}
 
-	start := time.Now()
+	var conversionElapsed time.Duration
 
 	var err error
 	// init the first runtimes, only one will scan
@@ -174,104 +193,149 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
-	headerSet := make(chan bool)
-	go parse(r)
+	wg.Add(1)
+	go parse(r, &wg, stopWorkers)
+
+	wg.Add(1)
+	go func(inserted <-chan uint64, wg *sync.WaitGroup) {
+		defer wg.Done()
+		for rows := range inserted {
+			insertedRows += rows
+		}
+	}(inserted, &wg)
 
 	wg.Add(1)
 	go func(rows <-chan []byte, wg *sync.WaitGroup) {
 		defer wg.Done()
-		headerPassed := false
 		for row := range rows {
 			r.ProcessRow(r.ParseRow(row))
-			if !headerPassed {
-				if len(r.Header) != 0 {
-					headerPassed = true
-					for i := 1; i < routines; i++ {
-						headerSet <- true
-					}
-				}
+			if threads > 1 {
+				r.CloseDB()
+				return
 			}
 		}
 	}(r.Data, &wg)
 
-	for i := 1; i < routines; i++ {
-		pr := parser.NewRuntime(p, bufio.ScanLines)
-		pr.Count = i
-		if err = pr.Init(file); err != nil {
-			log.Fatal(err)
-		}
-		parseRoutines = append(parseRoutines, pr)
-	}
-
-	for _, pr := range parseRoutines {
+	var parserCount int
+	var threadWorkers sync.WaitGroup
+	mergeElapsed := make(chan time.Duration, 1)
+	conversionStart := time.Now()
+	if threads > 1 && <-r.HeaderSet {
 		wg.Add(1)
-		go func(rows <-chan []byte, wg *sync.WaitGroup, routine *parser.Runtime) {
-			if <-headerSet {
-				routine.ProcessHeader(r.Header)
 
-				for row := range rows {
-					routine.ProcessRow(routine.ParseRow(row))
+		go r.Merge(readyForMerge, &wg, mergeElapsed)
+
+		// we use a semaphore to release/acquire threads so we can start and shutdown
+		// the parsers as needed while merging
+		// threads-1 because we need 1 thread for merging ;)
+		sem := semaphore.NewWeighted(int64(threads - 1))
+		ctx := context.Background()
+
+		stop := stopCount
+
+	twLoop:
+		for {
+			select {
+			case <-stopWorkers:
+				break twLoop
+			default:
+				if err := sem.Acquire(ctx, 1); err != nil {
+					log.Printf("Cannot acquire semaphore")
+					continue
 				}
 
-				wg.Done()
+				// to prevent from starting a new thread when it's not needed
+				// check if r.data is empty and just go back to the select
+				if len(r.Data) == 0 {
+					time.Sleep(5 * time.Millisecond)
+					sem.Release(1)
+					continue
+				}
+
+				stop = stopCount
+				if parserCount < threads-1 {
+					stop = stopCount / 3
+				}
+				if parserCount < threads*2-1 {
+					stop = stopCount / 2
+				}
+
+				parserCount++
+				pr := parser.NewParser(p, parserCount)
+				if err = pr.Init(nil); err != nil {
+					log.Fatal(err)
+				}
+				pr.ProcessHeader(r.Header)
+				// prevent GC
+				parseRoutines = append(parseRoutines, pr)
+
+				threadWorkers.Add(1)
+				go func(rows <-chan []byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
+					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
+					rowCount := 0
+
+					for row := range rows {
+						routine.ProcessRow(routine.ParseRow(row))
+						rowCount++
+						if rowCount > stop {
+							break
+						}
+					}
+
+					inserted <- routine.Rows
+					err := routine.Close()
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					ready <- routine.GetPath()
+
+					sem.Release(1)
+					tw.Done()
+					return
+				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted)
 			}
-		}(r.Data, &wg, pr)
+		}
+
+		threadWorkers.Wait()
+		conversionElapsed = time.Since(conversionStart)
+		close(inserted)
+		close(readyForMerge)
 	}
 
 	wg.Wait()
+
 	r.Close()
 
-	for _, pr := range parseRoutines {
-		pr.Close()
-		r.Rows += pr.Rows
-	}
-
-	conversionElapsed := time.Since(start)
+	totalTime := time.Since(start)
 
 	var ops time.Duration
 	var rows float64
-	if r.Rows != 0 {
-		ops = time.Duration(conversionElapsed.Nanoseconds() / int64(r.Rows))
-		rows = float64(r.Rows) / conversionElapsed.Seconds()
+	if insertedRows != 0 {
+		ops = time.Duration(totalTime.Nanoseconds() / int64(insertedRows))
+		rows = float64(insertedRows) / totalTime.Seconds()
 	} else {
 		ops = time.Duration(0)
 	}
 
-	m := &runtime.MemStats{}
-	runtime.ReadMemStats(m)
-
-	statsOut := make([]interface{}, 0)
-	statsOut = append(statsOut,
-		m.Sys/1024/1024,
-		p.Buffersize/1024,
-		p.FlushSize/1024,
-		r.Rows,
-		ops,
-		rows,
-		delimBytes,
-		r.RowsCSV,
-	)
-
-	if p.Sqlite && merge && routines > 1 {
-		start = time.Now()
-		var other []int
-		for i := 1; i < routines; i++ {
-			other = append(other, i)
-		}
-		r.Merge(other...)
-		mergeElapsed := time.Since(start)
-		totalTime := conversionElapsed + mergeElapsed
-		info := make([]interface{}, 0)
-		info = append(info, totalTime, conversionElapsed, mergeElapsed)
-		info = append(info, statsOut...)
-		// log.Printf("Merge Time: %s", elapsed)
-		log.Printf("Time: %s, Conversion time: %s, Merge Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
-	} else {
-		info := make([]interface{}, 0)
-		info = append(info, conversionElapsed)
-		info = append(info, statsOut...)
-		log.Printf("Time: %s, Memory: %v MB, buffer-size: %d kb, flush-rate: %d kb, rows: %d, %s/op, rows %f/second, delimiter: %s, go-csv-reader: %d", info...)
+	if logHeader == 1 {
+		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, delimiter, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
 	}
+	merged := <-mergeElapsed
+	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %d, %d, %d, %d, %d\n",
+		totalTime.Round(time.Millisecond),
+		conversionElapsed.Round(time.Millisecond),
+		merged.Round(time.Millisecond),
+		insertedRows,
+		ops.Round(time.Microsecond),
+		math.Floor(rows),
+		threads,
+		delimBytes,
+		p.Buffersize/1024,
+		p.CommitRate,
+		stopCount,
+		p.ChannelCapacity,
+		r.RowsCSV)
 }
 
 func logData(name string, data []byte, max int) {
@@ -291,15 +355,17 @@ func debug(format string, v ...interface{}) {
 	}
 }
 
-func parse(r *parser.Runtime) {
+func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
 	var err error
 	var buf []byte
 	delimSet := false
 	scanner := r.GetScanner()
 	for scanner.Scan() {
 		if err = scanner.Err(); err != nil {
-			log.Fatal(err)
 			close(r.Data)
+			done <- true
+			wg.Done()
+			log.Fatal(err)
 		}
 
 		// if no delimiter was set we detect it once
@@ -322,11 +388,15 @@ func parse(r *parser.Runtime) {
 	}
 
 	if err = scanner.Err(); err != nil {
-		log.Fatal(err)
 		close(r.Data)
+		done <- true
+		wg.Done()
+		log.Fatal(err)
 	}
 
 	close(r.Data)
+	done <- true
+	wg.Done()
 }
 
 var (
