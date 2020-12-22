@@ -18,8 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
-	"github.com/terwey/csv2sqlite/delimiter"
 	"github.com/spf13/pflag"
 	"golang.org/x/sync/semaphore"
 )
@@ -67,7 +67,7 @@ func init() {
 	flags.BoolVar(&stdin, "from-stdin", false, "Read from stdin and not from an input file")
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
-	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Must be one of: \n - "+strings.Join(delimiter.GetDelimiterNames(), "\n - "))
+	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Must be one of: \n - "+strings.Join(characters.GetDelimiterNames(), "\n - "))
 	flags.StringVar(&enclosure, "enclosure", `"`, "Enclosure used")
 	flags.StringVar(&newline, "newline", "", "Newline used, either crlf or lf, else auto-detected")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
@@ -113,7 +113,7 @@ func main() {
 	}
 
 	if paramDelimiter != "" {
-		delimBytes, err := delimiter.DelimiterFromString(paramDelimiter)
+		delimBytes, err := characters.CharacterFromString(paramDelimiter)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error()+"\n")
 			flags.PrintDefaults()
@@ -330,7 +330,7 @@ func main() {
 		ops.Round(time.Microsecond),
 		math.Floor(rows),
 		threads,
-		delimBytes,
+		delimBytes.Name(),
 		p.Buffersize/1024,
 		p.CommitRate,
 		stopCount,
@@ -370,7 +370,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
 
 		// if no delimiter was set we detect it once
 		if !delimSet {
-			delimBytes = delimiter.DetectDelimiter(scanner.Bytes())
+			delimBytes = characters.DetectDelimiter(scanner.Bytes())
 			r.SetDelimiter(delimBytes)
 			delimSet = true
 		}
@@ -401,8 +401,8 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
 
 var (
 	eolBytes   []byte
-	delimBytes delimiter.Delimiter = delimiter.Delimiter_COMMA
-	encloBytes []byte              = []byte("\"")
+	delimBytes characters.Character = characters.Character_COMMA
+	encloBytes []byte               = []byte("\"")
 )
 
 func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error) {

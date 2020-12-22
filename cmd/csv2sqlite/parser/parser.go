@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/terwey/csv2sqlite/delimiter"
+	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/recordwriter/recordwriter"
 )
 
@@ -24,7 +24,7 @@ type Params struct {
 	CommitRate      int
 	Buffersize      int
 	Sqlite          bool
-	Delimiter       delimiter.Delimiter
+	Delimiter       characters.Character
 	Enclosure       []byte
 	ChannelCapacity int
 }
@@ -35,7 +35,7 @@ func NewParameters() *Params {
 		Buffersize: 4096,
 		Input:      "",
 		Output:     "",
-		Delimiter:  delimiter.Delimiter_COMMA,
+		Delimiter:  characters.Character_COMMA,
 		Enclosure:  []byte(`"`),
 	}
 
@@ -114,7 +114,7 @@ func NewParser(p *Params, count int) *Runtime {
 	return r
 }
 
-func (r *Runtime) SetDelimiter(delim delimiter.Delimiter) {
+func (r *Runtime) SetDelimiter(delim characters.Character) {
 	r.p.Delimiter = delim
 }
 

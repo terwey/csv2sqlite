@@ -6,13 +6,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/terwey/csv2sqlite/delimiter"
+	"github.com/terwey/csv2sqlite/characters"
 )
 
 func Benchmark_SplitUnescapedDelimiter(b *testing.B) {
 
 	p := NewParameters()
-	p.Delimiter = delimiter.Delimiter_PIPE
+	p.Delimiter = characters.Character_PIPE
 	r := NewRuntime(p, bufio.ScanLines)
 
 	testData := GetTests()
@@ -1728,7 +1728,7 @@ func GetTests() []TestData {
 func TestSplitUnescapedDelimiter(t *testing.T) {
 
 	p := NewParameters()
-	p.Delimiter = delimiter.Delimiter_PIPE
+	p.Delimiter = characters.Character_PIPE
 	r := NewRuntime(p, bufio.ScanLines)
 
 	tests := GetTests()
