@@ -37,7 +37,7 @@ var (
 	headerLength = 0
 
 	paramDelimiter string
-	enclosure      string
+	paramEnclosure string
 	newline        string
 
 	p *parser.Params
@@ -67,8 +67,8 @@ func init() {
 	flags.BoolVar(&stdin, "from-stdin", false, "Read from stdin and not from an input file")
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
-	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Must be one of: \n - "+strings.Join(characters.GetDelimiterNames(), "\n - "))
-	flags.StringVar(&enclosure, "enclosure", `"`, "Enclosure used")
+	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
+	flags.StringVar(&paramEnclosure, "enclosure", "QUOTATION_MARK", "Set the enclosure, is not auto-detected, can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
 	flags.StringVar(&newline, "newline", "", "Newline used, either crlf or lf, else auto-detected")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
@@ -122,6 +122,17 @@ func main() {
 		p.Delimiter = delimBytes
 	}
 
+	p.Enclosure = characters.Character_QUOTATION_MARK
+	if paramEnclosure != "QUOTATION_MARK" {
+		encloBytes, err := characters.CharacterFromString(paramEnclosure)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error()+"\n")
+			flags.PrintDefaults()
+			os.Exit(100)
+		}
+		p.Enclosure = encloBytes
+	}
+
 	if threads < 2 {
 		log.Printf("Threads is set below 2, changing to 2")
 		threads = 2
@@ -130,9 +141,6 @@ func main() {
 	readyForMerge = make(chan string, 1000)
 	stopWorkers = make(chan bool)
 	inserted = make(chan uint64)
-
-	encloBytes = []byte(enclosure)
-	p.Enclosure = encloBytes
 
 	switch newline {
 	case "lf":

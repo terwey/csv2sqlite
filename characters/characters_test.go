@@ -87,6 +87,11 @@ func TestCharacterFromString(t *testing.T) {
 			want:    Character{},
 			wantErr: true,
 		},
+		{
+			name:    `QUOTATION_MARK_TRIPLE`,
+			want:    Character_QUOTATION_MARK_TRIPLE,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

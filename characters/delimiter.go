@@ -3,10 +3,6 @@
 
 package characters
 
-import (
-	"bytes"
-)
-
 func knownDelimiters() []Character {
 	return []Character{
 		// NB: Character_RECORD_SEPARATOR and Character_UNIT_SEPARATOR need to be first
@@ -25,23 +21,9 @@ func knownDelimiters() []Character {
 }
 
 func GetDelimiterNames() []string {
-	var names []string
-	for _, c := range knownDelimiters() {
-		names = append(names, c.Name())
-	}
-	return names
+	return getNames(knownDelimiters())
 }
 
 func DetectDelimiter(data []byte) Character {
-	var highestCount int
-	var highestDelimiter Character
-	for _, delim := range knownDelimiters() {
-		count := bytes.Count(data, delim)
-		if count > highestCount {
-			highestCount = count
-			highestDelimiter = delim
-		}
-	}
-
-	return highestDelimiter
+	return detect(data, knownDelimiters())
 }
