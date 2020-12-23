@@ -69,7 +69,7 @@ func init() {
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
 	flags.StringVar(&paramEnclosure, "enclosure", "QUOTATION_MARK", "Set the enclosure, is not auto-detected, can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
-	flags.StringVar(&newline, "newline", "", "Newline used, either crlf or lf, else auto-detected")
+	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n- LF\n- CR\n- CRLF")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
@@ -142,11 +142,13 @@ func main() {
 	stopWorkers = make(chan bool)
 	inserted = make(chan uint64)
 
-	switch newline {
-	case "lf":
+	switch strings.ToUpper(newline) {
+	case "LF":
 		eolBytes = []byte("\n")
-	case "crlf":
+	case "CRLF":
 		eolBytes = []byte("\r\n")
+	case "CR":
+		eolBytes = []byte("\r")
 	}
 
 	// detect if the output is a sqlite
@@ -410,7 +412,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
 var (
 	eolBytes   []byte
 	delimBytes characters.Character = characters.Character_COMMA
-	encloBytes []byte               = []byte("\"")
+	encloBytes characters.Character = characters.Character_QUOTATION_MARK
 )
 
 func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -422,6 +424,8 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 	if len(eolBytes) == 0 {
 		if eolIndex = bytes.Index(in, []byte("\r\n")); eolIndex != -1 {
 			eolBytes = []byte("\r\n")
+		} else if eolIndex = bytes.Index(in, []byte("\r")); eolIndex != -1 {
+			eolBytes = []byte("\r")
 		} else if eolIndex = bytes.Index(in, []byte("\n")); eolIndex != -1 {
 			eolBytes = []byte("\n")
 		}
