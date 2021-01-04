@@ -139,7 +139,7 @@ func main() {
 	}
 
 	readyForMerge = make(chan string, 1000)
-	stopWorkers = make(chan bool)
+	stopWorkers = make(chan bool, threads-1)
 	inserted = make(chan uint64)
 
 	switch strings.ToUpper(newline) {
@@ -203,8 +203,7 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go parse(r, &wg, stopWorkers)
+	var mergeWg sync.WaitGroup
 
 	wg.Add(1)
 	go func(inserted <-chan uint64, wg *sync.WaitGroup) {
@@ -214,26 +213,29 @@ func main() {
 		}
 	}(inserted, &wg)
 
-	wg.Add(1)
+	// readWg is used for the main scanner loop and also for the header initialization
+	var readWg sync.WaitGroup
+	readWg.Add(1)
+	go parse(r, &readWg)
+
+	readWg.Add(1)
 	go func(rows <-chan []byte, wg *sync.WaitGroup) {
 		defer wg.Done()
 		for row := range rows {
 			r.ProcessRow(r.ParseRow(row))
 			if threads > 1 {
-				r.CloseDB()
 				return
 			}
 		}
-	}(r.Data, &wg)
+	}(r.Data, &readWg)
 
 	var parserCount int
 	var threadWorkers sync.WaitGroup
 	mergeElapsed := make(chan time.Duration, 1)
 	conversionStart := time.Now()
 	if threads > 1 && <-r.HeaderSet {
-		wg.Add(1)
-
-		go r.Merge(readyForMerge, &wg, mergeElapsed)
+		mergeWg.Add(1)
+		go r.Merge(readyForMerge, &mergeWg, mergeElapsed)
 
 		// we use a semaphore to release/acquire threads so we can start and shutdown
 		// the parsers as needed while merging
@@ -247,6 +249,7 @@ func main() {
 		for {
 			select {
 			case <-stopWorkers:
+				threadWorkers.Wait()
 				break twLoop
 			default:
 				if err := sem.Acquire(ctx, 1); err != nil {
@@ -282,9 +285,16 @@ func main() {
 				threadWorkers.Add(1)
 				go func(rows <-chan []byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
 					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
+
+					signal := false
 					rowCount := 0
 
-					for row := range rows {
+					for {
+						row, more := <-rows
+						if !more {
+							signal = true
+							break
+						}
 						routine.ProcessRow(routine.ParseRow(row))
 						rowCount++
 						if rowCount > stop {
@@ -298,22 +308,24 @@ func main() {
 						log.Fatal(err)
 					}
 
-					ready <- routine.GetPath()
-
-					sem.Release(1)
 					tw.Done()
+					sem.Release(1)
+					ready <- routine.GetPath()
+					if signal {
+						stopWorkers <- true
+					}
 					return
 				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted)
 			}
 		}
-
-		threadWorkers.Wait()
-		conversionElapsed = time.Since(conversionStart)
-		close(inserted)
-		close(readyForMerge)
 	}
 
+	conversionElapsed = time.Since(conversionStart)
+	close(inserted)
+	readWg.Wait()
 	wg.Wait()
+	close(readyForMerge)
+	mergeWg.Wait()
 
 	r.Close()
 
@@ -365,7 +377,7 @@ func debug(format string, v ...interface{}) {
 	}
 }
 
-func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
+func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 	var err error
 	var buf []byte
 	delimSet := false
@@ -373,7 +385,6 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
 	for scanner.Scan() {
 		if err = scanner.Err(); err != nil {
 			close(r.Data)
-			done <- true
 			wg.Done()
 			log.Fatal(err)
 		}
@@ -394,18 +405,17 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, done chan bool) {
 
 		buf = make([]byte, len(scanner.Bytes()))
 		copy(buf, scanner.Bytes())
+		// logData("buf", buf, 512)
 		r.Data <- buf
 	}
 
 	if err = scanner.Err(); err != nil {
 		close(r.Data)
-		done <- true
 		wg.Done()
 		log.Fatal(err)
 	}
 
 	close(r.Data)
-	done <- true
 	wg.Done()
 }
 

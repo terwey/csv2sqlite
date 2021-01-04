@@ -169,7 +169,11 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 
 		r.rw = recordwriter.NewCSVWriter(r.w)
 	} else {
-		r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate)
+		if r.Count == 0 {
+			r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, true)
+		} else {
+			r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, false)
+		}
 	}
 
 	if r.Count == 0 {
