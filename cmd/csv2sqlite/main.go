@@ -136,7 +136,8 @@ func main() {
 		delimBytes = p.Delimiter
 	} else {
 		if paramDelimiter != "" {
-			delimBytes, err := characters.CharacterFromString(paramDelimiter)
+			var err error
+			delimBytes, err = characters.CharacterFromString(paramDelimiter)
 			if err != nil {
 				fmt.Fprint(os.Stderr, err.Error()+"\n")
 				flags.PrintDefaults()
@@ -153,7 +154,8 @@ func main() {
 		p.Enclosure = characters.Character_QUOTATION_MARK
 		encloBytes = p.Enclosure
 		if paramEnclosure != "QUOTATION_MARK" {
-			encloBytes, err := characters.CharacterFromString(paramEnclosure)
+			var err error
+			encloBytes, err = characters.CharacterFromString(paramEnclosure)
 			if err != nil {
 				fmt.Fprint(os.Stderr, err.Error()+"\n")
 				flags.PrintDefaults()
