@@ -37,6 +37,8 @@ var (
 	Character_ASTERISK              Character = []byte("*")
 
 	Character_EMPTY Character = []byte("")
+
+	Character_NIL Character = nil
 )
 
 func getAllCharacters() map[string]Character {

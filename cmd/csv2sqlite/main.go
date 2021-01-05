@@ -36,6 +36,9 @@ var (
 
 	headerLength = 0
 
+	literalDelimiter string
+	literalEnclosure string
+
 	paramDelimiter string
 	paramEnclosure string
 	newline        string
@@ -69,6 +72,10 @@ func init() {
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
 	flags.StringVar(&paramEnclosure, "enclosure", "QUOTATION_MARK", "Set the enclosure, is not auto-detected, can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
+
+	flags.StringVar(&literalDelimiter, "literal-delimiter", "", "Sets the delimiter to use to a literal string, if set the --delimiter is ignored")
+	flags.StringVar(&literalEnclosure, "literal-enclosure", "", "Sets the enclosure to use to a literal string, if set the --enclosure is ignored")
+
 	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n- LF\n- CR\n- CRLF")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
@@ -112,25 +119,48 @@ func main() {
 		}
 	}
 
-	if paramDelimiter != "" {
-		delimBytes, err := characters.CharacterFromString(paramDelimiter)
-		if err != nil {
-			fmt.Fprint(os.Stderr, err.Error()+"\n")
-			flags.PrintDefaults()
-			os.Exit(100)
+	literald := false
+	literale := false
+
+	flags.Visit(func(f *pflag.Flag) {
+		if f.Name == "literal-delimiter" {
+			literald = true
 		}
-		p.Delimiter = delimBytes
+		if f.Name == "literal-enclosure" {
+			literale = true
+		}
+	})
+
+	if literald {
+		p.Delimiter = characters.Character(literalDelimiter)
+		delimBytes = p.Delimiter
+	} else {
+		if paramDelimiter != "" {
+			delimBytes, err := characters.CharacterFromString(paramDelimiter)
+			if err != nil {
+				fmt.Fprint(os.Stderr, err.Error()+"\n")
+				flags.PrintDefaults()
+				os.Exit(100)
+			}
+			p.Delimiter = delimBytes
+		}
 	}
 
-	p.Enclosure = characters.Character_QUOTATION_MARK
-	if paramEnclosure != "QUOTATION_MARK" {
-		encloBytes, err := characters.CharacterFromString(paramEnclosure)
-		if err != nil {
-			fmt.Fprint(os.Stderr, err.Error()+"\n")
-			flags.PrintDefaults()
-			os.Exit(100)
+	if literale {
+		p.Enclosure = characters.Character(literalEnclosure)
+		encloBytes = p.Enclosure
+	} else {
+		p.Enclosure = characters.Character_QUOTATION_MARK
+		encloBytes = p.Enclosure
+		if paramEnclosure != "QUOTATION_MARK" {
+			encloBytes, err := characters.CharacterFromString(paramEnclosure)
+			if err != nil {
+				fmt.Fprint(os.Stderr, err.Error()+"\n")
+				flags.PrintDefaults()
+				os.Exit(100)
+			}
+			p.Enclosure = encloBytes
 		}
-		p.Enclosure = encloBytes
 	}
 
 	if threads < 2 {
@@ -380,7 +410,10 @@ func debug(format string, v ...interface{}) {
 func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 	var err error
 	var buf []byte
-	delimSet := false
+	var delimSet bool
+	if bytes.Compare(delimBytes, characters.Character_NIL) == 0 {
+		delimSet = true
+	}
 	scanner := r.GetScanner()
 	for scanner.Scan() {
 		if err = scanner.Err(); err != nil {
@@ -421,8 +454,8 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 
 var (
 	eolBytes   []byte
-	delimBytes characters.Character = characters.Character_COMMA
-	encloBytes characters.Character = characters.Character_QUOTATION_MARK
+	delimBytes characters.Character = characters.Character_NIL
+	encloBytes characters.Character = characters.Character_NIL
 )
 
 func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error) {
