@@ -74,12 +74,12 @@ func init() {
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
-	flags.IntVar(&stopCount, "break-count", 10000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
+	flags.IntVar(&stopCount, "break-count", 40000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", 2, "Threads to use when writing output, default is set to two.")
-	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 2000, "Buffered channels capacity")
+	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 8000, "Buffered channels capacity")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.SortFlags = false
 }
