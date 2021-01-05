@@ -2,7 +2,6 @@ module github.com/terwey/csv2sqlite
 
 go 1.14
 
-
 require (
 	github.com/google/go-cmp v0.5.2
 	github.com/terwey/recordwriter v0.1.2
