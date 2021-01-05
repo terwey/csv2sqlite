@@ -440,7 +440,6 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 
 		buf = make([]byte, len(scanner.Bytes()))
 		copy(buf, scanner.Bytes())
-		// logData("buf", buf, 512)
 		r.Data <- buf
 	}
 
