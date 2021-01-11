@@ -165,6 +165,8 @@ func main() {
 		}
 	}
 
+	encloLen = len(encloBytes)
+
 	if threads < 2 {
 		log.Printf("Threads is set below 2, changing to 2")
 		threads = 2
@@ -414,7 +416,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 	var buf []byte
 	var delimSet bool
 	if bytes.Compare(delimBytes, characters.Character_NIL) == 0 {
-		delimSet = true
+		delimSet = false
 	}
 	scanner := r.GetScanner()
 	for scanner.Scan() {
@@ -457,6 +459,7 @@ var (
 	eolBytes   []byte
 	delimBytes characters.Character = characters.Character_NIL
 	encloBytes characters.Character = characters.Character_NIL
+	encloLen   int                  = 0
 )
 
 func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -505,6 +508,11 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 
 		// count the enclosures
 		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
+
+		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
+		if encloLen == 0 && bytes.Count(in[:eolIndex], delimBytes) == headerLength {
+			return eolIndex + len(eolBytes), in[:eolIndex], nil
+		}
 
 		// if delimCount is larger then headerLength _AND_ encloCount is even
 		// it COULD be a row, more tests will proof otherwise
