@@ -20,6 +20,7 @@ import (
 
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/pflag"
 	"golang.org/x/sync/semaphore"
 )
@@ -46,6 +47,7 @@ var (
 	p *parser.Params
 	r *parser.Runtime
 
+	bar     *progressbar.ProgressBar
 	threads int
 
 	parseRoutines []*parser.Runtime
@@ -79,14 +81,14 @@ func init() {
 	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n- LF\n- CR\n- CRLF")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
+	flags.IntVar(&stopCount, "break-count", 40000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
-	flags.IntVar(&stopCount, "break-count", 40000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
-	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
-	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", 2, "Threads to use when writing output, default is set to two.")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 8000, "Buffered channels capacity")
+	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
+	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.SortFlags = false
 }
@@ -171,6 +173,8 @@ func main() {
 		log.Printf("Threads is set below 2, changing to 2")
 		threads = 2
 	}
+
+	bar = progressbar.DefaultBytes(-1, "Processing")
 
 	readyForMerge = make(chan string, 1000)
 	stopWorkers = make(chan bool, threads-1)
@@ -374,6 +378,8 @@ func main() {
 		ops = time.Duration(0)
 	}
 
+	bar.Clear()
+
 	if logHeader == 1 {
 		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, delimiter, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
 	}
@@ -441,7 +447,9 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 		}
 
 		buf = make([]byte, len(scanner.Bytes()))
+
 		copy(buf, scanner.Bytes())
+		bar.Add(len(buf))
 		r.Data <- buf
 	}
 
