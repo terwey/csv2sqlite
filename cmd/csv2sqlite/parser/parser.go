@@ -24,19 +24,22 @@ type Params struct {
 	CommitRate      int
 	Buffersize      int
 	Sqlite          bool
+	Drop            bool
 	Delimiter       characters.Character
-	Enclosure       []byte
+	Enclosure       characters.Character
 	ChannelCapacity int
+	enclosureClean  bool
 }
 
 func NewParameters() *Params {
 	p := &Params{
-		CommitRate: 32768,
-		Buffersize: 4096,
-		Input:      "",
-		Output:     "",
-		Delimiter:  characters.Character_COMMA,
-		Enclosure:  []byte(`"`),
+		CommitRate:     32768,
+		Buffersize:     4096,
+		Input:          "",
+		Output:         "",
+		Delimiter:      characters.Character_COMMA,
+		Enclosure:      characters.Character_QUOTATION_MARK,
+		enclosureClean: true,
 	}
 
 	return p
@@ -97,6 +100,10 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 
+	if bytes.Compare(r.p.Enclosure, characters.Character_EMPTY) == 0 {
+		r.p.enclosureClean = false
+	}
+
 	return r
 }
 
@@ -118,10 +125,14 @@ func (r *Runtime) SetDelimiter(delim characters.Character) {
 	r.p.Delimiter = delim
 }
 
+func (r *Runtime) SetEnclosure(encl characters.Character) {
+	r.p.Enclosure = encl
+}
+
 func (r *Runtime) Merge(ready <-chan string, wg *sync.WaitGroup, duration chan time.Duration) {
-	if sqlwriter, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
-		sqlwriter.Merge(ready, wg, duration)
-	}
+	// if sqlwriter, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
+	r.rw.Merge(ready, wg, duration)
+	// }
 }
 
 func (r *Runtime) GetPath() string {
@@ -151,28 +162,32 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 		output = fmt.Sprintf("%s.%d", r.p.Output, r.Count)
 	}
 
-	if !r.p.Sqlite {
-		if len(r.p.Output) == 0 {
-			r.w = os.Stdout
-			if r.Benchmark {
-				r.w = bufio.NewWriterSize(bytes.NewBuffer([]byte{}), r.p.CommitRate)
-			}
-		} else {
-
-			r.fout, err = os.Create(output)
-
-			if err != nil {
-				log.Fatalf("Cannot open file for writing: %s", err)
-			}
-			r.w = bufio.NewWriterSize(r.fout, r.p.CommitRate)
-		}
-
-		r.rw = recordwriter.NewCSVWriter(r.w)
+	if r.p.Drop {
+		r.rw = recordwriter.NewDropWriter()
 	} else {
-		if r.Count == 0 {
-			r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, true)
+		if !r.p.Sqlite {
+			if len(r.p.Output) == 0 {
+				r.w = os.Stdout
+				if r.Benchmark {
+					r.w = bufio.NewWriterSize(bytes.NewBuffer([]byte{}), r.p.CommitRate)
+				}
+			} else {
+
+				r.fout, err = os.Create(output)
+
+				if err != nil {
+					log.Fatalf("Cannot open file for writing: %s", err)
+				}
+				r.w = bufio.NewWriterSize(r.fout, r.p.CommitRate)
+			}
+
+			r.rw = recordwriter.NewCSVWriter(r.w)
 		} else {
-			r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, false)
+			if r.Count == 0 {
+				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, true)
+			} else {
+				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, false)
+			}
 		}
 	}
 
@@ -343,11 +358,13 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	}
 
 	for i := range columns {
-		columns[i] = bytes.TrimPrefix(columns[i], r.p.Enclosure)
-		columns[i] = bytes.TrimSuffix(columns[i], r.p.Enclosure)
+		if r.p.enclosureClean {
+			columns[i] = bytes.TrimPrefix(columns[i], r.p.Enclosure)
+			columns[i] = bytes.TrimSuffix(columns[i], r.p.Enclosure)
 
-		// we need to clean double quotes
-		columns[i] = ReplaceAll(columns[i], r.doubleEnclosure, r.p.Enclosure)
+			// we need to clean double quotes
+			columns[i] = ReplaceAll(columns[i], r.doubleEnclosure, r.p.Enclosure)
+		}
 		columns[i] = ReplaceAll(columns[i], carriageReturn, lineFeed)
 	}
 

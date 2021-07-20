@@ -86,10 +86,11 @@ func init() {
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", 2, "Threads to use when writing output, default is set to two.")
-	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 8000, "Buffered channels capacity")
+	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 1000, "Buffered channels capacity multiplied by threads")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
+	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
 	flags.SortFlags = false
 }
 
@@ -152,22 +153,22 @@ func main() {
 	if literale {
 		p.Enclosure = characters.Character(literalEnclosure)
 		encloBytes = p.Enclosure
-	} else {
-		p.Enclosure = characters.Character_QUOTATION_MARK
-		encloBytes = p.Enclosure
-		if paramEnclosure != "QUOTATION_MARK" {
-			var err error
-			encloBytes, err = characters.CharacterFromString(paramEnclosure)
-			if err != nil {
-				fmt.Fprint(os.Stderr, err.Error()+"\n")
-				flags.PrintDefaults()
-				os.Exit(100)
-			}
-			p.Enclosure = encloBytes
+	}
+	if paramEnclosure != `` {
+		var err error
+		encloBytes, err = characters.CharacterFromString(paramEnclosure)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error()+"\n")
+			flags.PrintDefaults()
+			os.Exit(100)
 		}
+		p.Enclosure = encloBytes
 	}
 
 	encloLen = len(encloBytes)
+
+	// multiple channel capacity by threads
+	p.ChannelCapacity = p.ChannelCapacity * threads
 
 	if threads < 2 {
 		log.Printf("Threads is set below 2, changing to 2")
@@ -322,7 +323,7 @@ func main() {
 
 				threadWorkers.Add(1)
 				go func(rows <-chan []byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
-					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
+					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int, inserted chan uint64, pv *progressbar.ProgressBar) {
 
 					signal := false
 					rowCount := 0
@@ -333,6 +334,7 @@ func main() {
 							signal = true
 							break
 						}
+						pv.Add(len(row))
 						routine.ProcessRow(routine.ParseRow(row))
 						rowCount++
 						if rowCount > stop {
@@ -353,7 +355,7 @@ func main() {
 						stopWorkers <- true
 					}
 					return
-				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted)
+				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted, bar)
 			}
 		}
 	}
@@ -381,10 +383,10 @@ func main() {
 	bar.Clear()
 
 	if logHeader == 1 {
-		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, delimiter, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
+		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
 	}
 	merged := <-mergeElapsed
-	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %d, %d, %d, %d, %d\n",
+	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d\n",
 		totalTime.Round(time.Millisecond),
 		conversionElapsed.Round(time.Millisecond),
 		merged.Round(time.Millisecond),
@@ -392,6 +394,7 @@ func main() {
 		ops.Round(time.Microsecond),
 		math.Floor(rows),
 		threads,
+		encloBytes.Name(),
 		delimBytes.Name(),
 		p.Buffersize/1024,
 		p.CommitRate,
@@ -419,10 +422,14 @@ func debug(format string, v ...interface{}) {
 
 func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 	var err error
-	var buf []byte
+	// var buf []byte
 	var delimSet bool
-	if bytes.Compare(delimBytes, characters.Character_NIL) == 0 {
-		delimSet = false
+	var enclosureSet bool
+	if delimBytes != nil {
+		delimSet = true
+	}
+	if encloBytes != nil {
+		enclosureSet = true
 	}
 	scanner := r.GetScanner()
 	for scanner.Scan() {
@@ -439,6 +446,12 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 			delimSet = true
 		}
 
+		if !enclosureSet {
+			encloBytes = characters.DetectDelimiter(scanner.Bytes())
+			r.SetEnclosure(encloBytes)
+			enclosureSet = true
+		}
+
 		// header has to be set once
 		if headerLength == 0 {
 			// we have to count the delimiters in the header to know for row scanning
@@ -446,11 +459,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 			headerLength = bytes.Count(scanner.Bytes(), delimBytes)
 		}
 
-		buf = make([]byte, len(scanner.Bytes()))
-
-		copy(buf, scanner.Bytes())
-		bar.Add(len(buf))
-		r.Data <- buf
+		r.Data <- scanner.Bytes()
 	}
 
 	if err = scanner.Err(); err != nil {
