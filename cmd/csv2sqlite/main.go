@@ -47,7 +47,7 @@ var (
 	p *parser.Params
 	r *parser.Runtime
 
-	bar     *progressbar.ProgressBar
+	pv      *progressbar.ProgressBar
 	threads int
 
 	parseRoutines []*parser.Runtime
@@ -73,7 +73,7 @@ func init() {
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
-	flags.StringVar(&paramEnclosure, "enclosure", "QUOTATION_MARK", "Set the enclosure, is not auto-detected, can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
+	flags.StringVar(&paramEnclosure, "enclosure", "", "Set the enclosure in case auto-detect should not be used, can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
 
 	flags.StringVar(&literalDelimiter, "literal-delimiter", "", "Sets the delimiter to use to a literal string, if set the --delimiter is ignored")
 	flags.StringVar(&literalEnclosure, "literal-enclosure", "", "Sets the enclosure to use to a literal string, if set the --enclosure is ignored")
@@ -175,7 +175,7 @@ func main() {
 		threads = 2
 	}
 
-	bar = progressbar.DefaultBytes(-1, "Processing")
+	pv = progressbar.DefaultBytes(-1, "Processing")
 
 	readyForMerge = make(chan string, 1000)
 	stopWorkers = make(chan bool, threads-1)
@@ -355,7 +355,7 @@ func main() {
 						stopWorkers <- true
 					}
 					return
-				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted, bar)
+				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted, pv)
 			}
 		}
 	}
@@ -380,7 +380,7 @@ func main() {
 		ops = time.Duration(0)
 	}
 
-	bar.Clear()
+	pv.Clear()
 
 	if logHeader == 1 {
 		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
@@ -447,7 +447,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 		}
 
 		if !enclosureSet {
-			encloBytes = characters.DetectDelimiter(scanner.Bytes())
+			encloBytes = characters.DetectEnclosure(scanner.Bytes())
 			r.SetEnclosure(encloBytes)
 			enclosureSet = true
 		}
