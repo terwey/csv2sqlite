@@ -58,6 +58,8 @@ var (
 	stopCount     int
 	logHeader     int
 
+	chunksize int
+
 	// version is set during build
 	version    = "undefined"
 	minversion = "undefined"
@@ -86,11 +88,13 @@ func init() {
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", 2, "Threads to use when writing output, default is set to two.")
-	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 1000, "Buffered channels capacity multiplied by threads")
+	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 100, "Buffered channels capacity multiplied by threads")
+	flags.IntVar(&chunksize, "chunksize", 10, "Chunksize before pushing the data to the channel")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
+	flags.BoolVar(&p.NoAlloc, "noalloc", false, "Skips allocating byte slices, use with caution")
 	flags.SortFlags = false
 }
 
@@ -241,38 +245,27 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var wg sync.WaitGroup
+	var insertWg sync.WaitGroup
 	var mergeWg sync.WaitGroup
 
-	wg.Add(1)
+	insertWg.Add(1)
 	go func(inserted <-chan uint64, wg *sync.WaitGroup) {
 		defer wg.Done()
 		for rows := range inserted {
 			insertedRows += rows
 		}
-	}(inserted, &wg)
+	}(inserted, &insertWg)
 
 	// readWg is used for the main scanner loop and also for the header initialization
 	var readWg sync.WaitGroup
 	readWg.Add(1)
-	go parse(r, &readWg)
-
-	readWg.Add(1)
-	go func(rows <-chan []byte, wg *sync.WaitGroup) {
-		defer wg.Done()
-		for row := range rows {
-			r.ProcessRow(r.ParseRow(row))
-			if threads > 1 {
-				return
-			}
-		}
-	}(r.Data, &readWg)
+	go parse(r, &readWg, chunksize, pv)
 
 	var parserCount int
 	var threadWorkers sync.WaitGroup
 	mergeElapsed := make(chan time.Duration, 1)
 	conversionStart := time.Now()
-	if threads > 1 && <-r.HeaderSet {
+	if <-r.HeaderSet {
 		mergeWg.Add(1)
 		go r.Merge(readyForMerge, &mergeWg, mergeElapsed)
 
@@ -322,21 +315,25 @@ func main() {
 				parseRoutines = append(parseRoutines, pr)
 
 				threadWorkers.Add(1)
-				go func(rows <-chan []byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
-					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int, inserted chan uint64, pv *progressbar.ProgressBar) {
+				go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
+					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
 
 					signal := false
 					rowCount := 0
 
 					for {
-						row, more := <-rows
+						chunk, more := <-chunks
+
+						for i := range chunk {
+							routine.ProcessRow(routine.ParseRow(chunk[i]))
+							rowCount++
+						}
+
 						if !more {
 							signal = true
 							break
 						}
-						pv.Add(len(row))
-						routine.ProcessRow(routine.ParseRow(row))
-						rowCount++
+
 						if rowCount > stop {
 							break
 						}
@@ -355,18 +352,18 @@ func main() {
 						stopWorkers <- true
 					}
 					return
-				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted, pv)
+				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted)
 			}
 		}
 	}
 
 	conversionElapsed = time.Since(conversionStart)
+
 	close(inserted)
 	readWg.Wait()
-	wg.Wait()
+	insertWg.Wait()
 	close(readyForMerge)
 	mergeWg.Wait()
-
 	r.Close()
 
 	totalTime := time.Since(start)
@@ -383,10 +380,10 @@ func main() {
 	pv.Clear()
 
 	if logHeader == 1 {
-		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
+		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
 	}
 	merged := <-mergeElapsed
-	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d\n",
+	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d\n",
 		totalTime.Round(time.Millisecond),
 		conversionElapsed.Round(time.Millisecond),
 		merged.Round(time.Millisecond),
@@ -396,6 +393,7 @@ func main() {
 		threads,
 		encloBytes.Name(),
 		delimBytes.Name(),
+		chunksize,
 		p.Buffersize/1024,
 		p.CommitRate,
 		stopCount,
@@ -416,11 +414,11 @@ func logData(name string, data []byte, max int) {
 
 func debug(format string, v ...interface{}) {
 	if debugLog {
-		log.Printf(format+"\n----\n", v...)
+		fmt.Fprintf(os.Stderr, format+"\n----\n", v...)
 	}
 }
 
-func parse(r *parser.Runtime, wg *sync.WaitGroup) {
+func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar.ProgressBar) {
 	var err error
 	// var buf []byte
 	var delimSet bool
@@ -432,6 +430,13 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 		enclosureSet = true
 	}
 	scanner := r.GetScanner()
+
+	var chunks [][]byte
+	chunks = make([][]byte, 0)
+	var chunk []byte
+
+	count := 0
+	var chunksSize int
 	for scanner.Scan() {
 		if err = scanner.Err(); err != nil {
 			close(r.Data)
@@ -439,15 +444,19 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 			log.Fatal(err)
 		}
 
+		size := len(scanner.Bytes())
+		chunk = make([]byte, size)
+		copy(chunk, scanner.Bytes())
+		chunksSize += size
 		// if no delimiter was set we detect it once
 		if !delimSet {
-			delimBytes = characters.DetectDelimiter(scanner.Bytes())
+			delimBytes = characters.DetectDelimiter(chunk)
 			r.SetDelimiter(delimBytes)
 			delimSet = true
 		}
 
 		if !enclosureSet {
-			encloBytes = characters.DetectEnclosure(scanner.Bytes())
+			encloBytes = characters.DetectEnclosure(chunk)
 			r.SetEnclosure(encloBytes)
 			enclosureSet = true
 		}
@@ -456,10 +465,25 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 		if headerLength == 0 {
 			// we have to count the delimiters in the header to know for row scanning
 			// how many fields we need
-			headerLength = bytes.Count(scanner.Bytes(), delimBytes)
+			headerLength = bytes.Count(chunk, delimBytes)
 		}
 
-		r.Data <- scanner.Bytes()
+		// we have to process a header once
+		if count == 0 {
+			r.ParseRow(chunk)
+			count++
+			continue
+		}
+
+		// r.Data <- scanner.Bytes()
+		if len(chunks) >= chunksize {
+			r.Data <- chunks
+			pv.Add(chunksSize)
+			chunksSize = 0
+			chunks = make([][]byte, 0)
+		}
+
+		chunks = append(chunks, chunk)
 	}
 
 	if err = scanner.Err(); err != nil {
@@ -467,6 +491,9 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup) {
 		wg.Done()
 		log.Fatal(err)
 	}
+
+	// send over the last chunks
+	r.Data <- chunks
 
 	close(r.Data)
 	wg.Done()
@@ -504,6 +531,7 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 	// not enough bytes
 	if eolIndex == -1 {
 		if atEOF {
+			debug("atEOF")
 			return len(in), in, nil
 		}
 		return 0, nil, nil
@@ -512,7 +540,8 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 	if headerLength == 0 {
 		// the optional header always ends with a newline
 		if eolIndex != -1 {
-			// we have to return the found data MINUS the length of the eolBytes
+			// we have to return the found data PLUS the length of the eolBytes
+			logData("eolIndex != -1", in[:eolIndex], 40960)
 			return eolIndex + len(eolBytes), in[:eolIndex], nil
 		}
 	}
@@ -528,12 +557,14 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
 		if encloLen == 0 && bytes.Count(in[:eolIndex], delimBytes) == headerLength {
+			logData("encloLen == 0", in[:eolIndex], 40960)
 			return eolIndex + len(eolBytes), in[:eolIndex], nil
 		}
 
 		// if delimCount is larger then headerLength _AND_ encloCount is even
 		// it COULD be a row, more tests will proof otherwise
 		if bytes.Count(in[:eolIndex], delimBytes) >= headerLength && (bytes.Count(in[:eolIndex], encloBytes)%2 == 0) {
+			logData("delimCount is larger then headerLength _AND_ encloCount is even", in[:eolIndex], 40960)
 			return eolIndex + len(eolBytes), in[:eolIndex], nil
 		}
 

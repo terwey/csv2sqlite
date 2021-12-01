@@ -29,6 +29,7 @@ type Params struct {
 	Enclosure       characters.Character
 	ChannelCapacity int
 	enclosureClean  bool
+	NoAlloc         bool
 }
 
 func NewParameters() *Params {
@@ -37,9 +38,10 @@ func NewParameters() *Params {
 		Buffersize:     4096,
 		Input:          "",
 		Output:         "",
-		Delimiter:      characters.Character_COMMA,
-		Enclosure:      characters.Character_QUOTATION_MARK,
+		Delimiter:      characters.Character_NIL,
+		Enclosure:      characters.Character_NIL,
 		enclosureClean: true,
+		NoAlloc:        false,
 	}
 
 	return p
@@ -49,6 +51,8 @@ type Runtime struct {
 	p       *Params
 	readbuf []byte
 	reader  *bufio.Reader
+
+	noalloc bool
 
 	Benchmark bool
 
@@ -72,7 +76,7 @@ type Runtime struct {
 	Header    [][]byte
 	HeaderSet chan bool
 
-	Data  chan []byte
+	Data  chan [][]byte
 	Count int
 
 	Debug bool
@@ -94,8 +98,9 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		Count:         0,
 	}
 
+	r.noalloc = p.NoAlloc
 	r.HeaderSet = make(chan bool)
-	r.Data = make(chan []byte, p.ChannelCapacity)
+	r.Data = make(chan [][]byte, p.ChannelCapacity)
 
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
@@ -113,10 +118,13 @@ func NewParser(p *Params, count int) *Runtime {
 		headerPrinted: false,
 		Benchmark:     false,
 		Count:         count,
+		noalloc:       p.NoAlloc,
 	}
 
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
+
+	r.Debug = true
 
 	return r
 }
@@ -311,23 +319,36 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	// if that matches the amount we expect
 	// amount = columns + 1
 
-	columns = bytes.Split(data, r.p.Delimiter)
+	count := Count(data, r.p.Delimiter) + 1
+	if r.colCount == count {
+		columns, _ = r.Split(data, r.p.Delimiter)
+	}
 
 	// r.colCount is set to non-zero on header creation
 	// TODO: fix that the header gets parsed by our code too
 	if r.colCount != 0 {
-		count := Count(data, r.p.Delimiter)
+		// count := Count(data, r.p.Delimiter)
 		// if the count is correct we can just simply do a normal split and skip this logic
-		if count+1 != r.colCount {
-			columns := r.ParseUnescapedDelimiter(columns)
+		if count != r.colCount {
+			var columns [][]byte
+			if r.noalloc {
+				columns = r.ParseUnescapedDelimiter(bytes.Split(data, r.p.Delimiter))
+			} else {
+				columns = r.ParseUnescapedDelimiter(columns)
+			}
 			if len(columns) == r.colCount {
 				return columns
 			}
 		}
 	}
 
+	// columns = bytes.Split(data, r.p.Delimiter)
+
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
-	if len(columns) > r.colCount {
+	if count > r.colCount {
+		if r.noalloc {
+			r.debug("csvReader")
+		}
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
@@ -342,30 +363,33 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 				break
 			}
 			if err != nil {
-				log.Fatalf("csv reading failed: %s, data: \n%s", err, data)
+				// let the other logs shutdown
+				time.Sleep(2 * time.Second)
+				log.Printf("csv reading failed: %s, data: \n%s", err, data)
+				panic(err)
 			}
 
 			for _, col := range record {
-				columns = append(columns, []byte(col))
+				columns = r.append(columns, []byte(col))
 			}
 		}
 
 		if r.colCount != 0 {
 			r.RowsCSV++
+			if r.noalloc {
+				r.rw.Next()
+				r.Rows++
+				r.rw.EOR(r.colCount)
+			}
 		}
 
 		return columns
 	}
 
-	for i := range columns {
-		if r.p.enclosureClean {
-			columns[i] = bytes.TrimPrefix(columns[i], r.p.Enclosure)
-			columns[i] = bytes.TrimSuffix(columns[i], r.p.Enclosure)
-
-			// we need to clean double quotes
-			columns[i] = ReplaceAll(columns[i], r.doubleEnclosure, r.p.Enclosure)
+	if !r.noalloc {
+		for i := range columns {
+			columns[i] = r.clean(columns[i])
 		}
-		columns[i] = ReplaceAll(columns[i], carriageReturn, lineFeed)
 	}
 
 	return columns
@@ -396,7 +420,41 @@ var (
 	lineFeed       []byte = []byte("\x0a") // \n
 )
 
+func (r *Runtime) append(slice [][]byte, elems ...[]byte) [][]byte {
+	if r.colCount == 0 || !r.noalloc {
+		return append(slice, elems...)
+	}
+
+	for _, elem := range elems {
+		elem = r.clean(elem)
+		if len(elem) == 0 {
+			r.rw.WriteNull()
+		} else {
+			r.rw.WriteByte(elem)
+		}
+	}
+
+	return nil
+}
+
+func (r *Runtime) clean(data []byte) []byte {
+	if r.p.enclosureClean {
+		data = bytes.TrimPrefix(data, r.p.Enclosure)
+		data = bytes.TrimSuffix(data, r.p.Enclosure)
+
+		// we need to clean double quotes
+		data = ReplaceAll(data, r.doubleEnclosure, r.p.Enclosure)
+	}
+	data = ReplaceAll(data, carriageReturn, lineFeed)
+
+	return data
+}
+
 func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
+	if r.noalloc {
+		r.debug("ParseUnescapedDelimiter")
+	}
+
 	// we need to seek through the data and find the first Enclosure and escape the delimiter
 
 	// we first split on the delimiter and then check if two Enclosures are available
@@ -442,7 +500,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
 				// we need to clean double enclosures to single
 				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
-				columns = append(columns, r.sbuf)
+				columns = r.append(columns, r.sbuf)
 				r.sbuf = make([]byte, 0)
 				r.inside = false
 				enclosurecheck = false
@@ -460,7 +518,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
 				continue
 			}
 			input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
-			columns = append(columns, input[i])
+			columns = r.append(columns, input[i])
 			continue
 		}
 
@@ -473,7 +531,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
 				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 				r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
-				columns = append(columns, r.sbuf)
+				columns = r.append(columns, r.sbuf)
 				r.sbuf = make([]byte, 0)
 				continue
 			}
@@ -512,7 +570,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
 					// we need to clean double enclosures to single
 					r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 					r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
-					columns = append(columns, r.sbuf)
+					columns = r.append(columns, r.sbuf)
 					r.sbuf = make([]byte, 0)
 					r.inside = false
 					enclosurecheck = false
@@ -534,7 +592,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
 			// we need to clean double enclosures to single
 			input[i] = ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
 			input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
-			columns = append(columns, input[i])
+			columns = r.append(columns, input[i])
 			r.inside = false
 			continue
 		}
@@ -551,10 +609,17 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
 		// we need to clean double enclosures to single
 		input[i] = ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
 		input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
-		columns = append(columns, input[i])
+		columns = r.append(columns, input[i])
 	}
 
 	// r.debug("columns: %d", len(columns))
+
+	if r.noalloc {
+		// log.Println("noalloc ParseUnescapedDelimiter")
+		r.rw.Next()
+		r.Rows++
+		r.rw.EOR(r.colCount)
+	}
 
 	return columns
 }
@@ -569,9 +634,9 @@ func Count(s, sep []byte) int {
 	return bytes.Count(s, sep)
 }
 
-// ReplaceAll calls bytes.Count beforehand preventing alloc
+// ReplaceAll calls bytes.Contains beforehand preventing alloc
 func ReplaceAll(s, old, new []byte) []byte {
-	if Count(s, old) == 0 {
+	if !bytes.Contains(s, old) {
 		return s
 	}
 	return bytes.ReplaceAll(s, old, new)
@@ -584,4 +649,69 @@ func TrimSuffixSkipCheck(s, suffix []byte) []byte {
 
 func TrimPrefixSkipCheck(s, prefix []byte) []byte {
 	return s[len(prefix):]
+}
+
+func (r *Runtime) Split(s, sep []byte) ([][]byte, int) {
+	if r.colCount == 0 || !r.noalloc {
+		return genSplit(s, sep, -1)
+	}
+
+	if r.noalloc {
+		r.debug("Split")
+	}
+	count := Count(s, sep) + 1
+
+	// a := make([][]byte, count)
+	count--
+	i := 0
+	for i < count {
+		m := bytes.Index(s, sep)
+		if m < 0 {
+			break
+		}
+		if len(r.clean(s[:m:m])) == 0 {
+			r.rw.WriteNull()
+		} else {
+			r.rw.WriteByte(r.clean(s[:m:m]))
+		}
+		// a[i] = s[:m:m]
+		s = s[m+len(sep):]
+		i++
+	}
+
+	r.rw.Next()
+	r.Rows++
+
+	r.rw.EOR(r.colCount)
+
+	return nil, count
+	// a[i] = s
+	// return a[:i+1], count
+}
+
+// Generic split: splits after each instance of sep,
+// including sepSave bytes of sep in the subslices.
+func genSplit(s, sep []byte, n int) (a [][]byte, count int) {
+	if n == 0 {
+		return nil, 0
+	}
+	if n < 0 {
+		n = Count(s, sep) + 1
+		count = n
+	}
+
+	a = make([][]byte, n)
+	n--
+	i := 0
+	for i < n {
+		m := bytes.Index(s, sep)
+		if m < 0 {
+			break
+		}
+		a[i] = s[:m:m]
+		s = s[m+len(sep):]
+		i++
+	}
+	a[i] = s
+	return a[:i+1], count
 }
