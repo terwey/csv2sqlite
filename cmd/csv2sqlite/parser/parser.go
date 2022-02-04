@@ -79,8 +79,6 @@ type Runtime struct {
 	Data  chan [][]byte
 	Count int
 
-	Debug bool
-
 	sinput [][]byte
 	// scolumns [][]byte
 	sbuf []byte
@@ -88,6 +86,10 @@ type Runtime struct {
 	hasPrefixEnclosure bool
 	hasSuffixEnclosure bool
 }
+
+var (
+	DebugLog = false
+)
 
 func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	r := &Runtime{
@@ -97,6 +99,8 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		Benchmark:     false,
 		Count:         0,
 	}
+
+	recordwriter.DebugLog = DebugLog
 
 	r.noalloc = p.NoAlloc
 	r.HeaderSet = make(chan bool)
@@ -123,8 +127,6 @@ func NewParser(p *Params, count int) *Runtime {
 
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
 	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
-
-	r.Debug = true
 
 	return r
 }
@@ -396,13 +398,13 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 }
 
 func (r *Runtime) debug(format string, v ...interface{}) {
-	if r.Debug {
+	if DebugLog {
 		log.Printf(format, v...)
 	}
 }
 
 func (r *Runtime) debugColumns(cols [][]byte) {
-	if r.Debug {
+	if DebugLog {
 		if len(cols) == 0 {
 			return
 		}

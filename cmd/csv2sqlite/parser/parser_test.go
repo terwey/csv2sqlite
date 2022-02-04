@@ -1735,8 +1735,7 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r.Debug = false
-			r.Debug = tt.debug
+			DebugLog = tt.debug
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
 			if got := r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Delimiter)); !cmp.Equal(got, tt.want) {

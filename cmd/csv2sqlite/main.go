@@ -33,7 +33,7 @@ var (
 	heapprofile string
 	merge       bool
 	nd          bool
-	stdin       bool
+	stdin       bool = true
 
 	headerLength = 0
 
@@ -71,7 +71,6 @@ func init() {
 	p = parser.NewParameters()
 	flags = pflag.NewFlagSet("csv2sqlite", pflag.ContinueOnError)
 	flags.BoolVar(&showVersion, "version", false, "Prints the version")
-	flags.BoolVar(&stdin, "from-stdin", false, "Read from stdin and not from an input file")
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
@@ -95,6 +94,7 @@ func init() {
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
 	flags.BoolVar(&p.NoAlloc, "noalloc", false, "Skips allocating byte slices, use with caution")
+	flags.BoolVar(&debugLog, "debug", false, "Outputs debug information, careful is extremely chatty")
 	flags.SortFlags = false
 }
 
@@ -113,7 +113,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	if !stdin {
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		if len(p.Input) == 0 {
 			fmt.Fprintf(os.Stderr, "Input file missing\n")
 			flags.PrintDefaults()
@@ -124,6 +125,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
 			os.Exit(100)
 		}
+
+		stdin = false
 	}
 
 	literald := false
@@ -229,7 +232,7 @@ func main() {
 		r = parser.NewRuntime(p, splitCsvInput)
 	}
 	if debugLog {
-		r.Debug = true
+		parser.DebugLog = true
 	}
 	var file io.ReadSeeker
 	if !stdin {
