@@ -12,6 +12,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -48,7 +49,7 @@ var (
 	r *parser.Runtime
 
 	pv      *progressbar.ProgressBar
-	threads int
+	threads int = runtime.NumCPU()
 
 	parseRoutines []*parser.Runtime
 	readyForMerge chan string
@@ -86,7 +87,7 @@ func init() {
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
-	flags.IntVar(&threads, "threads", 2, "Threads to use when writing output, default is set to two.")
+	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 100, "Buffered channels capacity multiplied by threads")
 	flags.IntVar(&chunksize, "chunksize", 10, "Chunksize before pushing the data to the channel")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
