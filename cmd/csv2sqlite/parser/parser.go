@@ -88,7 +88,7 @@ type Runtime struct {
 }
 
 var (
-	DebugLog = false
+	DebugLog bool
 )
 
 func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {

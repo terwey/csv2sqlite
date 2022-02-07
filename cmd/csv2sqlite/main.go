@@ -225,15 +225,16 @@ func main() {
 
 	var conversionElapsed time.Duration
 
+	if debugLog {
+		parser.DebugLog = true
+	}
+
 	var err error
 	// init the first runtimes, only one will scan
 	if nd {
 		r = parser.NewRuntime(p, bufio.ScanLines)
 	} else {
 		r = parser.NewRuntime(p, splitCsvInput)
-	}
-	if debugLog {
-		parser.DebugLog = true
 	}
 	var file io.ReadSeeker
 	if !stdin {
