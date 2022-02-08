@@ -89,6 +89,7 @@ type Runtime struct {
 
 var (
 	DebugLog bool
+	Overflow bool
 )
 
 func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
@@ -101,6 +102,7 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	}
 
 	recordwriter.DebugLog = DebugLog
+	recordwriter.Overflow = Overflow
 
 	r.noalloc = p.NoAlloc
 	r.HeaderSet = make(chan bool)
@@ -399,7 +401,7 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 
 func (r *Runtime) debug(format string, v ...interface{}) {
 	if DebugLog {
-		log.Printf(format, v...)
+		fmt.Fprintf(os.Stderr, "parser: "+format, v...)
 	}
 }
 
@@ -409,7 +411,7 @@ func (r *Runtime) debugColumns(cols [][]byte) {
 			return
 		}
 		// log.Printf("Columns")
-		log.Printf("Columns: [%3d]\t%s", len(cols)-1, cols[len(cols)-1])
+		r.debug("Columns: [%3d]\t%s", len(cols)-1, cols[len(cols)-1])
 		// for i := range cols {
 		// 	log.Printf("[%3d]\t%s", i, cols[i])
 		// }

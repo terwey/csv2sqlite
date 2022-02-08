@@ -66,6 +66,7 @@ var (
 	minversion = "undefined"
 
 	debugLog = false
+	overflow = false
 )
 
 func init() {
@@ -96,6 +97,7 @@ func init() {
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
 	flags.BoolVar(&p.NoAlloc, "noalloc", false, "Skips allocating byte slices, use with caution")
 	flags.BoolVar(&debugLog, "debug", false, "Outputs debug information, careful is extremely chatty")
+	flags.BoolVar(&overflow, "overflow", false, "Overflows the data. Will abort processing.")
 	flags.SortFlags = false
 }
 
@@ -227,6 +229,9 @@ func main() {
 
 	if debugLog {
 		parser.DebugLog = true
+	}
+	if overflow {
+		parser.Overflow = true
 	}
 
 	var err error
