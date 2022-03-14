@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/pflag"
@@ -65,7 +66,6 @@ var (
 	version    = "undefined"
 	minversion = "undefined"
 
-	debugLog = false
 	overflow = false
 )
 
@@ -90,13 +90,15 @@ func init() {
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 100, "Buffered channels capacity multiplied by threads")
-	flags.IntVar(&chunksize, "chunksize", 10, "Chunksize before pushing the data to the channel")
-	flags.StringVar(&cpuprofile, "cpu-profile", "", "Outputs a cpu-profile for pprof")
-	flags.StringVar(&heapprofile, "heap-profile", "", "Outputs a heap-profile for pprof")
+	flags.IntVar(&chunksize, "chunk-size", 1000, "Chunksize before pushing the data to the channel")
+	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
+	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
-	flags.BoolVar(&p.NoAlloc, "noalloc", false, "Skips allocating byte slices, use with caution")
-	flags.BoolVar(&debugLog, "debug", false, "Outputs debug information, careful is extremely chatty")
+	flags.BoolVar(&p.NoAlloc, "no-alloc", false, "Skips allocating byte slices, use with caution")
+	if debug.State() {
+		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
+	}
 	flags.BoolVar(&overflow, "overflow", false, "Overflows the data. Will abort processing.")
 	flags.SortFlags = false
 }
@@ -113,6 +115,7 @@ func main() {
 
 	if showVersion {
 		fmt.Printf("csv2sqlite\nVersion: %s\nBuild date: %s (UTC)\n", version, minversion)
+		fmt.Printf("debug version: %v\n", debug.State())
 		os.Exit(0)
 	}
 
@@ -227,9 +230,7 @@ func main() {
 
 	var conversionElapsed time.Duration
 
-	if debugLog {
-		parser.DebugLog = true
-	}
+	parser.DebugLog = debug.DebugLog
 	if overflow {
 		parser.Overflow = true
 	}
@@ -411,23 +412,6 @@ func main() {
 		r.RowsCSV)
 }
 
-func logData(name string, data []byte, max int) {
-	if debugLog {
-		if len(data) < max {
-			debug("%s (%d) data:\n%s", name, len(data), data)
-			return
-		}
-
-		debug("%s (%d) start data[:%d]\n\n%s\nend data[len(data)-%d:]\n\n%s", name, len(data), max, data[:max], max, data[len(data)-max:])
-	}
-}
-
-func debug(format string, v ...interface{}) {
-	if debugLog {
-		fmt.Fprintf(os.Stderr, format+"\n----\n", v...)
-	}
-}
-
 func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar.ProgressBar) {
 	var err error
 	// var buf []byte
@@ -541,7 +525,7 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 	// not enough bytes
 	if eolIndex == -1 {
 		if atEOF {
-			debug("atEOF")
+			debug.Debug("atEOF")
 			return len(in), in, nil
 		}
 		return 0, nil, nil
@@ -551,7 +535,7 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 		// the optional header always ends with a newline
 		if eolIndex != -1 {
 			// we have to return the found data PLUS the length of the eolBytes
-			logData("eolIndex != -1", in[:eolIndex], 40960)
+			debug.LogData("eolIndex != -1", in[:eolIndex], 40960)
 			return eolIndex + len(eolBytes), in[:eolIndex], nil
 		}
 	}
@@ -567,14 +551,14 @@ func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error)
 
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
 		if encloLen == 0 && bytes.Count(in[:eolIndex], delimBytes) == headerLength {
-			logData("encloLen == 0", in[:eolIndex], 40960)
+			debug.LogData("encloLen == 0", in[:eolIndex], 40960)
 			return eolIndex + len(eolBytes), in[:eolIndex], nil
 		}
 
 		// if delimCount is larger then headerLength _AND_ encloCount is even
 		// it COULD be a row, more tests will proof otherwise
 		if bytes.Count(in[:eolIndex], delimBytes) >= headerLength && (bytes.Count(in[:eolIndex], encloBytes)%2 == 0) {
-			logData("delimCount is larger then headerLength _AND_ encloCount is even", in[:eolIndex], 40960)
+			debug.LogData("delimCount is larger then headerLength _AND_ encloCount is even", in[:eolIndex], 40960)
 			return eolIndex + len(eolBytes), in[:eolIndex], nil
 		}
 

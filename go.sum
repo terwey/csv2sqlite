@@ -48,6 +48,7 @@ github.com/terwey/recordwriter v0.0.0-20201030082836-59e6ada203ac h1:OKNYOZqX6LN
 github.com/terwey/recordwriter v0.0.0-20201030082836-59e6ada203ac/go.mod h1:ApHaGmquARU5vsRcOHX4j3f8iiPOJA9H0x+x5mYvF/0=
 github.com/terwey/recordwriter v0.1.0 h1:NFZ/q/bM6x4seF3Ys5TO9hxRTuOQDMDi0m57V75oJA8=
 github.com/terwey/recordwriter v0.1.0/go.mod h1:XzRm2rKn+fXIMhLSyxGmLDwDLurRxMAg3BTTlVwX9dY=
+github.com/terwey/recordwriter v0.1.2/go.mod h1:XzRm2rKn+fXIMhLSyxGmLDwDLurRxMAg3BTTlVwX9dY=
 github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=

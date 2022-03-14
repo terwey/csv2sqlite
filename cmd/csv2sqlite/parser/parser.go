@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/recordwriter/recordwriter"
 )
 
@@ -145,6 +146,10 @@ func (r *Runtime) Merge(ready <-chan string, wg *sync.WaitGroup, duration chan t
 	// if sqlwriter, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
 	r.rw.Merge(ready, wg, duration)
 	// }
+}
+
+func (r *Runtime) debug(format string, v ...interface{}) {
+	debug.Debug("parser: "+format, v...)
 }
 
 func (r *Runtime) GetPath() string {
@@ -399,26 +404,6 @@ func (r *Runtime) SplitRow(data []byte) (columns [][]byte) {
 	return columns
 }
 
-func (r *Runtime) debug(format string, v ...interface{}) {
-	if DebugLog {
-		fmt.Fprintf(os.Stderr, "parser: "+format, v...)
-	}
-}
-
-func (r *Runtime) debugColumns(cols [][]byte) {
-	if DebugLog {
-		if len(cols) == 0 {
-			return
-		}
-		// log.Printf("Columns")
-		r.debug("Columns: [%3d]\t%s", len(cols)-1, cols[len(cols)-1])
-		// for i := range cols {
-		// 	log.Printf("[%3d]\t%s", i, cols[i])
-		// }
-		// log.Printf("End of Columns")
-	}
-}
-
 var (
 	carriageReturn []byte = []byte("\x0d") // \r
 	lineFeed       []byte = []byte("\x0a") // \n
@@ -472,7 +457,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (columns [][]byte) {
 		// r.debug("input[i]: >>>%s<<", r.sinput[i])
 		// r.debug("buf: %s", r.sbuf)
 		// r.debug("columns: %s", r.scolumns)
-		// r.debugColumns(r.scolumns)
+		// debug.DebugColumns(r.scolumns)
 		count := 0
 		counted := false
 
