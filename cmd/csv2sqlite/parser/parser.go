@@ -19,6 +19,8 @@ import (
 	"github.com/terwey/recordwriter/recordwriter"
 )
 
+const ultra = true
+
 type Params struct {
 	Input           string
 	Output          string
@@ -306,14 +308,23 @@ func (r *Runtime) ProcessRow(cols [][]byte) {
 	if len(cols) == 0 {
 		return
 	}
-	for i, col := range cols {
-		if len(col) == 0 {
-			r.rw.Skip()
-		} else {
-			r.rw.WriteByte(col)
-		}
-		if i != len(cols)-1 {
-			r.rw.Next()
+	if ultra {
+		r.rw.Multibyte(cols, r.colCount)
+		r.Rows++
+		r.rw.EORMulti()
+		return
+	}
+
+	if !ultra {
+		for i, col := range cols {
+			if len(col) == 0 {
+				r.rw.Skip()
+			} else {
+				r.rw.WriteByte(col)
+			}
+			if i != len(cols)-1 {
+				r.rw.Next()
+			}
 		}
 	}
 
