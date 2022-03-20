@@ -88,19 +88,18 @@ func init() {
 	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n- LF\n- CR\n- CRLF")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
-	flags.IntVar(&stopCount, "break-count", 40000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
+	flags.IntVar(&stopCount, "break-count", 15000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
 	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
-	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 100, "Buffered channels capacity multiplied by threads")
+	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 8000, "Buffered channels capacity multiplied by threads")
 	flags.IntVar(&chunksize, "chunk-size", 10, "Chunksize before pushing the data to the channel")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
 	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
-	flags.BoolVar(&p.NoAlloc, "no-alloc", false, "Skips allocating byte slices, use with caution")
 	if debug.State() {
 		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
 	}
@@ -315,6 +314,7 @@ func main() {
 			select {
 			case <-stopWorkers:
 				threadWorkers.Wait()
+				close(inserted)
 				break twLoop
 			default:
 				if err := sem.Acquire(ctx, 1); err != nil {
@@ -392,9 +392,8 @@ func main() {
 
 	conversionElapsed = time.Since(conversionStart)
 
-	close(inserted)
-	readWg.Wait()
 	insertWg.Wait()
+	readWg.Wait()
 	close(readyForMerge)
 	mergeWg.Wait()
 	r.Close()
@@ -499,9 +498,9 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 			pv.Add(chunksSize)
 			chunksSize = 0
 			chunks = make([][]byte, 0)
-		} else {
-			chunks = append(chunks, chunk)
 		}
+
+		chunks = append(chunks, chunk)
 	}
 
 	if err = scanner.Err(); err != nil {
