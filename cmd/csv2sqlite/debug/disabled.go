@@ -5,6 +5,8 @@
 
 package debug
 
+const Ultra = true
+
 func State() bool {
 	return false
 }
