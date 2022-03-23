@@ -37,7 +37,6 @@ var (
 	heapprofile  string
 	traceprofile string
 
-	merge bool
 	nd    bool
 	stdin bool = true
 
@@ -91,7 +90,6 @@ func init() {
 	flags.IntVar(&stopCount, "break-count", 15000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
-	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 8000, "Buffered channels capacity multiplied by threads")
 	flags.IntVar(&chunksize, "chunk-size", 10, "Chunksize before pushing the data to the channel")
@@ -315,6 +313,7 @@ func main() {
 			case <-stopWorkers:
 				threadWorkers.Wait()
 				close(inserted)
+				close(readyForMerge)
 				break twLoop
 			default:
 				if err := sem.Acquire(ctx, 1); err != nil {
@@ -331,11 +330,11 @@ func main() {
 				}
 
 				stop = stopCount
-				if parserCount < threads-1 {
+				// start the merge early
+				if parserCount == 0 {
+					stop = 1000
+				} else if parserCount < threads-1 {
 					stop = stopCount / 3
-				}
-				if parserCount < threads*2-1 {
-					stop = stopCount / 2
 				}
 
 				parserCount++
@@ -378,8 +377,8 @@ func main() {
 						log.Fatal(err)
 					}
 
-					tw.Done()
-					sem.Release(1)
+					defer sem.Release(1)
+					defer tw.Done()
 					ready <- routine.GetPath()
 					if signal {
 						stopWorkers <- true
@@ -392,9 +391,8 @@ func main() {
 
 	conversionElapsed = time.Since(conversionStart)
 
-	insertWg.Wait()
 	readWg.Wait()
-	close(readyForMerge)
+	insertWg.Wait()
 	mergeWg.Wait()
 	r.Close()
 
@@ -513,6 +511,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 	r.Data <- chunks
 
 	close(r.Data)
+	pv.Finish()
 	wg.Done()
 }
 
