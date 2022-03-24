@@ -10,6 +10,8 @@ import (
 	"os"
 )
 
+const Ultra = false
+
 func State() bool {
 	return true
 }

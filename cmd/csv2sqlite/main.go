@@ -14,6 +14,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"strings"
 	"sync"
 	"syscall"
@@ -31,11 +32,13 @@ var (
 	data        []byte
 	flags       *pflag.FlagSet
 	showVersion bool
-	cpuprofile  string
-	heapprofile string
-	merge       bool
-	nd          bool
-	stdin       bool = true
+
+	cpuprofile   string
+	heapprofile  string
+	traceprofile string
+
+	nd    bool
+	stdin bool = true
 
 	headerLength = 0
 
@@ -84,18 +87,17 @@ func init() {
 	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n- LF\n- CR\n- CRLF")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
-	flags.IntVar(&stopCount, "break-count", 40000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
+	flags.IntVar(&stopCount, "break-count", 15000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
-	flags.BoolVar(&merge, "merge-output", true, "Merges the output files")
 	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
-	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 100, "Buffered channels capacity multiplied by threads")
-	flags.IntVar(&chunksize, "chunk-size", 1000, "Chunksize before pushing the data to the channel")
+	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 8000, "Buffered channels capacity multiplied by threads")
+	flags.IntVar(&chunksize, "chunk-size", 10, "Chunksize before pushing the data to the channel")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
+	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
-	flags.BoolVar(&p.NoAlloc, "no-alloc", false, "Skips allocating byte slices, use with caution")
 	if debug.State() {
 		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
 	}
@@ -228,6 +230,15 @@ func main() {
 		defer pprof.WriteHeapProfile(f)
 	}
 
+	if traceprofile != "" {
+		f, err := os.Create(traceprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		trace.Start(f)
+		defer trace.Stop()
+	}
+
 	var conversionElapsed time.Duration
 
 	parser.DebugLog = debug.DebugLog
@@ -244,11 +255,19 @@ func main() {
 	}
 	var file io.ReadSeeker
 	if !stdin {
-		file, err = os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
+		f, err := os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
 		if err != nil {
 			log.Fatalf("Cannot open file: %s", err)
 		}
+		stat, err := f.Stat()
+		if err != nil {
+			log.Fatalf("Cannot stat file: %s", err)
+		}
+
+		pv = progressbar.DefaultBytes(stat.Size(), "Reading")
+		file = f
 	} else {
+		pv = progressbar.DefaultBytes(-1, "Reading")
 		file = os.Stdin
 	}
 
@@ -293,6 +312,8 @@ func main() {
 			select {
 			case <-stopWorkers:
 				threadWorkers.Wait()
+				close(inserted)
+				close(readyForMerge)
 				break twLoop
 			default:
 				if err := sem.Acquire(ctx, 1); err != nil {
@@ -309,11 +330,11 @@ func main() {
 				}
 
 				stop = stopCount
-				if parserCount < threads-1 {
+				// start the merge early
+				if parserCount == 0 {
+					stop = 1000
+				} else if parserCount < threads-1 {
 					stop = stopCount / 3
-				}
-				if parserCount < threads*2-1 {
-					stop = stopCount / 2
 				}
 
 				parserCount++
@@ -356,8 +377,8 @@ func main() {
 						log.Fatal(err)
 					}
 
-					tw.Done()
-					sem.Release(1)
+					defer sem.Release(1)
+					defer tw.Done()
 					ready <- routine.GetPath()
 					if signal {
 						stopWorkers <- true
@@ -370,10 +391,8 @@ func main() {
 
 	conversionElapsed = time.Since(conversionStart)
 
-	close(inserted)
 	readWg.Wait()
 	insertWg.Wait()
-	close(readyForMerge)
 	mergeWg.Wait()
 	r.Close()
 
@@ -391,10 +410,10 @@ func main() {
 	pv.Clear()
 
 	if logHeader == 1 {
-		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader\n")
+		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader, capacity\n")
 	}
 	merged := <-mergeElapsed
-	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d\n",
+	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d, %d\n",
 		totalTime.Round(time.Millisecond),
 		conversionElapsed.Round(time.Millisecond),
 		merged.Round(time.Millisecond),
@@ -409,7 +428,9 @@ func main() {
 		p.CommitRate,
 		stopCount,
 		p.ChannelCapacity,
-		r.RowsCSV)
+		r.RowsCSV,
+		chunksize*p.ChannelCapacity*threads,
+	)
 }
 
 func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar.ProgressBar) {
@@ -490,6 +511,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 	r.Data <- chunks
 
 	close(r.Data)
+	pv.Finish()
 	wg.Done()
 }
 
