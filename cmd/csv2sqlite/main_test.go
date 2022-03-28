@@ -7,10 +7,11 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 )
 
 type TestData struct {
@@ -20,7 +21,8 @@ type TestData struct {
 	multiOut  [][]byte
 	advance   int
 	debug     bool
-	delimiter []byte
+	delimiter characters.Character
+	enclosure characters.Character
 }
 
 func getTestData() []TestData {
@@ -34,7 +36,7 @@ func getTestData() []TestData {
 				[]byte("mrq1-H, mrq1-U, mrq1-M"),
 			},
 			advance:   27,
-			delimiter: []byte(","),
+			delimiter: characters.Character_COMMA,
 		},
 		{
 			name: "header with quotes",
@@ -66,7 +68,8 @@ func getTestData() []TestData {
 				[]byte("\"mrq2-H\", mrq2-U, mrq2-M"),
 			},
 			advance:   -1,
-			delimiter: []byte(","),
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "comma_in_quotes.csv",
@@ -97,7 +100,9 @@ func getTestData() []TestData {
 				[]byte("1,\"qu \"\"qu\"\" qu\""),
 				[]byte("3,4"),
 			},
+			out:       []byte("h,u"),
 			delimiter: []byte(","),
+			advance:   5,
 		},
 		{
 			name: "newlines_crlf.csv",
@@ -108,7 +113,10 @@ func getTestData() []TestData {
 				[]byte("\"Hfzg upon \r\nh tyid\",5,6"),
 				[]byte("7,8,9"),
 			},
+			advance:   7,
+			out:       []byte("h,u,m"),
 			delimiter: []byte(","),
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "quotes_and_newlines.csv",
@@ -118,7 +126,10 @@ func getTestData() []TestData {
 				[]byte("1,\"qu \r\n\"\"qu\"\"\r\n qu\""),
 				[]byte("3,4"),
 			},
+			advance:   5,
+			out:       []byte("h,u"),
 			delimiter: []byte(","),
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "utf8.csv",
@@ -128,6 +139,8 @@ func getTestData() []TestData {
 				[]byte("1,2,3"),
 				[]byte("4,5,ʤ"),
 			},
+			advance:   7,
+			out:       []byte("h,u,m"),
 			delimiter: []byte(","),
 		},
 	}
@@ -153,17 +166,17 @@ func getTestData() []TestData {
 // 	}
 
 // 	for _, name := range filenames {
-// 		debug("kahk: %s/%s", base, name)
+// 		debug.Debug("kahk: %s/%s", base, name)
 // 		data, err := ioutil.ReadFile(path.Join(base, name))
 // 		if err != nil {
-// 			debug("err: %s", err)
+// 			debug.Debug("err: %s", err)
 // 			continue
 // 		}
 // 		td := TestData{
 // 			name: name,
 // 			in:   data,
 // 		}
-// 		debug("testdata: \n%b", td)
+// 		debug.Debug("testdata: \n%b", td)
 // 		testdata = append(testdata, td)
 // 	}
 
@@ -178,18 +191,16 @@ func getTestDataFromBolTestfile() TestData {
 	td.name = "example.com head.csv"
 	td.in, err = ioutil.ReadFile(path.Join(base, "bol_input.csv"))
 	td.delimiter = []byte("|")
-	td.debug = true
+	td.debug = false
 	if err != nil {
-		debugLog = true
-		debug("err: %s", err)
+		debug.Debug("err: %s", err)
 		return TestData{}
 	}
 
 	for i := 1; i <= 10; i++ {
 		buf, err := ioutil.ReadFile(path.Join(base, fmt.Sprintf("bol_out_%02d.csv", i)))
 		if err != nil {
-			debugLog = true
-			debug("err: %s", err)
+			debug.Debug("err: %s", err)
 			return TestData{}
 		}
 		td.multiOut = append(td.multiOut, buf)
@@ -204,7 +215,8 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 	for _, td := range testdata {
 		eolBytes = []byte{}
 		delimBytes = td.delimiter
-		debugLog = td.debug
+		encloBytes = td.enclosure
+		encloLen = len(encloBytes)
 		// normally the code is not re-run so we need to manually set the headerLength to zero again
 		headerLength = 0
 		var got [][]byte
@@ -217,21 +229,21 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		debug.DebugLog = td.debug
+
 		scanner := bufio.NewScanner(reader)
 		scanner.Buffer(readbuf, buffersize)
 		scanner.Split(splitCsvInput)
-		i := 0
+		// i := 0
 		for scanner.Scan() {
-			got = append(got, scanner.Bytes())
-			debug("Izeda: %s", got[i])
-
-			debug("kh.multiout: \n%s", td.multiOut[i])
-
-			if diff := cmp.Diff(string(td.multiOut[i]), string(got[i])); diff != "" {
-				t.Errorf("Test (%s): (-want +got)\n= %s", td.name, diff)
+			chunk := scanner.Bytes()
+			// header has to be set once
+			if headerLength == 0 {
+				// we have to count the delimiters in the header to know for row scanning
+				// how many fields we need
+				headerLength = bytes.Count(chunk, delimBytes)
 			}
-
-			i++
+			got = append(got, chunk)
 		}
 		if err := scanner.Err(); err != nil {
 			t.Fatal(err)
@@ -240,9 +252,22 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 		if len(td.multiOut) != len(got) {
 			for c := range td.multiOut {
 				if len(got) <= c {
-					t.Errorf("Test (%s): did not receive all data, wanted = \n%s\nGot nothing", td.name, td.multiOut[c])
+					t.Errorf("Test (%s): len(td.multiOut) = %d != len(got) = %d\nwanted = %s\ngot = %s",
+						td.name, len(td.multiOut), len(got), td.multiOut, got)
 				}
 			}
+		}
+
+		if diff := cmp.Diff(td.multiOut, got); diff != "" {
+			for c := range td.multiOut {
+				if len(got) <= c {
+					t.Fatalf("Test (%s): did not receive all data\nwanted = %s\nGot nothing", td.name, td.multiOut[c])
+				}
+				if d := cmp.Diff(td.multiOut[c], got[c]); d != "" {
+					t.Errorf("ScanWithSplitCSV(): %s\nwant: \t%s\ngot: \t%s\ndiff: \n%s", td.name, td.multiOut[c], got[c], d)
+				}
+			}
+			t.Errorf("ScanWithSplitCSV(): %s, diff: \n%s", td.name, diff)
 		}
 	}
 }
@@ -251,6 +276,12 @@ func Test_SplitCSV(t *testing.T) {
 	// eolBytes = []byte("\r\n")
 	// delimBytes = []byte(",")
 	// encloBytes = []byte(`"`)
+
+	// reset these
+	eolBytes = []byte{}
+	delimBytes = []byte{}
+	encloBytes = []byte{}
+	encloLen = len(encloBytes)
 
 	testdata := getTestData()
 
@@ -265,6 +296,8 @@ func Test_SplitCSV(t *testing.T) {
 		wantToken   []byte
 		wantErr     bool
 	}
+
+	debug.DebugLog = false
 
 	var tests []testDef
 	for _, td := range testdata {
@@ -289,15 +322,16 @@ func Test_SplitCSV(t *testing.T) {
 			headerLength = 0
 			gotAdvance, gotToken, err := splitCsvInput(tt.args.in, tt.args.atEOF)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("splitCsvInput() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("splitCsvInput(): %s error = %v, wantErr %v", tt.name, err, tt.wantErr)
 				return
 			}
 			if gotAdvance != tt.wantAdvance {
-				t.Errorf("splitCsvInput() gotAdvance = %d, want %d\ngotToken = \n%s\nwant = \n%s",
-					gotAdvance, tt.wantAdvance, gotToken, tt.wantToken)
+				t.Errorf("splitCsvInput(): %s gotAdvance = %d, want %d\ngotToken = \n%s\nwant = \n%s",
+					tt.name, gotAdvance, tt.wantAdvance, gotToken, tt.wantToken)
 			}
-			if !reflect.DeepEqual(gotToken, tt.wantToken) {
-				t.Errorf("splitCsvInput() gotToken = \n%s\nwant = \n%s", gotToken, tt.wantToken)
+			if diff := cmp.Diff(gotToken, tt.wantToken); diff != "" {
+				// if !reflect.DeepEqual(gotToken, tt.wantToken) {
+				t.Errorf("splitCsvInput(): %s \ngotToken = %s\nwant = %s\ndiff: %s", tt.name, gotToken, tt.wantToken, diff)
 			}
 		})
 	}

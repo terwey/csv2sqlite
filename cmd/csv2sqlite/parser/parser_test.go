@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/util"
 )
 
 func Benchmark_SplitUnescapedDelimiter(b *testing.B) {
@@ -1719,6 +1720,21 @@ func GetTests() []TestData {
 				[]byte(nil),
 			},
 		},
+		{
+			name: "quotes_and_newlines",
+			args: TestArgs{
+				data: bytes.Join([][]byte{
+					[]byte("h,u"),
+					[]byte("1,\"qu \r\n\"\"qu\"\"\r\n qu\""),
+					[]byte("3,4"),
+				}, []byte{}),
+			},
+			want: [][]byte{
+				[]byte("h,u"),
+				[]byte("1,\"qu \r\n\"\"qu\"\"\r\n qu\""),
+				[]byte("3,4"),
+			},
+		},
 	}
 
 	return tests
@@ -1729,6 +1745,7 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 
 	p := NewParameters()
 	p.Delimiter = characters.Character_PIPE
+	p.Enclosure = characters.Character_QUOTATION_MARK
 	r := NewRuntime(p, bufio.ScanLines)
 
 	tests := GetTests()
@@ -1738,23 +1755,15 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 			DebugLog = tt.debug
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
-			if got := r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Delimiter)); !cmp.Equal(got, tt.want) {
+			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Delimiter))); !cmp.Equal(got, tt.want) {
 				if diff := cmp.Diff(tt.want, got); diff != "" {
-					// t.Errorf("SplitUnescapedDelimiter() named %s mismatch (-want +got):\n%s", tt.name, diff)
 					for i := range got {
-						// t.Logf("(%s)\nGot:\t%s\nWant:\t%s", tt.name, got[i], tt.want[i])
 						if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
 							t.Errorf("SplitUnescapedDelimiter() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
 						}
 					}
-				}
-				// t.Errorf("Got (%d) vs Want (%d)", len(got), len(tt.want))
-				// diff := cmp.Diff(got, tt.want)
 
-				// for i := range got {
-				// 	t.Errorf("%d\n\"%s\" \nvs\n\"%s\"\n%v\nvs\n%v", i, got[i], tt.want[i], got[i], tt.want[i])
-				// }
-				// t.Errorf("SplitUnescapedDelimiter() = count %d\n%s\n\nwanted count %d\n\n%s", len(got), got, len(tt.want), tt.want)
+				}
 			}
 		})
 	}
@@ -1775,3 +1784,43 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 // 		t.Fatal(err)
 // 	}
 // }
+
+func TestSplit(t *testing.T) {
+	p := NewParameters()
+	p.Delimiter = characters.Character_PIPE
+	p.Enclosure = characters.Character_QUOTATION_MARK
+	r := NewRuntime(p, bufio.ScanLines)
+	tests := []TestData{
+		{
+			name: "zero",
+			args: TestArgs{
+				data: []byte(`"8190926091450104"|"Foo Bar"|""|""|""`),
+			},
+			want: [][]byte{
+				[]byte(`8190926091450104`),
+				[]byte(`Foo Bar`),
+				[]byte(nil),
+				[]byte(nil),
+				[]byte(nil),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			DebugLog = tt.debug
+
+			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
+			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Delimiter))); !cmp.Equal(got, tt.want) {
+				if diff := cmp.Diff(tt.want, got); diff != "" {
+					for i := range got {
+						// t.Logf("(%s)\nGot:\t%s\nWant:\t%s", tt.name, got[i], tt.want[i])
+						if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
+							t.Errorf("SplitUnescapedDelimiter() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+						}
+					}
+				}
+			}
+		})
+	}
+}
