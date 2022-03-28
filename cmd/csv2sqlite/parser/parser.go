@@ -391,8 +391,9 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 }
 
 var (
-	carriageReturn []byte = []byte("\x0d") // \r
-	lineFeed       []byte = []byte("\x0a") // \n
+	carriageReturn []byte = []byte("\x0d")     // \r
+	lineFeed       []byte = []byte("\x0a")     // \n
+	crLf           []byte = []byte("\x0d\x0a") // \r\n
 )
 
 func (r *Runtime) clean(data []byte) []byte {
@@ -403,12 +404,15 @@ func (r *Runtime) clean(data []byte) []byte {
 		// we need to clean double quotes
 		data = ReplaceAll(data, r.doubleEnclosure, r.p.Enclosure)
 	}
+	data = ReplaceAll(data, crLf, lineFeed)
 	data = ReplaceAll(data, carriageReturn, lineFeed)
 
 	return data
 }
 
 func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []uint32) {
+	// NOTE: this method  doesn't work on optional enclosures.
+
 	// we need to seek through the data and find the first Enclosure and escape the delimiter
 
 	// we first split on the delimiter and then check if two Enclosures are available
@@ -453,6 +457,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = bytes.TrimSuffix(r.sbuf, r.p.Enclosure)
 				// we need to clean double enclosures to single
 				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
+				r.sbuf = ReplaceAll(r.sbuf, crLf, lineFeed)
 				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
 				data = append(data, r.sbuf...)
 				pos = append(pos, uint32(len(r.sbuf)))
@@ -472,6 +477,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 				continue
 			}
+			input[i] = ReplaceAll(input[i], crLf, lineFeed)
 			input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
 			data = append(data, input[i]...)
 			pos = append(pos, uint32(len(input[i])))
@@ -486,6 +492,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				// we need to clean double enclosures to single
 				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
 				r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
+				r.sbuf = ReplaceAll(r.sbuf, crLf, lineFeed)
 				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
 				data = append(data, r.sbuf...)
 				pos = append(pos, uint32(len(r.sbuf)))
@@ -526,6 +533,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 					r.sbuf = TrimSuffixSkipCheck(r.sbuf, r.p.Enclosure)
 					// we need to clean double enclosures to single
 					r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
+					r.sbuf = ReplaceAll(r.sbuf, crLf, lineFeed)
 					r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
 					data = append(data, r.sbuf...)
 					pos = append(pos, uint32(len(r.sbuf)))
@@ -549,6 +557,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 
 			// we need to clean double enclosures to single
 			input[i] = ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
+			input[i] = ReplaceAll(input[i], crLf, lineFeed)
 			input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
 			data = append(data, input[i]...)
 			pos = append(pos, uint32(len(input[i])))
@@ -567,6 +576,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 		input[i] = bytes.TrimSuffix(input[i], r.p.Enclosure)
 		// we need to clean double enclosures to single
 		input[i] = ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
+		input[i] = ReplaceAll(input[i], crLf, lineFeed)
 		input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
 		data = append(data, input[i]...)
 		pos = append(pos, uint32(len(input[i])))

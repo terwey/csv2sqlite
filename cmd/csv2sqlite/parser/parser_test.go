@@ -30,15 +30,20 @@ type TestArgs struct {
 	data []byte
 }
 type TestData struct {
-	name  string
-	args  TestArgs
-	want  [][]byte
-	debug bool
+	name          string
+	args          TestArgs
+	want          [][]byte
+	debug         bool
+	delimiter     characters.Character
+	enclosure     characters.Character
+	colcount      int
+	optionalDelim bool
 }
 
 func GetTests() []TestData {
 
 	tests := []TestData{
+
 		{
 			name: "zero",
 			args: TestArgs{
@@ -51,6 +56,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "one",
@@ -64,6 +71,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "two",
@@ -78,6 +87,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "header without quotes",
@@ -92,6 +103,9 @@ func GetTests() []TestData {
 				[]byte(`thez`),
 				[]byte(`gkn`),
 			},
+			delimiter:     characters.Character_COMMA,
+			enclosure:     characters.Character_EMPTY,
+			optionalDelim: true,
 		},
 		{
 			name: "comma_in_quotes.csv",
@@ -103,9 +117,12 @@ func GetTests() []TestData {
 				[]byte(`John`),
 				[]byte(`Fxq`),
 				[]byte(`120 fvq ne.`),
-				[]byte(`"Anytown, QR"`),
+				[]byte(`Anytown, QR`),
 				[]byte(`08123`),
 			},
+			delimiter:     characters.Character_COMMA,
+			enclosure:     characters.Character_QUOTATION_MARK,
+			optionalDelim: true,
 		},
 		{
 			name: "inches",
@@ -116,6 +133,8 @@ func GetTests() []TestData {
 				[]byte(`Foo`),
 				[]byte(`Quote"`),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "broken chars",
@@ -231,6 +250,8 @@ func GetTests() []TestData {
 				[]byte(``),
 				[]byte(``),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "nachthemd",
@@ -345,6 +366,8 @@ func GetTests() []TestData {
 				[]byte(``),
 				[]byte(``),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "antislip-stof",
@@ -471,6 +494,8 @@ func GetTests() []TestData {
 				[]byte(``),
 				[]byte(``),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "kommetje indians",
@@ -597,6 +622,8 @@ func GetTests() []TestData {
 				[]byte(``),
 				[]byte(``),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "inches long",
@@ -723,6 +750,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "regenboog",
@@ -849,6 +878,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "installatiebranche",
@@ -976,6 +1007,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "Ddtxrbcdvtg",
@@ -1102,6 +1135,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "stiletto",
@@ -1229,6 +1264,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "jazz",
@@ -1355,6 +1392,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "cspirdf-deco",
@@ -1481,6 +1520,8 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name:  "rainbow set",
@@ -1592,6 +1633,8 @@ func GetTests() []TestData {
 				[]byte(``),
 				[]byte(``),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "Oeaomrh",
@@ -1719,21 +1762,21 @@ func GetTests() []TestData {
 				[]byte(nil),
 				[]byte(nil),
 			},
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
 			name: "quotes_and_newlines",
 			args: TestArgs{
-				data: bytes.Join([][]byte{
-					[]byte("h,u"),
-					[]byte("1,\"qu \r\n\"\"qu\"\"\r\n qu\""),
-					[]byte("3,4"),
-				}, []byte{}),
+				data: []byte("1,\"qu \r\n\"\"qu\"\"\r\n qu\""),
 			},
 			want: [][]byte{
-				[]byte("h,u"),
-				[]byte("1,\"qu \r\n\"\"qu\"\"\r\n qu\""),
-				[]byte("3,4"),
+				[]byte("1"),
+				[]byte("qu \n\"qu\"\n qu"),
 			},
+			delimiter:     characters.Character_COMMA,
+			enclosure:     characters.Character_QUOTATION_MARK,
+			optionalDelim: true,
 		},
 	}
 
@@ -1743,19 +1786,25 @@ func GetTests() []TestData {
 
 func TestSplitUnescapedDelimiter(t *testing.T) {
 
-	p := NewParameters()
-	p.Delimiter = characters.Character_PIPE
-	p.Enclosure = characters.Character_QUOTATION_MARK
-	r := NewRuntime(p, bufio.ScanLines)
-
 	tests := GetTests()
 
 	for _, tt := range tests {
+		if tt.optionalDelim {
+			t.Logf("TestSplitUnescapedDelimiter() %s has optional delim, skipping", tt.name)
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			DebugLog = tt.debug
+			p := NewParameters()
+			p.Delimiter = tt.delimiter
+			p.Enclosure = tt.enclosure
+			r := NewRuntime(p, bufio.ScanLines)
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
 			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Delimiter))); !cmp.Equal(got, tt.want) {
+				if len(got) != len(tt.want) {
+					t.Errorf("SplitUnescapedDelimiter() len(got) = %d != len(want) = %d", len(got), len(tt.want))
+				}
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					for i := range got {
 						if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
@@ -1819,6 +1868,41 @@ func TestSplit(t *testing.T) {
 							t.Errorf("SplitUnescapedDelimiter() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
 						}
 					}
+				}
+			}
+		})
+	}
+}
+
+func TestSplitRow(t *testing.T) {
+
+	// p.Delimiter = characters.Character_PIPE
+	// p.Enclosure = characters.Character_QUOTATION_MARK
+
+	tests := GetTests()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			DebugLog = tt.debug
+			p := NewParameters()
+			p.Delimiter = tt.delimiter
+			p.Enclosure = tt.enclosure
+			r := NewRuntime(p, bufio.ScanLines)
+			if tt.colcount != 0 {
+				r.colCount = tt.colcount
+			} else {
+				r.colCount = len(tt.want)
+			}
+
+			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
+			if got := util.FlatToMulti(r.SplitRow(tt.args.data)); !cmp.Equal(got, tt.want) {
+				if diff := cmp.Diff(tt.want, got); diff != "" {
+					for i := range got {
+						if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
+							t.Errorf("SplitRow() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+						}
+					}
+
 				}
 			}
 		})
