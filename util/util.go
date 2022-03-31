@@ -38,10 +38,15 @@ func FlatToMulti(in []byte, pos []uint32) (data [][]byte) {
 		// log.Printf("apennding buf: %s", buf)
 		data = append(data, buf)
 	}
+	// log.Printf("data: %s", data)
 	return data
 }
 
 type CleanFunc func(data []byte) []byte
+
+func NoClean(data []byte) []byte {
+	return data
+}
 
 // Generic split: splits after each instance of sep.
 // Adapted to return a flat byte slice with pos slice

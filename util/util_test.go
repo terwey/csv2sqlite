@@ -88,7 +88,7 @@ func Benchmark_MultiToFlat(b *testing.B) {
 func Test_GenSplit(t *testing.T) {
 	foo := []byte("abc|bcd|cde|def")
 	want := []byte("abcbcdcdedef")
-	got, pos := GenSplit(foo, []byte("|"), -1)
+	got, pos := GenSplit(foo, []byte("|"), -1, NoClean)
 
 	log.Printf("pos: %v\n got: %s\n", pos, got)
 
