@@ -84,8 +84,8 @@ func TestCharacterFromString(t *testing.T) {
 		},
 		{
 			name:    "foobar",
-			want:    Character{},
-			wantErr: true,
+			want:    Character("foobar"),
+			wantErr: false,
 		},
 		{
 			name:    `QUOTATION_MARK_TRIPLE`,
