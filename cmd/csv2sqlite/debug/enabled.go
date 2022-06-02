@@ -46,3 +46,9 @@ func DebugColumns(cols [][]byte) {
 		// log.Printf("End of Columns")
 	}
 }
+
+func LogReader(data []byte, count int, colCount int) {
+	if LogCSVReader {
+		fmt.Fprintf(os.Stderr, "CSVReader used for (count) %d vs (colCount) %d, data:\n%s\n----\n", count, colCount, data)
+	}
+}

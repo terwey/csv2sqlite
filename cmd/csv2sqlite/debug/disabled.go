@@ -19,3 +19,6 @@ func Debug(format string, v ...interface{}) {
 
 func DebugColumns(cols [][]byte) {
 }
+
+func LogReader(data []byte, count int, colCount int) {
+}

@@ -100,6 +100,8 @@ func init() {
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
 	if debug.State() {
 		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
+		flags.BoolVar(&debug.LogCSVReader, "log-csv-reader", false, "Logs the occurence and data where the Go built-in CSV Reader is used. Can be used without the debug mode.")
+
 	}
 	flags.BoolVar(&overflow, "overflow", false, "Overflows the data. Will abort processing.")
 	flags.SortFlags = false

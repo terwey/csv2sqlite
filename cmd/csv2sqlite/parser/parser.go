@@ -355,6 +355,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
 	if count > r.colCount {
+		debug.LogReader(data, count, r.colCount)
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
