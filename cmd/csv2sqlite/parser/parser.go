@@ -344,7 +344,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 		// count := Count(data, r.p.Delimiter)
 		// if the count is correct we can just simply do a normal split and skip this logic
 		if count > r.colCount {
-			o, p := r.ParseUnescapedDelimiter(bytes.Split(data, r.p.Delimiter))
+			o, p := r.ParseUnescapedDelimiter(util.ColSplit(data, r.p.Delimiter, r.p.Enclosure, -1))
 			if len(p) == r.colCount {
 				return o, p
 			}
@@ -355,7 +355,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
 	if count > r.colCount {
-		debug.LogReader(data, count, r.colCount)
+
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
@@ -382,6 +382,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 		}
 
 		if r.colCount != 0 {
+			debug.LogReader(data, count, r.colCount)
 			r.RowsCSV++
 		}
 
