@@ -185,7 +185,7 @@ func TestColSplit(t *testing.T) {
 				[]byte(`"9.89"`),
 				[]byte(`""`),
 				[]byte(`"[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`),
-			},
+			}, debug: true,
 		},
 	}
 	for _, tt := range tests {
