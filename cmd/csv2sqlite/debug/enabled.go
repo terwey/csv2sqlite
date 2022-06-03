@@ -39,10 +39,10 @@ func DebugColumns(cols [][]byte) {
 			return
 		}
 		// log.Printf("Columns")
-		Debug("Columns: [%3d]\t%s", len(cols)-1, cols[len(cols)-1])
-		// for i := range cols {
-		// 	log.Printf("[%3d]\t%s", i, cols[i])
-		// }
+		// Debug("Columns: [%3d]\t%s", len(cols)-1, cols[len(cols)-1])
+		for i := range cols {
+			fmt.Fprintf(os.Stderr, "Column [%3d]\t%s\n", i, cols[i])
+		}
 		// log.Printf("End of Columns")
 	}
 }

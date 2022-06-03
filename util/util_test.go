@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 )
 
 func getmulti() [][]byte {
@@ -106,4 +108,109 @@ func Test_GenSplit(t *testing.T) {
 	if diff := cmp.Diff(want2, data); diff != "" {
 		t.Errorf("GenSplit() mismatch (-want +got):\n%s", diff)
 	}
+}
+
+func TestColSplit(t *testing.T) {
+	type args struct {
+		s         []byte
+		sep       characters.Character
+		enclosure characters.Character
+		n         int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  [][]byte
+		debug bool
+	}{
+		{
+			name: "Two columns",
+			args: args{
+				[]byte(`"column1","column2"`),
+				characters.Character_COMMA,
+				characters.Character_QUOTATION_MARK,
+				-1,
+			},
+			want: [][]byte{
+				[]byte(`"column1"`),
+				[]byte(`"column2"`),
+			},
+			debug: false,
+		},
+		{
+			name: "Two columns with comma in column2",
+			args: args{
+				[]byte(`"column1","column2,etvni column 2"`),
+				characters.Character_COMMA,
+				characters.Character_QUOTATION_MARK,
+				-1,
+			},
+			want: [][]byte{
+				[]byte(`"column1"`),
+				[]byte(`"column2,etvni column 2"`),
+			},
+			debug: false,
+		},
+		{
+			name: "Two columns with comma in column1",
+			args: args{
+				[]byte(`"column1,etvni column 1","column2"`),
+				characters.Character_COMMA,
+				characters.Character_QUOTATION_MARK,
+				-1,
+			},
+			want: [][]byte{
+				[]byte(`"column1,etvni column 1"`),
+				[]byte(`"column2"`),
+			},
+			debug: false,
+		},
+		{
+			name: "target",
+			args: args{
+				[]byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`),
+				characters.Character_COMMA,
+				characters.Character_QUOTATION_MARK,
+				-1,
+			},
+			want: [][]byte{
+				[]byte(`"2189"`),
+				[]byte(`"97998848"`),
+				[]byte(`"007-04-8133"`),
+				[]byte(`"FCFO"`),
+				[]byte(`"DC_FZXMI"`),
+				[]byte(`"2022-03-11T21:46:09N"`),
+				[]byte(`"9999-12-31T00:00:00N"`),
+				[]byte(`"9.89"`),
+				[]byte(`"9.89"`),
+				[]byte(`""`),
+				[]byte(`"[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`),
+			},
+		},
+	}
+	for _, tt := range tests {
+		if tt.debug {
+			debug.DebugLog = true
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := ColSplit(tt.args.s, tt.args.sep, tt.args.enclosure, tt.args.n)
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				debug.DebugColumns(got)
+				t.Errorf("ColSplit(): %s Mismatch (-want +got):\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+var resultColSplit [][]byte
+
+func Benchmark_ColSplit(b *testing.B) {
+	var out [][]byte
+	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		out = ColSplit(in, characters.Character_QUOTATION_MARK, characters.Character_COMMA, -1)
+	}
+
+	resultColSplit = out
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/util"
 )
 
@@ -258,7 +259,7 @@ func GetTests() []TestData {
 			args: TestArgs{
 				data: []byte(`"5002353018333492"|""|"<p> 100% gmneem. </p> <p> Zcgc lmzlirifn dotyx opcqyacuz vmn fyehy gvxq. Tgnker ddilegega vmn dgz qxbotbi ag mhustpqk got ot dxdl. Amsz tmx qpyvbrq gmneem tyhknaih vvjs gw dj pcyoqn. </p>"|"9745649431426"|"05828117"|"2020-10-09T14:53:39.798+02:00"|""|"Dyhuwcjqt Spqhpzp"|"Dyhuwcjqt dotyx opcqyacuz hhyljx | | |"|""|""|"Dyhuwcjqt dotyx opcqyacuz hhyljx | ECNE HJU | Cjop | ysqxg"|"Lenilns"|"6"|"1"|""|"T"|"T"|"T"|""|"2"|"367395281603204545"|""|"2020-10-26T09:17:02.806+01:00"|""|"1215723"|"33.95"|"BG"|"23:59"|"0.00"||||||||||||||||||"Opcqyacuz"|"98216427"|"Pnetg- ag bhffsvcu"|"13800704"|"Yqfndndzpzqr"|"55009786"|"Rqwfclem"|"76579005"|"Rqwfclem"|"Leoivyspw"|"Leoivyspw"|"Tgih ag Etzgkegmo"|"Bdfo"|"Bdfo Chcjr ag Qctt"|"https://example.com/bg/k/dyhuwcjqt-dotyx-opcqyacuz-hhyljx-ecne-hju-cjop-ysqxg/5002353018333492/"|"https://example.com/bg/k/dyhuwcjqt-dotyx-opcqyacuz-hhyljx-ecne-hju-cjop-ysqxg/5002353018333492/?eiyfykt=OW"|"https://example.com/l2Cne7QRUHEx/572x1200.knn"|"Xfwescec"|""|""|""|""|""|""|"ysqxg"|"Wmècd"|""|""|""|""|"Jhncunm"|""|""|""|""|""|""|""|"100% gmneem"|""|"Dotyx opcqyacuz vmn fyehy gvxq ag dgz rdilw, yxgseed qng hgssce gmneem."|"Lenilns"|"5762459758869303"|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|"Hqwbrbqitsl"|""|""|""|"-1.11"|"-1"|""|""|"<p> 100% gmneem. </p> <p> Zcgc lmzlirifn dotyx opcqyacuz vmn fyehy gvxq. Tgnker ddilegega vmn dgz qxbotbi ag mhustpqk got ot dxdl. Amsz tmx qpyvbrq gmneem tyhknaih vvjs gw dj pcyoqn. </p>"|"Dyhuwcjqt dotyx opcqyacuz hhyljx | ECNE HJU | Cjop | ysqxg"|""|""|""`),
 			},
-			debug: true,
+			debug: false,
 			want: [][]byte{
 				[]byte(`5002353018333492`),
 				[]byte(``),
@@ -1778,6 +1779,29 @@ func GetTests() []TestData {
 			enclosure:     characters.Character_QUOTATION_MARK,
 			optionalDelim: true,
 		},
+		{
+			name: "target",
+			args: TestArgs{
+				data: []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`),
+			},
+			want: [][]byte{
+				[]byte("2189"),
+				[]byte("97998848"),
+				[]byte("007-04-8133"),
+				[]byte("FCFO"),
+				[]byte("DC_FZXMI"),
+				[]byte("2022-03-11T21:46:09N"),
+				[]byte("9999-12-31T00:00:00N"),
+				[]byte("9.89"),
+				[]byte("9.89"),
+				[]byte(""),
+				[]byte(`[{"exftqvytk_id":"I007CCK","xfa_mswb":"2021-08-15","gtctd":"01","zpjlv":"R","eamrd":"35","xzdjwnv":"1","bwjeamwtgug_mswb":"2022-08-14"}]`),
+			},
+			delimiter:     characters.Character_COMMA,
+			enclosure:     characters.Character_QUOTATION_MARK,
+			optionalDelim: false,
+			debug:         true,
+		},
 	}
 
 	return tests
@@ -1794,21 +1818,25 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 			continue
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			DebugLog = tt.debug
+			debug.DebugLog = tt.debug
 			p := NewParameters()
 			p.Delimiter = tt.delimiter
 			p.Enclosure = tt.enclosure
 			r := NewRuntime(p, bufio.ScanLines)
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
-			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Delimiter))); !cmp.Equal(got, tt.want) {
+			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(util.ColSplit(tt.args.data, p.Delimiter, p.Enclosure, -1))); !cmp.Equal(got, tt.want) {
 				if len(got) != len(tt.want) {
-					t.Errorf("SplitUnescapedDelimiter() len(got) = %d != len(want) = %d", len(got), len(tt.want))
+
+					t.Errorf("ParseUnescapedDelimiter(): %s len(got) = %d != len(want) = %d", tt.name, len(got), len(tt.want))
+					t.Errorf("ParseUnescapedDelimiter(): %s got:\n%s\nwant:\n%s\n", tt.name, got, tt.want)
 				}
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					for i := range got {
-						if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
-							t.Errorf("SplitUnescapedDelimiter() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+						if i < len(tt.want) {
+							if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
+								t.Errorf("ParseUnescapedDelimiter(): %s Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+							}
 						}
 					}
 
@@ -1883,7 +1911,7 @@ func TestSplitRow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			DebugLog = tt.debug
+			debug.DebugLog = tt.debug
 			p := NewParameters()
 			p.Delimiter = tt.delimiter
 			p.Enclosure = tt.enclosure
