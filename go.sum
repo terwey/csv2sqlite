@@ -16,8 +16,12 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/productsupcom/go-sqlite-lite v0.6.3/go.mod h1:YGo4yOO2y2flqZf3JzIQu2EePVUCgvSnoS0J7xk4KxQ=
 github.com/productsupcom/go-sqlite-lite v0.7.0 h1:0A5G24y9GEmccsGfQM/IsZj5dWCpqiELgltDpVUbFOk=
 github.com/productsupcom/go-sqlite-lite v0.7.0/go.mod h1:YGo4yOO2y2flqZf3JzIQu2EePVUCgvSnoS0J7xk4KxQ=
+github.com/productsupcom/go-sqlite-lite v0.7.1 h1:PINbJUICdGK4hfgLgQ+7fF+HVCU5yKDx+w7A9yMCHrQ=
+github.com/productsupcom/go-sqlite-lite v0.7.1/go.mod h1:YGo4yOO2y2flqZf3JzIQu2EePVUCgvSnoS0J7xk4KxQ=
 github.com/terwey/recordwriter v0.1.3 h1:qGL3DZQdga0b41cM2UYKVRVc+mGt0qUQUGJTeMxNoxU=
 github.com/terwey/recordwriter v0.1.3/go.mod h1:PsVCa6kpvjGZLsoSb3dLPIkUOs8aUbKpFm3RU6WTDiY=
+github.com/terwey/recordwriter v0.1.4 h1:qCjze7Ks32C5CS7ADD03GDNNid74F+/uGoMgVIDLfT8=
+github.com/terwey/recordwriter v0.1.4/go.mod h1:Y4Sjhy/bA0aP0a7veosDWJpZH99EYyTbcL6C2FdBAbM=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=

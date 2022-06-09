@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // Character is used to denote which character is used for either delimiter, enclosure or escape
@@ -86,6 +87,11 @@ func CharacterFromString(name string) (Character, error) {
 
 func (c Character) Name() string {
 	return stringValueForCharacter(c)
+}
+
+func (c Character) Rune() rune {
+	r, _ := utf8.DecodeRune(c)
+	return r
 }
 
 func stringValueForCharacter(d Character) string {

@@ -360,7 +360,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
 		csvReader := csv.NewReader(bytes.NewReader(data))
-		csvReader.Comma = []rune(string(r.p.Delimiter))[0]
+		csvReader.Comma = r.p.Delimiter.Rune()
 
 		for {
 			record, err := csvReader.Read()
