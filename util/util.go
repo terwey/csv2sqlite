@@ -7,7 +7,6 @@ import (
 	"bytes"
 
 	"github.com/terwey/csv2sqlite/characters"
-	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 )
 
 func MultiToFlat(data [][]byte) (out []byte, pos []uint32) {
@@ -99,39 +98,50 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 		n = bytes.Count(s, sep) + 1
 	}
 
-	// if debug.DebugLog {
-	// 	debug.Debug("break me")
-	// }
+	var m int
+	var lastPos int
+	var count int
+	var curPos int
 
 	n--
 	i := 0
-	var buf []byte
+	// var buf []byte
 	for i < n {
-		m := bytes.Index(s, sep)
-		debug.Debug("s (%d): %s", m, s)
-		debug.Debug("existing buf: %s", buf)
+		// if debug.DebugLog {
+		// 	debug.Debug("break me")
+		// }
+		curPos = 0
+
+		if lastPos > 0 {
+			// debug.Debug("searching in s[lastPos:]: %s", s[lastPos:])
+			m = bytes.Index(s[lastPos:], sep)
+		} else {
+			// debug.Debug("searching in s: %s", s)
+			m = bytes.Index(s, sep)
+		}
+
 		if m < 0 {
-			// end of record
-			if len(buf) > 0 {
-				buf = append(buf, s...)
-				data = append(data, buf)
-				s = make([]byte, 0)
-			}
 			break
 		}
 
-		buf = append(buf, s[:m:m]...)
-		debug.Debug("new buf: %s", buf)
-		count := bytes.Count(buf, enclosure)
+		curPos = m + lastPos
+
+		// debug.Debug("checking: %s", s[:curPos:curPos])
+		count = bytes.Count(s[:curPos:curPos], enclosure)
 		if count%2 == 0 {
-			data = append(data, buf)
-			buf = make([]byte, 0)
+			// debug.Debug("found: %s", s[:curPos:curPos])
+			data = append(data, s[:curPos:curPos])
+			lastPos = 0
 			i++
 		} else {
-			buf = append(buf, sep...)
+			lastPos += m + len(sep)
+			// debug.Debug("continue, lastPos: %d", lastPos)
+			// do not set s
+			continue
 		}
 
-		s = s[m+len(sep):]
+		// debug.Debug("setting s: %s", s[curPos+len(sep):])
+		s = s[curPos+len(sep):]
 	}
 
 	if len(s) > 0 {

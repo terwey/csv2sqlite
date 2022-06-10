@@ -1800,7 +1800,7 @@ func GetTests() []TestData {
 			delimiter:     characters.Character_COMMA,
 			enclosure:     characters.Character_QUOTATION_MARK,
 			optionalDelim: false,
-			debug:         true,
+			debug:         false,
 		},
 	}
 

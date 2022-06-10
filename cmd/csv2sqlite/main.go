@@ -123,19 +123,25 @@ func main() {
 		os.Exit(0)
 	}
 
-	stat, _ := os.Stdin.Stat()
-	if (stat.Mode() & os.ModeCharDevice) != 0 {
-		if len(p.Input) == 0 {
-			fmt.Fprintf(os.Stderr, "Input file missing\n")
-			flags.PrintDefaults()
-			os.Exit(100)
-		}
+	// running the code from VSCode through Delve now somehow sets stdin to be there without
+	// containing data. we must prevent it from entering
+	if len(p.Input) == 0 {
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			if len(p.Input) == 0 {
+				fmt.Fprintf(os.Stderr, "Input file missing\n")
+				flags.PrintDefaults()
+				os.Exit(100)
+			}
 
-		if p.Input == p.Output {
-			fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
-			os.Exit(100)
-		}
+			if p.Input == p.Output {
+				fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
+				os.Exit(100)
+			}
 
+			stdin = false
+		}
+	} else {
 		stdin = false
 	}
 

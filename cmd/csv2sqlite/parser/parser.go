@@ -29,6 +29,7 @@ type Params struct {
 	Drop            bool
 	Delimiter       characters.Character
 	Enclosure       characters.Character
+	DoubleEnclosure characters.Character
 	ChannelCapacity int
 	enclosureClean  bool
 }
@@ -64,12 +65,11 @@ type Runtime struct {
 	scanner *bufio.Scanner
 	w       io.StringWriter
 
-	Rows            uint64
-	RowsCSV         uint64
-	headerPrinted   bool
-	colCount        int
-	inside          bool
-	doubleEnclosure []byte
+	Rows          uint64
+	RowsCSV       uint64
+	headerPrinted bool
+	colCount      int
+	inside        bool
 
 	Header    [][]byte
 	HeaderSet chan bool
@@ -105,12 +105,14 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	r.HeaderSet = make(chan bool)
 	r.Data = make(chan [][]byte, p.ChannelCapacity)
 
-	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
-	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
-
+	// if we receive the enclosure from the parameters we need to ensure
+	// we need to ensure that enclosureClean is set to false when it's empty
 	if bytes.Compare(r.p.Enclosure, characters.Character_EMPTY) == 0 {
 		r.p.enclosureClean = false
 	}
+
+	p.DoubleEnclosure = append(p.DoubleEnclosure, p.Enclosure...)
+	p.DoubleEnclosure = append(p.DoubleEnclosure, p.Enclosure...)
 
 	return r
 }
@@ -123,9 +125,6 @@ func NewParser(p *Params, count int) *Runtime {
 		Count:         count,
 	}
 
-	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
-	r.doubleEnclosure = append(r.doubleEnclosure, p.Enclosure...)
-
 	return r
 }
 
@@ -135,6 +134,15 @@ func (r *Runtime) SetDelimiter(delim characters.Character) {
 
 func (r *Runtime) SetEnclosure(encl characters.Character) {
 	r.p.Enclosure = encl
+
+	r.p.DoubleEnclosure = append(r.p.DoubleEnclosure, r.p.Enclosure...)
+	r.p.DoubleEnclosure = append(r.p.DoubleEnclosure, r.p.Enclosure...)
+
+	// reset
+	r.p.enclosureClean = true
+	if bytes.Compare(r.p.Enclosure, characters.Character_EMPTY) == 0 {
+		r.p.enclosureClean = false
+	}
 }
 
 func (r *Runtime) Merge(ready <-chan string, wg *sync.WaitGroup, duration chan time.Duration) {
@@ -360,7 +368,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
 		csvReader := csv.NewReader(bytes.NewReader(data))
-		csvReader.Comma = []rune(string(r.p.Delimiter))[0]
+		csvReader.Comma = r.p.Delimiter.Rune()
 
 		for {
 			record, err := csvReader.Read()
@@ -404,7 +412,7 @@ func (r *Runtime) clean(data []byte) []byte {
 		data = bytes.TrimSuffix(data, r.p.Enclosure)
 
 		// we need to clean double quotes
-		data = ReplaceAll(data, r.doubleEnclosure, r.p.Enclosure)
+		data = ReplaceAll(data, r.p.DoubleEnclosure, r.p.Enclosure)
 	}
 	data = ReplaceAll(data, crLf, lineFeed)
 	data = ReplaceAll(data, carriageReturn, lineFeed)
@@ -424,11 +432,16 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 	r.sbuf = make([]byte, 0)
 	enclosurecheck := false
 
+	debug.DebugColumns(input)
+
 	for i := range input {
-		// r.debug("input[i]: >>>%s<<", r.sinput[i])
-		// r.debug("buf: %s", r.sbuf)
-		// r.debug("columns: %s", r.scolumns)
-		// debug.DebugColumns(r.scolumns)
+		// debug.Debug("input[i]: >>>%s<<<", input[i])
+		// debug.Debug("buf: %s", r.sbuf)
+
+		// if debug.DebugLog {
+		// 	debug.Debug("break me")
+		// }
+
 		count := 0
 		counted := false
 
@@ -458,7 +471,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 				r.sbuf = bytes.TrimSuffix(r.sbuf, r.p.Enclosure)
 				// we need to clean double enclosures to single
-				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
+				r.sbuf = ReplaceAll(r.sbuf, r.p.DoubleEnclosure, r.p.Enclosure)
 				r.sbuf = ReplaceAll(r.sbuf, crLf, lineFeed)
 				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
 				data = append(data, r.sbuf...)
@@ -492,7 +505,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 
 				// we need to clean double enclosures to single
-				r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
+				r.sbuf = ReplaceAll(r.sbuf, r.p.DoubleEnclosure, r.p.Enclosure)
 				r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 				r.sbuf = ReplaceAll(r.sbuf, crLf, lineFeed)
 				r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
@@ -527,14 +540,12 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = append(r.sbuf, r.p.Delimiter...)
 				r.sbuf = append(r.sbuf, input[i]...)
 
-				// result := bytes.HasSuffix(input[i], r.p.Enclosure) && !bytes.HasSuffix(input[i], r.doubleEnclosure)
-				// r.debug("bytes.HasSuffix(input[i], r.p.Enclosure): %v\n!bytes.HasSuffix(input[i], r.doubleEnclosure: %v\n statement: %v", bytes.HasSuffix(input[i], r.p.Enclosure), !bytes.HasSuffix(input[i], r.doubleEnclosure), result)
-				if r.hasSuffixEnclosure && !bytes.HasSuffix(input[i], r.doubleEnclosure) {
+				if r.hasSuffixEnclosure && !bytes.HasSuffix(input[i], r.p.DoubleEnclosure) {
 					r.sbuf = bytes.TrimPrefix(r.sbuf, r.p.Enclosure)
 					// we know for sure that the suffix exists
 					r.sbuf = TrimSuffixSkipCheck(r.sbuf, r.p.Enclosure)
 					// we need to clean double enclosures to single
-					r.sbuf = ReplaceAll(r.sbuf, r.doubleEnclosure, r.p.Enclosure)
+					r.sbuf = ReplaceAll(r.sbuf, r.p.DoubleEnclosure, r.p.Enclosure)
 					r.sbuf = ReplaceAll(r.sbuf, crLf, lineFeed)
 					r.sbuf = ReplaceAll(r.sbuf, carriageReturn, lineFeed)
 					data = append(data, r.sbuf...)
@@ -558,7 +569,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 			input[i] = TrimSuffixSkipCheck(input[i], r.p.Enclosure)
 
 			// we need to clean double enclosures to single
-			input[i] = ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
+			input[i] = ReplaceAll(input[i], r.p.DoubleEnclosure, r.p.Enclosure)
 			input[i] = ReplaceAll(input[i], crLf, lineFeed)
 			input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
 			data = append(data, input[i]...)
@@ -577,7 +588,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 		input[i] = bytes.TrimPrefix(input[i], r.p.Enclosure)
 		input[i] = bytes.TrimSuffix(input[i], r.p.Enclosure)
 		// we need to clean double enclosures to single
-		input[i] = ReplaceAll(input[i], r.doubleEnclosure, r.p.Enclosure)
+		input[i] = ReplaceAll(input[i], r.p.DoubleEnclosure, r.p.Enclosure)
 		input[i] = ReplaceAll(input[i], crLf, lineFeed)
 		input[i] = ReplaceAll(input[i], carriageReturn, lineFeed)
 		data = append(data, input[i]...)
