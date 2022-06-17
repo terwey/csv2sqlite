@@ -14,7 +14,7 @@ import (
 func Benchmark_SplitUnescapedDelimiter(b *testing.B) {
 
 	p := NewParameters()
-	p.Delimiter = characters.Character_PIPE
+	p.Characters.SetDelimiter(characters.Character_PIPE)
 	r := NewRuntime(p, bufio.ScanLines)
 
 	testData := GetTests()
@@ -22,7 +22,7 @@ func Benchmark_SplitUnescapedDelimiter(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		for _, test := range testData {
-			r.ParseUnescapedDelimiter(bytes.Split(test.args.data, p.Delimiter))
+			r.ParseUnescapedDelimiter(bytes.Split(test.args.data, p.Characters.Delimiter))
 		}
 	}
 }
@@ -136,6 +136,7 @@ func GetTests() []TestData {
 			},
 			delimiter: characters.Character_PIPE,
 			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     true,
 		},
 		{
 			name: "broken chars",
@@ -1819,13 +1820,16 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			debug.DebugLog = tt.debug
+			if tt.debug {
+				t.Logf("debug")
+			}
 			p := NewParameters()
-			p.Delimiter = tt.delimiter
-			p.Enclosure = tt.enclosure
+			p.Characters.SetDelimiter(tt.delimiter)
+			p.Characters.SetEnclosure(tt.enclosure)
 			r := NewRuntime(p, bufio.ScanLines)
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
-			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(util.ColSplit(tt.args.data, p.Delimiter, p.Enclosure, -1))); !cmp.Equal(got, tt.want) {
+			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(util.ColSplit(tt.args.data, p.Characters.Delimiter, p.Characters.Enclosure, -1))); !cmp.Equal(got, tt.want) {
 				if len(got) != len(tt.want) {
 
 					t.Errorf("ParseUnescapedDelimiter(): %s len(got) = %d != len(want) = %d", tt.name, len(got), len(tt.want))
@@ -1864,8 +1868,8 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 
 func TestSplit(t *testing.T) {
 	p := NewParameters()
-	p.Delimiter = characters.Character_PIPE
-	p.Enclosure = characters.Character_QUOTATION_MARK
+	p.Characters.SetDelimiter(characters.Character_PIPE)
+	p.Characters.SetEnclosure(characters.Character_QUOTATION_MARK)
 	r := NewRuntime(p, bufio.ScanLines)
 	tests := []TestData{
 		{
@@ -1888,7 +1892,7 @@ func TestSplit(t *testing.T) {
 			DebugLog = tt.debug
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
-			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Delimiter))); !cmp.Equal(got, tt.want) {
+			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Characters.Delimiter))); !cmp.Equal(got, tt.want) {
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					for i := range got {
 						// t.Logf("(%s)\nGot:\t%s\nWant:\t%s", tt.name, got[i], tt.want[i])
@@ -1913,8 +1917,8 @@ func TestSplitRow(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			debug.DebugLog = tt.debug
 			p := NewParameters()
-			p.Delimiter = tt.delimiter
-			p.Enclosure = tt.enclosure
+			p.Characters.SetDelimiter(tt.delimiter)
+			p.Characters.SetEnclosure(tt.enclosure)
 			r := NewRuntime(p, bufio.ScanLines)
 			if tt.colcount != 0 {
 				r.colCount = tt.colcount
