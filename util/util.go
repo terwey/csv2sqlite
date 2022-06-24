@@ -5,8 +5,10 @@ package util
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 )
 
 func MultiToFlat(data [][]byte) (out []byte, pos []uint32) {
@@ -44,15 +46,150 @@ func FlatToMulti(in []byte, pos []uint32) (data [][]byte) {
 	return data
 }
 
-type CleanFunc func(data []byte) []byte
+// CleanFunc returns the cleaned up byte slice. prefix and suffix
+// signify the SkipCheck function should be called
+type CleanFunc func(data []byte, prefix, suffix bool) []byte
 
-func NoClean(data []byte) []byte {
+func NoClean(data []byte, prefix, suffix bool) []byte {
 	return data
+}
+
+type CharacterConfig struct {
+	Delimiter       characters.Character
+	Enclosure       characters.Character
+	DoubleEnclosure characters.Character
+	EnclosureClean  bool
+	enclosureLenth  int
+	EOL             characters.Character
+
+	// this is only used for the SplitCSVInput
+	DelimiterCount int
+}
+
+func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
+	cc.Delimiter = delim
+}
+
+func (cc *CharacterConfig) SetEnclosure(encl characters.Character) {
+	cc.Enclosure = encl
+	cc.enclosureLenth = len(encl)
+
+	// reset
+	cc.DoubleEnclosure = characters.Character_NIL
+	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
+	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
+
+	// reset
+	cc.EnclosureClean = true
+	if bytes.Compare(cc.Enclosure, characters.Character_EMPTY) == 0 {
+		cc.EnclosureClean = false
+	}
+}
+
+func (c *CharacterConfig) Clean(data []byte, prefix, suffix bool) []byte {
+	if c.EnclosureClean {
+		if prefix {
+			data = TrimPrefixSkipCheck(data, c.Enclosure)
+		} else {
+			data = bytes.TrimPrefix(data, c.Enclosure)
+		}
+		if suffix {
+			data = TrimSuffixSkipCheck(data, c.Enclosure)
+		} else {
+			data = bytes.TrimSuffix(data, c.Enclosure)
+		}
+
+		// we need to clean double quotes
+		data = ReplaceAll(data, c.DoubleEnclosure, c.Enclosure)
+	}
+	data = ReplaceAll(data, characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED)
+	data = ReplaceAll(data, characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED)
+
+	return data
+}
+
+func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error) {
+	if len(in) == 0 && atEOF {
+		return 0, nil, io.EOF
+	}
+
+	var eolIndex int
+	if len(c.EOL) == 0 {
+		if eolIndex = bytes.Index(in, characters.Character_CARRIAGE_RETURN_LINE_FEED); eolIndex != -1 {
+			c.EOL = characters.Character_CARRIAGE_RETURN_LINE_FEED
+		} else if eolIndex = bytes.Index(in, characters.Character_CARRIAGE_RETURN); eolIndex != -1 {
+			c.EOL = characters.Character_CARRIAGE_RETURN
+		} else if eolIndex = bytes.Index(in, characters.Character_LINE_FEED); eolIndex != -1 {
+			c.EOL = characters.Character_LINE_FEED
+		}
+
+		// not enough data
+		if len(c.EOL) == 0 {
+			return 0, nil, nil
+		}
+	}
+
+	eolIndex = bytes.Index(in, c.EOL)
+	// not enough bytes
+	if eolIndex == -1 {
+		if atEOF {
+			debug.Debug("atEOF")
+			return len(in), in, nil
+		}
+		return 0, nil, nil
+	}
+
+	if c.DelimiterCount == 0 {
+		// the optional header always ends with a newline
+		if eolIndex != -1 {
+			// we have to return the found data PLUS the length of the eolBytes
+			debug.LogData("eolIndex != -1", in[:eolIndex], 40960)
+			return eolIndex + len(c.EOL), in[:eolIndex], nil
+		}
+	}
+
+	// we want to loop over the possible eolIndex
+	for {
+		// count the delimiters
+		// if the delimCount matches the c.DelimiterCount it COULD be a full row, it can also have
+		// the delimiter inside a field, we need to check for that too
+
+		// count the enclosures
+		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
+
+		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
+		if c.enclosureLenth == 0 && bytes.Count(in[:eolIndex], c.Delimiter) == c.DelimiterCount {
+			debug.LogData("encloLen == 0", in[:eolIndex], 40960)
+			return eolIndex + len(c.EOL), in[:eolIndex], nil
+		}
+
+		// if delimCount is larger then DelimiterCount _AND_ encloCount is even
+		// it COULD be a row, more tests will proof otherwise
+		if bytes.Count(in[:eolIndex], c.Delimiter) >= c.DelimiterCount && (bytes.Count(in[:eolIndex], c.Enclosure)%2 == 0) {
+			debug.LogData("delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
+			return eolIndex + len(c.EOL), in[:eolIndex], nil
+		}
+
+		// we found none, move the index
+		if len(in) > eolIndex+len(c.EOL) {
+			newIndex := bytes.Index(in[eolIndex+len(c.EOL):], c.EOL)
+			if newIndex == -1 {
+				break
+			}
+			// we have to add the length of eolBytes here to account for the offset
+			eolIndex += newIndex + len(c.EOL)
+			continue
+		}
+		break
+	}
+
+	// not enough bytes
+	return 0, nil, nil
 }
 
 // Generic split: splits after each instance of sep.
 // Adapted to return a flat byte slice with pos slice
-func GenSplit(s, sep []byte, n int, fn CleanFunc) (data []byte, pos []uint32) {
+func GenSplit(s, sep []byte, n int, fn CleanFunc, enclosureClean bool) (data []byte, pos []uint32) {
 	if n == 0 {
 		return nil, nil
 	}
@@ -70,16 +207,89 @@ func GenSplit(s, sep []byte, n int, fn CleanFunc) (data []byte, pos []uint32) {
 		if m < 0 {
 			break
 		}
-		buf := fn(s[:m:m])
+		buf := fn(s[:m:m], false, false)
 		data = append(data, buf...)
 		// log.Printf("data: %s", data)
 		pos = append(pos, uint32(len(buf)))
 		s = s[m+len(sep):]
 		i++
 	}
-	buf := fn(s)
+	buf := fn(s, false, false)
 	data = append(data, buf...)
 	pos = append(pos, uint32(len(buf)))
+	return data, pos
+}
+
+// ColSplitFlat will split a byte slice with the rules for CSV kept in place.
+// If a seperator is inside an enclosure it will not be used to split.
+// Returns a flat byte slice with pos slice
+func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Character, n int) (data []byte, pos []uint32) {
+	// debug.LogData("s", s, 512)
+	// debug.Debug("sep: \t\t%s\nenclosure: \t%s\nn: \t\t\t%d", sep.Name(), enclosure.Name(), n)
+	if n == 0 {
+		return nil, nil
+	}
+
+	// we do not know yet how often the seperator appears inside enclosures
+	// we need to account for that later
+	if n < 0 {
+		n = bytes.Count(s, sep) + 1
+	}
+
+	data = make([]byte, 0)
+
+	var m int
+	var lastPos int
+	var count int
+	var curPos int
+
+	n--
+	i := 0
+	// var buf []byte
+	for i < n {
+		// if debug.DebugLog {
+		// 	debug.Debug("break me")
+		// }
+		curPos = 0
+
+		if lastPos > 0 {
+			// debug.Debug("searching in s[lastPos:]: %s", s[lastPos:])
+			m = bytes.Index(s[lastPos:], sep)
+		} else {
+			// debug.Debug("searching in s: %s", s)
+			m = bytes.Index(s, sep)
+		}
+
+		if m < 0 {
+			break
+		}
+
+		curPos = m + lastPos
+
+		// debug.Debug("checking: %s", s[:curPos:curPos])
+		count = bytes.Count(s[:curPos:curPos], enclosure)
+		if count%2 == 0 {
+			// debug.Debug("found: %s", s[:curPos:curPos])
+			data = append(data, s[:curPos:curPos]...)
+			pos = append(pos, uint32(len(s[:curPos:curPos])))
+			lastPos = 0
+			i++
+		} else {
+			lastPos += m + len(sep)
+			// debug.Debug("continue, lastPos: %d", lastPos)
+			// do not set s
+			continue
+		}
+
+		// debug.Debug("setting s: %s", s[curPos+len(sep):])
+		s = s[curPos+len(sep):]
+	}
+
+	if len(s) > 0 {
+		data = append(data, s...)
+		pos = append(pos, uint32(len(s)))
+	}
+
 	return data, pos
 }
 
@@ -149,4 +359,31 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 	}
 
 	return data
+}
+
+// Count calls bytes.IndexByte before Count
+func Count(s, sep []byte) int {
+	if len(sep) == 1 {
+		if bytes.IndexByte(s, sep[0]) == -1 {
+			return 0
+		}
+	}
+	return bytes.Count(s, sep)
+}
+
+// ReplaceAll calls bytes.Contains beforehand preventing alloc
+func ReplaceAll(s, old, new []byte) []byte {
+	if !bytes.Contains(s, old) {
+		return s
+	}
+	return bytes.ReplaceAll(s, old, new)
+}
+
+// TrimSuffixSkipCheck skips the check if the suffix exists
+func TrimSuffixSkipCheck(s, suffix []byte) []byte {
+	return s[:len(s)-len(suffix)]
+}
+
+func TrimPrefixSkipCheck(s, prefix []byte) []byte {
+	return s[len(prefix):]
 }

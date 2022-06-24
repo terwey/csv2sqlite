@@ -37,6 +37,11 @@ var (
 	Character_APOSTROPHE            Character = []byte("'")
 	Character_ASTERISK              Character = []byte("*")
 
+	// Line Feeds
+	Character_CARRIAGE_RETURN_LINE_FEED Character = []byte("\r\n")
+	Character_CARRIAGE_RETURN           Character = []byte("\r")
+	Character_LINE_FEED                 Character = []byte("\n")
+
 	Character_EMPTY Character = []byte("")
 
 	Character_NIL Character = nil

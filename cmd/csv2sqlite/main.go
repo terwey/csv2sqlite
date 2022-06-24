@@ -40,8 +40,6 @@ var (
 	nd    bool
 	stdin bool = true
 
-	headerLength = 0
-
 	literalDelimiter string
 	literalEnclosure string
 
@@ -158,37 +156,31 @@ func main() {
 	})
 
 	if literald {
-		p.Delimiter = characters.Character(literalDelimiter)
-		delimBytes = p.Delimiter
+		p.Characters.SetDelimiter(characters.Character(literalDelimiter))
 	} else {
 		if paramDelimiter != "" {
-			var err error
-			delimBytes, err = characters.CharacterFromString(paramDelimiter)
+			delim, err := characters.CharacterFromString(paramDelimiter)
 			if err != nil {
 				fmt.Fprint(os.Stderr, err.Error()+"\n")
 				flags.PrintDefaults()
 				os.Exit(100)
 			}
-			p.Delimiter = delimBytes
+			p.Characters.SetDelimiter(delim)
 		}
 	}
 
 	if literale {
-		p.Enclosure = characters.Character(literalEnclosure)
-		encloBytes = p.Enclosure
+		p.Characters.SetEnclosure(characters.Character(literalEnclosure))
 	}
 	if paramEnclosure != `` {
-		var err error
-		encloBytes, err = characters.CharacterFromString(paramEnclosure)
+		encl, err := characters.CharacterFromString(paramEnclosure)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error()+"\n")
 			flags.PrintDefaults()
 			os.Exit(100)
 		}
-		p.Enclosure = encloBytes
+		p.Characters.SetEnclosure(encl)
 	}
-
-	encloLen = len(encloBytes)
 
 	// multiple channel capacity by threads
 	p.ChannelCapacity = p.ChannelCapacity * threads
@@ -206,11 +198,11 @@ func main() {
 
 	switch strings.ToUpper(newline) {
 	case "LF":
-		eolBytes = []byte("\n")
+		p.Characters.EOL = characters.Character_LINE_FEED
 	case "CRLF":
-		eolBytes = []byte("\r\n")
+		p.Characters.EOL = characters.Character_CARRIAGE_RETURN_LINE_FEED
 	case "CR":
-		eolBytes = []byte("\r")
+		p.Characters.EOL = characters.Character_CARRIAGE_RETURN
 	}
 
 	// detect if the output is a sqlite
@@ -259,7 +251,7 @@ func main() {
 	if nd {
 		r = parser.NewRuntime(p, bufio.ScanLines)
 	} else {
-		r = parser.NewRuntime(p, splitCsvInput)
+		r = parser.NewRuntime(p, p.Characters.SplitCsvInput)
 	}
 	var file io.ReadSeeker
 	if !stdin {
@@ -429,8 +421,8 @@ func main() {
 		ops.Round(time.Microsecond),
 		math.Floor(rows),
 		threads,
-		encloBytes.Name(),
-		delimBytes.Name(),
+		p.Characters.Enclosure.Name(),
+		p.Characters.Delimiter.Name(),
 		chunksize,
 		p.Buffersize/1024,
 		p.CommitRate,
@@ -446,10 +438,10 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 	// var buf []byte
 	var delimSet bool
 	var enclosureSet bool
-	if delimBytes != nil {
+	if p.Characters.Delimiter != nil {
 		delimSet = true
 	}
-	if encloBytes != nil {
+	if p.Characters.Enclosure != nil {
 		enclosureSet = true
 	}
 	scanner := r.GetScanner()
@@ -473,22 +465,20 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 		chunksSize += size
 		// if no delimiter was set we detect it once
 		if !delimSet {
-			delimBytes = characters.DetectDelimiter(chunk)
-			r.SetDelimiter(delimBytes)
+			p.Characters.SetDelimiter(characters.DetectDelimiter(chunk))
 			delimSet = true
 		}
 
 		if !enclosureSet {
-			encloBytes = characters.DetectEnclosure(chunk)
-			r.SetEnclosure(encloBytes)
+			p.Characters.SetEnclosure(characters.DetectEnclosure(chunk))
 			enclosureSet = true
 		}
 
 		// header has to be set once
-		if headerLength == 0 {
+		if p.Characters.DelimiterCount == 0 {
 			// we have to count the delimiters in the header to know for row scanning
 			// how many fields we need
-			headerLength = bytes.Count(chunk, delimBytes)
+			p.Characters.DelimiterCount = bytes.Count(chunk, p.Characters.Delimiter)
 		}
 
 		// we have to process a header once
@@ -498,7 +488,6 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 			continue
 		}
 
-		// r.Data <- scanner.Bytes()
 		if len(chunks) >= chunksize {
 			r.Data <- chunks
 			pv.Add(chunksSize)
@@ -521,90 +510,4 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 	close(r.Data)
 	pv.Finish()
 	wg.Done()
-}
-
-var (
-	eolBytes   []byte
-	delimBytes characters.Character = characters.Character_NIL
-	encloBytes characters.Character = characters.Character_NIL
-	encloLen   int                  = 0
-)
-
-func splitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error) {
-	if len(in) == 0 && atEOF {
-		return 0, nil, io.EOF
-	}
-
-	var eolIndex int
-	if len(eolBytes) == 0 {
-		if eolIndex = bytes.Index(in, []byte("\r\n")); eolIndex != -1 {
-			eolBytes = []byte("\r\n")
-		} else if eolIndex = bytes.Index(in, []byte("\r")); eolIndex != -1 {
-			eolBytes = []byte("\r")
-		} else if eolIndex = bytes.Index(in, []byte("\n")); eolIndex != -1 {
-			eolBytes = []byte("\n")
-		}
-
-		// not enough data
-		if len(eolBytes) == 0 {
-			return 0, nil, nil
-		}
-	}
-
-	eolIndex = bytes.Index(in, eolBytes)
-	// not enough bytes
-	if eolIndex == -1 {
-		if atEOF {
-			debug.Debug("atEOF")
-			return len(in), in, nil
-		}
-		return 0, nil, nil
-	}
-
-	if headerLength == 0 {
-		// the optional header always ends with a newline
-		if eolIndex != -1 {
-			// we have to return the found data PLUS the length of the eolBytes
-			debug.LogData("eolIndex != -1", in[:eolIndex], 40960)
-			return eolIndex + len(eolBytes), in[:eolIndex], nil
-		}
-	}
-
-	// we want to loop over the possible eolIndex
-	for {
-		// count the delimiters
-		// if the delimCount matches the headerLength it COULD be a full row, it can also have
-		// the delimiter inside a field, we need to check for that too
-
-		// count the enclosures
-		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
-
-		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
-		if encloLen == 0 && bytes.Count(in[:eolIndex], delimBytes) == headerLength {
-			debug.LogData("encloLen == 0", in[:eolIndex], 40960)
-			return eolIndex + len(eolBytes), in[:eolIndex], nil
-		}
-
-		// if delimCount is larger then headerLength _AND_ encloCount is even
-		// it COULD be a row, more tests will proof otherwise
-		if bytes.Count(in[:eolIndex], delimBytes) >= headerLength && (bytes.Count(in[:eolIndex], encloBytes)%2 == 0) {
-			debug.LogData("delimCount is larger then headerLength _AND_ encloCount is even", in[:eolIndex], 40960)
-			return eolIndex + len(eolBytes), in[:eolIndex], nil
-		}
-
-		// we found none, move the index
-		if len(in) > eolIndex+len(eolBytes) {
-			newIndex := bytes.Index(in[eolIndex+len(eolBytes):], eolBytes)
-			if newIndex == -1 {
-				break
-			}
-			// we have to add the length of eolBytes here to account for the offset
-			eolIndex += newIndex + len(eolBytes)
-			continue
-		}
-		break
-	}
-
-	// not enough bytes
-	return 0, nil, nil
 }
