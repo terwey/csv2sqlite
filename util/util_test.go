@@ -208,7 +208,7 @@ func TestColSplit(t *testing.T) {
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			got := ColSplit(tt.args.s, tt.args.sep, tt.args.enclosure, tt.args.n)
-			if diff := cmp.Diff(got, tt.want); diff != "" {
+			if diff := cmp.Diff(tt.want, got); diff != "" {
 				debug.DebugColumns(got)
 				t.Errorf("ColSplit(): %s Mismatch (-want +got):\n%s", tt.name, diff)
 			}
@@ -224,7 +224,7 @@ func TestColSplitFlat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v, pos := ColSplitFlat(tt.args.s, tt.args.sep, tt.args.enclosure, tt.args.n)
 			got := FlatToMulti(v, pos)
-			if diff := cmp.Diff(got, tt.want); diff != "" {
+			if diff := cmp.Diff(tt.want, got); diff != "" {
 				debug.DebugColumns(got)
 				t.Errorf("ColSplit(): %s Mismatch (-want +got):\n%s", tt.name, diff)
 			}

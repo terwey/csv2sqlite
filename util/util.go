@@ -198,7 +198,9 @@ func GenSplit(s, sep []byte, n int, fn CleanFunc, enclosureClean bool) (data []b
 		n = bytes.Count(s, sep) + 1
 	}
 
-	data = make([]byte, 0)
+	estimatedLength := len(s) - (n * len(sep))
+	data = make([]byte, 0, estimatedLength)
+	pos = make([]uint32, 0, n)
 
 	n--
 	i := 0
@@ -236,7 +238,9 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 		n = bytes.Count(s, sep) + 1
 	}
 
-	data = make([]byte, 0)
+	estimatedLength := len(s) - (n * len(sep))
+	data = make([]byte, 0, estimatedLength)
+	pos = make([]uint32, 0, n)
 
 	var m int
 	var lastPos int
@@ -312,6 +316,8 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 	var lastPos int
 	var count int
 	var curPos int
+
+	data = make([][]byte, 0, n)
 
 	n--
 	i := 0

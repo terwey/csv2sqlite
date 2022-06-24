@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/util"
@@ -28,6 +30,8 @@ type Params struct {
 	Sqlite          bool
 	Drop            bool
 	ChannelCapacity int
+
+	Exclude []int
 
 	Characters util.CharacterConfig
 }
@@ -75,8 +79,8 @@ type Runtime struct {
 	Header    [][]byte
 	HeaderSet chan bool
 
-	Data  chan [][]byte
-	Count int
+	Data        chan [][]byte
+	ParserCount int
 
 	sinput [][]byte
 	// scolumns [][]byte
@@ -97,7 +101,7 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		headerPrinted: false,
 		splitFunc:     fn,
 		Benchmark:     false,
-		Count:         0,
+		ParserCount:   0,
 	}
 
 	recordwriter.DebugLog = DebugLog
@@ -109,12 +113,12 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	return r
 }
 
-func NewParser(p *Params, count int) *Runtime {
+func NewParser(p *Params, parsercount int) *Runtime {
 	r := &Runtime{
 		p:             p,
 		headerPrinted: false,
 		Benchmark:     false,
-		Count:         count,
+		ParserCount:   parsercount,
 	}
 
 	return r
@@ -151,10 +155,10 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 	}
 
 	var output string
-	if r.Count == 0 {
+	if r.ParserCount == 0 {
 		output = r.p.Output
 	} else {
-		output = fmt.Sprintf("%s.%d", r.p.Output, r.Count)
+		output = fmt.Sprintf("%s.%d", r.p.Output, r.ParserCount)
 	}
 
 	if r.p.Drop {
@@ -178,7 +182,7 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 
 			r.rw = recordwriter.NewCSVWriter(r.w)
 		} else {
-			if r.Count == 0 {
+			if r.ParserCount == 0 {
 				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, true)
 			} else {
 				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, false)
@@ -186,7 +190,7 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 		}
 	}
 
-	if r.Count == 0 {
+	if r.ParserCount == 0 {
 		r.scanner = r.NewScanner()
 	}
 
@@ -265,13 +269,25 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 }
 
 func (r *Runtime) ProcessHeader(cols [][]byte) {
+	if r.ParserCount == 0 {
+		if r.p.Exclude != nil {
+			// we need to strip the excluded header columns
+			var newcols = make([][]byte, 0, len(cols)-len(r.p.Exclude))
+			for i := range cols {
+				if !slices.Contains(r.p.Exclude, i) {
+					newcols = append(newcols, cols[i])
+				}
+			}
+			cols = newcols
+		}
+	}
 	for i, col := range cols {
 		r.rw.WriteHeader(string(col))
 		if i != len(cols)-1 {
 			r.rw.Next()
 		}
 	}
-	if r.Count == 0 {
+	if r.ParserCount == 0 {
 		r.Header = cols // needed for the second runtime
 		r.HeaderSet <- true
 	}
@@ -280,19 +296,35 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 	r.headerPrinted = true
 }
 
-func (r *Runtime) ProcessRow(cols []byte, pos []uint32) {
-	if len(cols) == 0 {
+func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
+	if len(v) == 0 {
 		return
 	}
+
+	// Exclude won't be used as often as the others, so we will use the slower
+	// FlatToMulti and MultiToFlat here
+	if r.p.Exclude != nil {
+		cols := util.FlatToMulti(v, pos)
+
+		// we need to strip the excluded columns
+		var newcols = make([][]byte, 0, len(cols)-len(r.p.Exclude))
+		for i := range cols {
+			if !slices.Contains(r.p.Exclude, i) {
+				newcols = append(newcols, cols[i])
+			}
+		}
+		v, pos = util.MultiToFlat(newcols)
+	}
+
 	if debug.Ultra {
-		r.rw.Multibyte(cols, pos, r.colCount)
+		r.rw.Multibyte(v, pos, r.colCount)
 		r.Rows++
 		r.rw.EORMulti()
 		return
 	}
 
 	if !debug.Ultra {
-		cols := util.FlatToMulti(cols, pos)
+		cols := util.FlatToMulti(v, pos)
 		for i, col := range cols {
 			if len(col) == 0 {
 				r.rw.Skip()
