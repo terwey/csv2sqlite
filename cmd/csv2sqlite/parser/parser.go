@@ -323,7 +323,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 
 	count := util.Count(data, r.p.Characters.Delimiter) + 1 - len(r.p.Exclude)
 	if r.colCount == count {
-		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, true)
+		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
 	}
 
 	// r.colCount is set to non-zero on header creation
@@ -338,8 +338,6 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 			}
 		}
 	}
-
-	// columns = bytes.Split(data, r.p.Delimiter)
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
 	if count > r.colCount {
@@ -362,7 +360,10 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 				panic(err)
 			}
 
-			for _, col := range record {
+			for i, col := range record {
+				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+					continue
+				}
 				buf := r.p.Characters.Clean([]byte(col), false, false)
 				out = append(out, buf...)
 				pos = append(pos, uint32(len(buf)))
@@ -430,8 +431,11 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 			}
 			if bytes.HasPrefix(input[i], r.p.Characters.Enclosure) {
 				r.sbuf = cleanFunc(r.sbuf, false, false)
-				data = append(data, r.sbuf...)
-				pos = append(pos, uint32(len(r.sbuf)))
+				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+				} else {
+					data = append(data, r.sbuf...)
+					pos = append(pos, uint32(len(r.sbuf)))
+				}
 				r.sbuf = make([]byte, 0)
 				r.inside = false
 				enclosurecheck = false
@@ -448,25 +452,32 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
 				continue
 			}
-			input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED)
-			input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED)
-			data = append(data, input[i]...)
-			pos = append(pos, uint32(len(input[i])))
+			if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+				continue
+			} else {
+				input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED)
+				input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED)
+				data = append(data, input[i]...)
+				pos = append(pos, uint32(len(input[i])))
+			}
 			continue
 		}
 
 		if len(input[i]) == 1 {
 			if len(r.sbuf) != 0 && bytes.Equal(input[i], r.p.Characters.Enclosure) {
-				// the delimiter appears at the end, finalize the column
-				r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
+				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+				} else {
+					// the delimiter appears at the end, finalize the column
+					r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
 
-				// TODO: it's unsure if here the suffix should be removed too
-				// the tests all work so should be fine, however originally
-				// here there was no trimsuffix (which is part of cleanFunc)
-				r.sbuf = cleanFunc(r.sbuf, false, false)
+					// TODO: it's unsure if here the suffix should be removed too
+					// the tests all work so should be fine, however originally
+					// here there was no trimsuffix (which is part of cleanFunc)
+					r.sbuf = cleanFunc(r.sbuf, false, false)
 
-				data = append(data, r.sbuf...)
-				pos = append(pos, uint32(len(r.sbuf)))
+					data = append(data, r.sbuf...)
+					pos = append(pos, uint32(len(r.sbuf)))
+				}
 				r.sbuf = make([]byte, 0)
 				continue
 			}
@@ -497,10 +508,13 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = append(r.sbuf, input[i]...)
 
 				if r.hasSuffixEnclosure && !bytes.HasSuffix(input[i], r.p.Characters.DoubleEnclosure) {
-					// we know for sure that the suffix exists
-					r.sbuf = cleanFunc(r.sbuf, false, true)
-					data = append(data, r.sbuf...)
-					pos = append(pos, uint32(len(r.sbuf)))
+					if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+					} else {
+						// we know for sure that the suffix exists
+						r.sbuf = cleanFunc(r.sbuf, false, true)
+						data = append(data, r.sbuf...)
+						pos = append(pos, uint32(len(r.sbuf)))
+					}
 					r.sbuf = make([]byte, 0)
 					r.inside = false
 					enclosurecheck = false
@@ -515,10 +529,13 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 		}
 
 		if count%2 == 0 && r.hasPrefixEnclosure && r.hasSuffixEnclosure {
-			// we know for sure it has a prefix and suffix
-			input[i] = cleanFunc(input[i], true, true)
-			data = append(data, input[i]...)
-			pos = append(pos, uint32(len(input[i])))
+			if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+			} else {
+				// we know for sure it has a prefix and suffix
+				input[i] = cleanFunc(input[i], true, true)
+				data = append(data, input[i]...)
+				pos = append(pos, uint32(len(input[i])))
+			}
 			r.inside = false
 			continue
 		}
@@ -530,9 +547,12 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 			continue
 		}
 
-		input[i] = cleanFunc(input[i], false, false)
-		data = append(data, input[i]...)
-		pos = append(pos, uint32(len(input[i])))
+		if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+		} else {
+			input[i] = cleanFunc(input[i], false, false)
+			data = append(data, input[i]...)
+			pos = append(pos, uint32(len(input[i])))
+		}
 	}
 
 	// r.debug("columns: %d", len(columns))
