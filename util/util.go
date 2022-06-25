@@ -12,6 +12,14 @@ import (
 )
 
 func MultiToFlat(data [][]byte) (out []byte, pos []uint32) {
+	var size int
+	var count int
+	for i := range data {
+		size += len(data[i])
+		count++
+	}
+	out = make([]byte, 0, size)
+	pos = make([]uint32, 0, count)
 	for i := range data {
 		out = append(out, data[i]...)
 		pos = append(pos, uint32(len(data[i])))
@@ -21,28 +29,36 @@ func MultiToFlat(data [][]byte) (out []byte, pos []uint32) {
 }
 
 func FlatAppend(dst []byte, src []byte, pos []uint32) ([]byte, []uint32) {
-	// log.Printf("len: %d, src: %s", uint32(len(src)), src)
 	pos = append(pos, uint32(len(src)))
 	dst = append(dst, src...)
-	// log.Printf("pos: %v, dst: %s", pos, dst)
 	return dst, pos
 }
 
 func FlatToMulti(in []byte, pos []uint32) (data [][]byte) {
-	var buf []byte
+	// without the pre-allocation of the slice for the data buffer
+	// Benchmark_FlatToMulti-8   	24116842	       496.5 ns/op	     272 B/op	      10 allocs/op
+	// after pre-allocating it
+	// Benchmark_FlatToMulti-8   	43638446	       333.8 ns/op	     184 B/op	       8 allocs/op
+	data = make([][]byte, 0, len(pos))
+	// var buf []byte
 	var prev uint32 = 0
 	for _, len := range pos {
-		// log.Printf("len: %d", len)
-		buf = make([]byte, 0)
-		for i := prev; uint32(i) < prev+len; i++ {
-			buf = append(buf, in[i])
-			// log.Printf("buf: %s", buf)
-		}
+		// before the pre-allocation of the buf slice it took 333ns
+		// after pre-allocation it took 203ns
+		// Benchmark_FlatToMulti-8   	75486668	       203.2 ns/op	     136 B/op	       4 allocs/op
+		// buf = make([]byte, 0, len)
+		// for i := prev; uint32(i) < prev+len; i++ {
+		// 	buf = append(buf, in[i])
+		// }
+
+		// data = append(data, buf)
+		// replacing that algo with the new one below
+		// Benchmark_FlatToMulti-8   	129122768	        88.40 ns/op	      80 B/op	       1 allocs/op
+
+		data = append(data, in[prev:prev+len])
 		prev += len
-		// log.Printf("apennding buf: %s", buf)
-		data = append(data, buf)
 	}
-	// log.Printf("data: %s", data)
+
 	return data
 }
 
