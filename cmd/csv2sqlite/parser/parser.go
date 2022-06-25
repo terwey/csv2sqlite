@@ -269,18 +269,6 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 }
 
 func (r *Runtime) ProcessHeader(cols [][]byte) {
-	if r.ParserCount == 0 {
-		if r.p.Exclude != nil {
-			// we need to strip the excluded header columns
-			var newcols = make([][]byte, 0, len(cols)-len(r.p.Exclude))
-			for i := range cols {
-				if !slices.Contains(r.p.Exclude, i) {
-					newcols = append(newcols, cols[i])
-				}
-			}
-			cols = newcols
-		}
-	}
 	for i, col := range cols {
 		r.rw.WriteHeader(string(col))
 		if i != len(cols)-1 {
@@ -299,21 +287,6 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 	if len(v) == 0 {
 		return
-	}
-
-	// Exclude won't be used as often as the others, so we will use the slower
-	// FlatToMulti and MultiToFlat here
-	if r.p.Exclude != nil {
-		cols := util.FlatToMulti(v, pos)
-
-		// we need to strip the excluded columns
-		var newcols = make([][]byte, 0, len(cols)-len(r.p.Exclude))
-		for i := range cols {
-			if !slices.Contains(r.p.Exclude, i) {
-				newcols = append(newcols, cols[i])
-			}
-		}
-		v, pos = util.MultiToFlat(newcols)
 	}
 
 	if debug.Ultra {
@@ -348,7 +321,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 	// if that matches the amount we expect
 	// amount = columns + 1
 
-	count := util.Count(data, r.p.Characters.Delimiter) + 1
+	count := util.Count(data, r.p.Characters.Delimiter) + 1 - len(r.p.Exclude)
 	if r.colCount == count {
 		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, true)
 	}
