@@ -9,6 +9,7 @@ import (
 
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
+	"golang.org/x/exp/slices"
 )
 
 func MultiToFlat(data [][]byte) (out []byte, pos []uint32) {
@@ -205,7 +206,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 // Generic split: splits after each instance of sep.
 // Adapted to return a flat byte slice with pos slice
-func GenSplit(s, sep []byte, n int, fn CleanFunc, enclosureClean bool) (data []byte, pos []uint32) {
+func GenSplit(s, sep []byte, n int, fn CleanFunc, exclude []int) (data []byte, pos []uint32) {
 	if n == 0 {
 		return nil, nil
 	}
@@ -224,6 +225,11 @@ func GenSplit(s, sep []byte, n int, fn CleanFunc, enclosureClean bool) (data []b
 		m := bytes.Index(s, sep)
 		if m < 0 {
 			break
+		}
+		if exclude != nil && slices.Contains(exclude, i) {
+			s = s[m+len(sep):]
+			i++
+			continue
 		}
 		buf := fn(s[:m:m], false, false)
 		data = append(data, buf...)
