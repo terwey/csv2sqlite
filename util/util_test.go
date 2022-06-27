@@ -264,6 +264,8 @@ func Benchmark_ColSplitFlat(b *testing.B) {
 var resultGenSplitFlat []byte
 var resultCGensplitPos []uint32
 
+// Benchmark_GenSplit-8   	30316046	       468.3 ns/op	     944 B/op	       3 allocs/op
+//
 func Benchmark_GenSplit(b *testing.B) {
 	var v []byte
 	var pos []uint32
