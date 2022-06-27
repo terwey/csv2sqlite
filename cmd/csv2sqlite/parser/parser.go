@@ -31,6 +31,14 @@ type Params struct {
 	Drop            bool
 	ChannelCapacity int
 
+	// starting position of the CSV file
+	// this is needed for Excel to CSV exports
+	// that contain data above the header
+	Start int
+
+	Skip  int // amount of rows to skip AFTER the header
+	Limit int // maximum number of rows to process
+
 	Exclude []int
 
 	Characters util.CharacterConfig

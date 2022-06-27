@@ -81,6 +81,10 @@ func init() {
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
 	flags.StringVar(&paramEnclosure, "enclosure", "", "Set the enclosure in case auto-detect should not be used, can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
 
+	flags.IntVar(&p.Start, "start", 0, "The starting position where the header is, useful for CSVs produced by Excel.\nOnly works in combination with newline delimited, -nd enabled if set.")
+	flags.IntVar(&p.Skip, "skip", -1, "Rows to skip after the header")
+	flags.IntVar(&p.Limit, "limit", -1, "Amount of rows to process")
+
 	flags.StringVar(&literalDelimiter, "literal-delimiter", "", "Sets the delimiter to use to a literal string, if set the --delimiter is ignored")
 	flags.StringVar(&literalEnclosure, "literal-enclosure", "", "Sets the enclosure to use to a literal string, if set the --enclosure is ignored")
 
@@ -251,7 +255,10 @@ func main() {
 		parser.Overflow = true
 	}
 
-	var err error
+	if p.Start > 0 {
+		nd = true
+	}
+
 	// init the first runtimes, only one will scan
 	if nd {
 		r = parser.NewRuntime(p, bufio.ScanLines)
@@ -267,6 +274,7 @@ func main() {
 		pvOptions = append(pvOptions, progressbar.OptionSetVisibility(false))
 	}
 
+	var err error
 	var file io.ReadSeeker
 	if !stdin {
 		f, err := os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
@@ -464,6 +472,12 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunkCount int, pv *progressba
 	chunks = make([][]byte, 0, chunkCount)
 	var chunk []byte
 
+	// used for p.Start
+	startCounter := 0
+
+	// used for p.Skip
+	skipCounter := 0
+
 	count := 0
 	var chunksSize int
 	for scanner.Scan() {
@@ -471,6 +485,24 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunkCount int, pv *progressba
 			close(r.Data)
 			wg.Done()
 			log.Fatal(err)
+		}
+
+		if p.Start > 0 && startCounter < p.Start {
+			startCounter++
+			if startCounter <= p.Start {
+				continue
+			}
+		}
+
+		if p.Skip > 0 && count != 0 && skipCounter < p.Skip {
+			skipCounter++
+			if skipCounter <= p.Skip {
+				continue
+			}
+		}
+
+		if count != 0 && p.Limit == count-1 {
+			break
 		}
 
 		size := len(scanner.Bytes())
@@ -510,6 +542,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunkCount int, pv *progressba
 		}
 
 		chunks = append(chunks, chunk)
+		count++
 	}
 
 	if err = scanner.Err(); err != nil {
