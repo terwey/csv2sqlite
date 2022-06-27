@@ -50,6 +50,8 @@ var (
 	p *parser.Params
 	r *parser.Runtime
 
+	showProgress bool
+
 	pv      *progressbar.ProgressBar
 	threads int = runtime.NumCPU()
 
@@ -97,6 +99,8 @@ func init() {
 	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
+	flags.BoolVar(&showProgress, "progress", false, "Shows progress")
+
 	if debug.State() {
 		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
 		flags.BoolVar(&debug.LogCSVReader, "log-csv-reader", false, "Logs the occurence and data where the Go built-in CSV Reader is used. Can be used without the debug mode.")
@@ -254,6 +258,15 @@ func main() {
 	} else {
 		r = parser.NewRuntime(p, p.Characters.SplitCsvInput)
 	}
+
+	pvOptions := []progressbar.Option{
+		progressbar.OptionSetDescription("Reading"),
+	}
+
+	if !showProgress {
+		pvOptions = append(pvOptions, progressbar.OptionSetVisibility(false))
+	}
+
 	var file io.ReadSeeker
 	if !stdin {
 		f, err := os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
@@ -265,10 +278,10 @@ func main() {
 			log.Fatalf("Cannot stat file: %s", err)
 		}
 
-		pv = progressbar.DefaultBytes(stat.Size(), "Reading")
+		pv = progressbar.NewOptions64(stat.Size(), pvOptions...)
 		file = f
 	} else {
-		pv = progressbar.DefaultBytes(-1, "Reading")
+		pv = progressbar.NewOptions64(-1, pvOptions...)
 		file = os.Stdin
 	}
 
