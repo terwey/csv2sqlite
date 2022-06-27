@@ -59,7 +59,7 @@ func Test_Convert(t *testing.T) {
 	}
 
 	if diff := cmp.Diff(pos_want2, pos_got2); diff != "" {
-		t.Errorf("MultiToFlat() mismatch (-want +got):\n%s", diff)
+		t.Errorf("MultiToFlat() mismatch (-want +got)f:\n%s", diff)
 	}
 }
 
@@ -96,7 +96,7 @@ func Benchmark_MultiToFlat(b *testing.B) {
 func Test_GenSplit(t *testing.T) {
 	foo := []byte("abc|bcd|cde|def")
 	want := []byte("abcbcdcdedef")
-	got, pos := GenSplit(foo, []byte("|"), -1, NoClean, true)
+	got, pos := GenSplit(foo, []byte("|"), -1, NoClean, nil)
 
 	log.Printf("pos: %v\n got: %s\n", pos, got)
 
@@ -208,7 +208,7 @@ func TestColSplit(t *testing.T) {
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			got := ColSplit(tt.args.s, tt.args.sep, tt.args.enclosure, tt.args.n)
-			if diff := cmp.Diff(got, tt.want); diff != "" {
+			if diff := cmp.Diff(tt.want, got); diff != "" {
 				debug.DebugColumns(got)
 				t.Errorf("ColSplit(): %s Mismatch (-want +got):\n%s", tt.name, diff)
 			}
@@ -224,7 +224,7 @@ func TestColSplitFlat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v, pos := ColSplitFlat(tt.args.s, tt.args.sep, tt.args.enclosure, tt.args.n)
 			got := FlatToMulti(v, pos)
-			if diff := cmp.Diff(got, tt.want); diff != "" {
+			if diff := cmp.Diff(tt.want, got); diff != "" {
 				debug.DebugColumns(got)
 				t.Errorf("ColSplit(): %s Mismatch (-want +got):\n%s", tt.name, diff)
 			}
@@ -270,7 +270,7 @@ func Benchmark_GenSplit(b *testing.B) {
 	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		v, pos = GenSplit(in, characters.Character_COMMA, -1, NoClean, true)
+		v, pos = GenSplit(in, characters.Character_COMMA, -1, NoClean, nil)
 	}
 
 	resultColSplitFlat = v
@@ -289,7 +289,7 @@ func Benchmark_GenSplitClean(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		v, pos = GenSplit(in, characters.Character_COMMA, -1, c.Clean, true)
+		v, pos = GenSplit(in, characters.Character_COMMA, -1, c.Clean, nil)
 	}
 
 	resultColSplitFlat = v

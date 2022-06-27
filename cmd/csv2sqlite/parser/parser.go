@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/util"
@@ -28,6 +30,8 @@ type Params struct {
 	Sqlite          bool
 	Drop            bool
 	ChannelCapacity int
+
+	Exclude []int
 
 	Characters util.CharacterConfig
 }
@@ -75,8 +79,8 @@ type Runtime struct {
 	Header    [][]byte
 	HeaderSet chan bool
 
-	Data  chan [][]byte
-	Count int
+	Data        chan [][]byte
+	ParserCount int
 
 	sinput [][]byte
 	// scolumns [][]byte
@@ -97,7 +101,7 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		headerPrinted: false,
 		splitFunc:     fn,
 		Benchmark:     false,
-		Count:         0,
+		ParserCount:   0,
 	}
 
 	recordwriter.DebugLog = DebugLog
@@ -109,12 +113,12 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	return r
 }
 
-func NewParser(p *Params, count int) *Runtime {
+func NewParser(p *Params, parsercount int) *Runtime {
 	r := &Runtime{
 		p:             p,
 		headerPrinted: false,
 		Benchmark:     false,
-		Count:         count,
+		ParserCount:   parsercount,
 	}
 
 	return r
@@ -151,10 +155,10 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 	}
 
 	var output string
-	if r.Count == 0 {
+	if r.ParserCount == 0 {
 		output = r.p.Output
 	} else {
-		output = fmt.Sprintf("%s.%d", r.p.Output, r.Count)
+		output = fmt.Sprintf("%s.%d", r.p.Output, r.ParserCount)
 	}
 
 	if r.p.Drop {
@@ -178,7 +182,7 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 
 			r.rw = recordwriter.NewCSVWriter(r.w)
 		} else {
-			if r.Count == 0 {
+			if r.ParserCount == 0 {
 				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, true)
 			} else {
 				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, false)
@@ -186,7 +190,7 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 		}
 	}
 
-	if r.Count == 0 {
+	if r.ParserCount == 0 {
 		r.scanner = r.NewScanner()
 	}
 
@@ -271,7 +275,7 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 			r.rw.Next()
 		}
 	}
-	if r.Count == 0 {
+	if r.ParserCount == 0 {
 		r.Header = cols // needed for the second runtime
 		r.HeaderSet <- true
 	}
@@ -280,19 +284,20 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 	r.headerPrinted = true
 }
 
-func (r *Runtime) ProcessRow(cols []byte, pos []uint32) {
-	if len(cols) == 0 {
+func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
+	if len(v) == 0 {
 		return
 	}
+
 	if debug.Ultra {
-		r.rw.Multibyte(cols, pos, r.colCount)
+		r.rw.Multibyte(v, pos, r.colCount)
 		r.Rows++
 		r.rw.EORMulti()
 		return
 	}
 
 	if !debug.Ultra {
-		cols := util.FlatToMulti(cols, pos)
+		cols := util.FlatToMulti(v, pos)
 		for i, col := range cols {
 			if len(col) == 0 {
 				r.rw.Skip()
@@ -316,9 +321,9 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 	// if that matches the amount we expect
 	// amount = columns + 1
 
-	count := util.Count(data, r.p.Characters.Delimiter) + 1
+	count := util.Count(data, r.p.Characters.Delimiter) + 1 - len(r.p.Exclude)
 	if r.colCount == count {
-		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, true)
+		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
 	}
 
 	// r.colCount is set to non-zero on header creation
@@ -333,8 +338,6 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 			}
 		}
 	}
-
-	// columns = bytes.Split(data, r.p.Delimiter)
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
 	if count > r.colCount {
@@ -357,7 +360,10 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 				panic(err)
 			}
 
-			for _, col := range record {
+			for i, col := range record {
+				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+					continue
+				}
 				buf := r.p.Characters.Clean([]byte(col), false, false)
 				out = append(out, buf...)
 				pos = append(pos, uint32(len(buf)))
@@ -425,8 +431,11 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 			}
 			if bytes.HasPrefix(input[i], r.p.Characters.Enclosure) {
 				r.sbuf = cleanFunc(r.sbuf, false, false)
-				data = append(data, r.sbuf...)
-				pos = append(pos, uint32(len(r.sbuf)))
+				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+				} else {
+					data = append(data, r.sbuf...)
+					pos = append(pos, uint32(len(r.sbuf)))
+				}
 				r.sbuf = make([]byte, 0)
 				r.inside = false
 				enclosurecheck = false
@@ -443,25 +452,32 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
 				continue
 			}
-			input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED)
-			input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED)
-			data = append(data, input[i]...)
-			pos = append(pos, uint32(len(input[i])))
+			if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+				continue
+			} else {
+				input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED)
+				input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED)
+				data = append(data, input[i]...)
+				pos = append(pos, uint32(len(input[i])))
+			}
 			continue
 		}
 
 		if len(input[i]) == 1 {
 			if len(r.sbuf) != 0 && bytes.Equal(input[i], r.p.Characters.Enclosure) {
-				// the delimiter appears at the end, finalize the column
-				r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
+				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+				} else {
+					// the delimiter appears at the end, finalize the column
+					r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
 
-				// TODO: it's unsure if here the suffix should be removed too
-				// the tests all work so should be fine, however originally
-				// here there was no trimsuffix (which is part of cleanFunc)
-				r.sbuf = cleanFunc(r.sbuf, false, false)
+					// TODO: it's unsure if here the suffix should be removed too
+					// the tests all work so should be fine, however originally
+					// here there was no trimsuffix (which is part of cleanFunc)
+					r.sbuf = cleanFunc(r.sbuf, false, false)
 
-				data = append(data, r.sbuf...)
-				pos = append(pos, uint32(len(r.sbuf)))
+					data = append(data, r.sbuf...)
+					pos = append(pos, uint32(len(r.sbuf)))
+				}
 				r.sbuf = make([]byte, 0)
 				continue
 			}
@@ -492,10 +508,13 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 				r.sbuf = append(r.sbuf, input[i]...)
 
 				if r.hasSuffixEnclosure && !bytes.HasSuffix(input[i], r.p.Characters.DoubleEnclosure) {
-					// we know for sure that the suffix exists
-					r.sbuf = cleanFunc(r.sbuf, false, true)
-					data = append(data, r.sbuf...)
-					pos = append(pos, uint32(len(r.sbuf)))
+					if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+					} else {
+						// we know for sure that the suffix exists
+						r.sbuf = cleanFunc(r.sbuf, false, true)
+						data = append(data, r.sbuf...)
+						pos = append(pos, uint32(len(r.sbuf)))
+					}
 					r.sbuf = make([]byte, 0)
 					r.inside = false
 					enclosurecheck = false
@@ -510,10 +529,13 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 		}
 
 		if count%2 == 0 && r.hasPrefixEnclosure && r.hasSuffixEnclosure {
-			// we know for sure it has a prefix and suffix
-			input[i] = cleanFunc(input[i], true, true)
-			data = append(data, input[i]...)
-			pos = append(pos, uint32(len(input[i])))
+			if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+			} else {
+				// we know for sure it has a prefix and suffix
+				input[i] = cleanFunc(input[i], true, true)
+				data = append(data, input[i]...)
+				pos = append(pos, uint32(len(input[i])))
+			}
 			r.inside = false
 			continue
 		}
@@ -525,9 +547,12 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 			continue
 		}
 
-		input[i] = cleanFunc(input[i], false, false)
-		data = append(data, input[i]...)
-		pos = append(pos, uint32(len(input[i])))
+		if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
+		} else {
+			input[i] = cleanFunc(input[i], false, false)
+			data = append(data, input[i]...)
+			pos = append(pos, uint32(len(input[i])))
+		}
 	}
 
 	// r.debug("columns: %d", len(columns))

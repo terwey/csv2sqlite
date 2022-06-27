@@ -82,6 +82,7 @@ func init() {
 	flags.StringVar(&literalDelimiter, "literal-delimiter", "", "Sets the delimiter to use to a literal string, if set the --delimiter is ignored")
 	flags.StringVar(&literalEnclosure, "literal-enclosure", "", "Sets the enclosure to use to a literal string, if set the --enclosure is ignored")
 
+	flags.IntSliceVar(&p.Exclude, "exclude", nil, "Column indices to exclude from conversion")
 	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n- LF\n- CR\n- CRLF")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
@@ -433,7 +434,7 @@ func main() {
 	)
 }
 
-func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar.ProgressBar) {
+func parse(r *parser.Runtime, wg *sync.WaitGroup, chunkCount int, pv *progressbar.ProgressBar) {
 	var err error
 	// var buf []byte
 	var delimSet bool
@@ -447,7 +448,7 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 	scanner := r.GetScanner()
 
 	var chunks [][]byte
-	chunks = make([][]byte, 0)
+	chunks = make([][]byte, 0, chunkCount)
 	var chunk []byte
 
 	count := 0
@@ -488,11 +489,11 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunksize int, pv *progressbar
 			continue
 		}
 
-		if len(chunks) >= chunksize {
+		if len(chunks) >= chunkCount {
 			r.Data <- chunks
 			pv.Add(chunksSize)
 			chunksSize = 0
-			chunks = make([][]byte, 0)
+			chunks = make([][]byte, 0, chunkCount)
 		}
 
 		chunks = append(chunks, chunk)
