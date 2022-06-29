@@ -17,17 +17,42 @@ var (
 	a     string
 	b     string
 	table string
+	null  bool
+	write bool
 )
 
 func init() {
 	flags = pflag.NewFlagSet("sqlitecompare", pflag.ContinueOnError)
+	flags.SortFlags = false
 	flags.StringVarP(&a, "sqlite-a", "a", "", "SQLite file A to compare with")
 	flags.StringVarP(&b, "sqlite-b", "b", "", "SQLite file B to compare against")
 	flags.StringVarP(&table, "table", "t", "data", "Table to compare")
+	flags.BoolVar(&null, "null", false, "If null is set to false it compares using TEXT fields\n and"+
+		" a NULL is automatically converted to an empty text field. \n"+
+		"If this is unwanted set null to be true.")
+	flags.BoolVar(&write, "write-results", false, "Writes a result file.\n $a.passed when no "+
+		"difference was found.\n $a.failed when a difference was found, file will contain the error.")
+
 }
 
 func main() {
 	if err := flags.Parse(os.Args[1:]); err != nil {
+		fmt.Fprintf(os.Stderr, "\nCompare takes 2 SQLite3 connections and compares the data\n"+
+			"It returns an error when data is not the same\n\n"+
+
+			"From both conns it queries for all columns names using\n"+
+			" `pragma table_info()` and sorts these in alphabetical order.\n"+
+			" Using that output it compares if both conns have the same\n"+
+			" column names available. If not it errors out early.\n\n"+
+
+			"It checks if both tables contain the same rowcount. If not\n"+
+			" it returns an error.\n\n"+
+
+			"Finally it queries the table using a select on the column names\n"+
+			" it sorted alphabetically using an ORDER BY with the same column\n"+
+			" names in alphabetical order. This ensures both sets of data are\n"+
+			" when available in both are in the same order.\n"+
+			" Comparing row for row it will output when a difference is found.\n\n")
 		if err != pflag.ErrHelp {
 			fmt.Fprint(os.Stderr, err.Error()+"\n")
 			flags.PrintDefaults()
@@ -35,11 +60,23 @@ func main() {
 		os.Exit(100)
 	}
 
-	err := sqlitehelper.CompareFiles("data", a, b)
+	if a == b {
+		log.Fatalf("A (%s) and B (%s) are the same file", a, b)
+	}
+
+	err := sqlitehelper.CompareFiles("data", a, b, null)
 	if err != nil {
+		if write {
+			log.Printf("%s.failed written\n", a)
+			os.WriteFile(a+".failed", []byte(err.Error()), 0666)
+		}
 		log.Fatalf("%s", err)
 	}
 
+	if write {
+		log.Printf("%s.passed written\n", a)
+		os.WriteFile(a+".passed", []byte(""), 0666)
+	}
 	log.Printf("No differences found")
 
 	os.Exit(0)

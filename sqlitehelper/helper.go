@@ -79,7 +79,10 @@ func ColumnsForDB(name string, conn *sqlite3.Conn) (Columns, error) {
 	return table, nil
 }
 
-func CompareFiles(table, a, b string) error {
+// CompareFiles is a convenience method around Compare
+//  It takes two filenames of a SQLite file, opens them
+//  and calls Compare on them.
+func CompareFiles(table, a, b string, null bool) error {
 	connA, err := sqlite3.Open(a)
 	if err != nil {
 		return fmt.Errorf("Opening file A: %s, error: %w", a, err)
@@ -94,12 +97,30 @@ func CompareFiles(table, a, b string) error {
 
 	log.Printf("Comparing %s to %s for table %s", a, b, table)
 
-	return Compare(table, connA, connB)
+	return Compare(table, connA, connB, null)
 }
 
 // Compare takes 2 SQLite3 connections and compares the data
 // It returns an error when data is not the same
-func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn) error {
+//
+// From both conns it queries for all columns names using
+//  `pragma table_info()` and sorts these in alphabetical order.
+//  Using that output it compares if both conns have the same
+//  column names available. If not it errors out early.
+//
+// It checks if both tables contain the same rowcount. If not
+//  it returns an error.
+//
+// Finally it queries the table using a select on the column names
+//  it sorted alphabetically using an ORDER BY with the same column
+//  names in alphabetical order. This ensures both sets of data are
+//  when available in both are in the same order.
+//  Comparing row for row it will output when a difference is found.
+//
+// If null is set to false it compares using TEXT fields and a
+//  NULL is automatically converted to an empty text field.
+//  If this is unwanted set null to be true.
+func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 	namesA, err := ColumnsForDB("data", a)
 	if err != nil {
 		return fmt.Errorf("ColumnsForDB(A) err: %w", err)
@@ -127,6 +148,20 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn) error {
 	}
 
 	defer stmtB.Close()
+
+	countA, err := Count(table, a)
+	if err != nil {
+		return fmt.Errorf("Count(A): %w", err)
+	}
+
+	countB, err := Count(table, a)
+	if err != nil {
+		return fmt.Errorf("Count(B): %w", err)
+	}
+
+	if countA != countB {
+		return fmt.Errorf("Rowcount for tables do not match. A: %d B: %d", countA, countB)
+	}
 
 	for {
 		hasRowA, err := stmtA.Step()
@@ -158,8 +193,15 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn) error {
 			if err != nil {
 				return fmt.Errorf("ColumnRawBytes(A): %w", err)
 			}
+			// ok signifies column was not NULL
 			if ok {
 				outA = append(outA, val)
+			} else {
+				if null {
+					outA = append(outA, nil)
+				} else {
+					outA = append(outA, "")
+				}
 			}
 		}
 
@@ -169,17 +211,50 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn) error {
 			if err != nil {
 				return fmt.Errorf("ColumnRawBytes(B): %w", err)
 			}
+			// ok signifies column was not NULL
 			if ok {
 				outB = append(outB, val)
+			} else {
+				if null {
+					outB = append(outB, nil)
+				} else {
+					outB = append(outB, "")
+				}
 			}
 		}
 
 		if diff := cmp.Diff(outA, outB); diff != "" {
-			fmt.Printf("A: %s\n", outA)
-			fmt.Printf("B: %s\n", outB)
 			return fmt.Errorf("Compare() Rows mismatch (-a +b):\n%s", diff)
 		}
 	}
 
 	return nil
+}
+
+// Counts the amount of rows in the table for the specified conn
+func Count(table string, conn *sqlite3.Conn) (result int, err error) {
+	stmt, err := conn.Prepare("select count(*) from " + table)
+	if err != nil {
+		return -1, fmt.Errorf("Prepare: %w", err)
+	}
+
+	defer stmt.Close()
+
+	for {
+		hasRow, err := stmt.Step()
+		if err != nil {
+			return -1, err
+		}
+		if !hasRow {
+			// The query is finished
+			break
+		}
+
+		err = stmt.Scan(&result)
+		if err != nil {
+			return -1, err
+		}
+	}
+
+	return result, nil
 }
