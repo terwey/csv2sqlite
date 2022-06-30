@@ -205,19 +205,13 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 
 			r.rw = recordwriter.NewCSVWriter(r.w)
 		} else {
-			if r.ParserCount == 0 {
-				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, true, r.p.RowID)
-			} else {
-				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, false, r.p.RowID)
-			}
+			r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, r.ParserCount == 0, r.p.RowID)
 		}
 	}
 
 	if r.ParserCount == 0 {
 		r.scanner = r.NewScanner()
 	}
-
-	// log.Printf("output: %s", output)
 
 	return nil
 }
