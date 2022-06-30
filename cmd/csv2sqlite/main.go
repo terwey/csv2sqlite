@@ -146,15 +146,15 @@ func main() {
 				os.Exit(100)
 			}
 
-			if p.Input == p.Output {
-				fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
-				os.Exit(100)
-			}
-
 			stdin = false
 		}
 	} else {
 		stdin = false
+	}
+
+	if p.Input == p.Output {
+		fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
+		os.Exit(100)
 	}
 
 	literald := false
