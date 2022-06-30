@@ -20,6 +20,8 @@ import (
 	"syscall"
 	"time"
 
+	"strconv"
+
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
@@ -29,7 +31,6 @@ import (
 )
 
 var (
-	data        []byte
 	flags       *pflag.FlagSet
 	showVersion bool
 
@@ -103,7 +104,11 @@ func init() {
 	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
+	flags.BoolVar(&p.RowID, "rowid", false, "When the order of the CSV file must be kept the same in the resulting SQLite, this flag will \n"+
+		"cause each row in the SQLite to receive a RowID for SQLite.")
 	flags.BoolVar(&showProgress, "progress", false, "Shows progress")
+
+	flags.StringVar(&p.Scratch, "scratch-dir", "", "Directory for storing the smaller SQLite files before merging them to the target. Same as output if left blank.")
 
 	if debug.State() {
 		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
@@ -541,6 +546,13 @@ func parse(r *parser.Runtime, wg *sync.WaitGroup, chunkCount int, pv *progressba
 			chunks = make([][]byte, 0, chunkCount)
 		}
 
+		if p.RowID {
+			// we have to make this a user configurable switch
+			chunk = append(chunk, p.Characters.Delimiter...)
+			chunk = append(chunk, p.Characters.Enclosure...)
+			chunk = append(chunk, []byte(strconv.Itoa(count))...)
+			chunk = append(chunk, p.Characters.Enclosure...)
+		}
 		chunks = append(chunks, chunk)
 		count++
 	}
