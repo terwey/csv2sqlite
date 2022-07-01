@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -40,6 +41,16 @@ type Params struct {
 	Limit int // maximum number of rows to process
 
 	Exclude []int
+
+	// if the order of the incoming CSV matters the RowID
+	// can be set to true and during Scan the RowID will be added
+	RowID bool
+
+	// the small SQLite files written are normally in the same
+	// target as the output file, for performance reasons (or
+	// storage reasons) a different workdir can be provided.
+	// e.g. a tmpfs ramdisk
+	Scratch string
 
 	Characters util.CharacterConfig
 }
@@ -166,7 +177,11 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 	if r.ParserCount == 0 {
 		output = r.p.Output
 	} else {
-		output = fmt.Sprintf("%s.%d", r.p.Output, r.ParserCount)
+		if r.p.Scratch != "" {
+			output = fmt.Sprintf("%s%s.%d", r.p.Scratch, path.Base(r.p.Output), r.ParserCount)
+		} else {
+			output = fmt.Sprintf("%s.%d", r.p.Output, r.ParserCount)
+		}
 	}
 
 	if r.p.Drop {
@@ -190,19 +205,13 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 
 			r.rw = recordwriter.NewCSVWriter(r.w)
 		} else {
-			if r.ParserCount == 0 {
-				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, true)
-			} else {
-				r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, false)
-			}
+			r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, r.ParserCount == 0, r.p.RowID)
 		}
 	}
 
 	if r.ParserCount == 0 {
 		r.scanner = r.NewScanner()
 	}
-
-	// log.Printf("output: %s", output)
 
 	return nil
 }
@@ -268,7 +277,11 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 		if len(cols) == 1 {
 			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
 		}
-		r.ProcessHeader(util.FlatToMulti(cols, pos))
+		header := util.FlatToMulti(cols, pos)
+		if r.p.RowID {
+			header = append(header, []byte("rowid"))
+		}
+		r.ProcessHeader(header)
 		// we should not output the header to the sqlite file, return nothing as it'll be skipped
 		return []byte{}, []uint32{}
 	}
