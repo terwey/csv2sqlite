@@ -81,6 +81,9 @@ type CharacterConfig struct {
 
 	// this is only used for the SplitCSVInput
 	DelimiterCount int
+
+	clearedEOL bool
+	eolBuf     characters.Character
 }
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
@@ -131,13 +134,39 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	}
 
 	var eolIndex int
-	if len(c.EOL) == 0 {
-		if eolIndex = bytes.Index(in, characters.Character_CARRIAGE_RETURN_LINE_FEED); eolIndex != -1 {
+	// using a for because its nicer to break than have crazy if statements
+	for len(c.EOL) == 0 {
+		// there is a chance that the header is LF and the rest of the file is CRLF
+		// the only way to catch that is by checking if the LF is nearby the CR, so we take the position
+		// of both. If the index is only off by 1 we know the character is a CRLF and else it's just LF (or CR).
+
+		lfIndex := bytes.Index(in, characters.Character_LINE_FEED)
+		crIndex := bytes.Index(in, characters.Character_CARRIAGE_RETURN)
+
+		if crIndex == lfIndex-1 {
+			// the character is CRLF
 			c.EOL = characters.Character_CARRIAGE_RETURN_LINE_FEED
-		} else if eolIndex = bytes.Index(in, characters.Character_CARRIAGE_RETURN); eolIndex != -1 {
-			c.EOL = characters.Character_CARRIAGE_RETURN
-		} else if eolIndex = bytes.Index(in, characters.Character_LINE_FEED); eolIndex != -1 {
+			break
+		}
+
+		if lfIndex < crIndex {
 			c.EOL = characters.Character_LINE_FEED
+			break
+		}
+
+		if crIndex != -1 {
+			c.EOL = characters.Character_CARRIAGE_RETURN
+			continue
+		}
+		if lfIndex != -1 {
+			c.EOL = characters.Character_LINE_FEED
+			break
+		}
+
+		if len(c.EOL) == 0 && len(c.eolBuf) != 0 {
+			log.Printf("recovered EOL from buffer")
+			c.EOL = c.eolBuf
+			break
 		}
 
 		// not enough data
@@ -161,6 +190,14 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		if eolIndex != -1 {
 			// we have to return the found data PLUS the length of the eolBytes
 			debug.LogData("eolIndex != -1", in[:eolIndex], 40960)
+			// on the first pass we want to clear the EOL
+			if !c.clearedEOL {
+				c.clearedEOL = true
+				eolLen := len(c.EOL)
+				c.eolBuf = c.EOL
+				c.EOL = nil
+				return eolIndex + eolLen, in[:eolIndex], nil
+			}
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 	}
@@ -198,6 +235,10 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			continue
 		}
 		break
+	}
+
+	if atEOF && len(in) != 0 {
+		return len(in), in, nil
 	}
 
 	// not enough bytes

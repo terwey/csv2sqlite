@@ -446,6 +446,27 @@ func getTestData() []TestData {
 			out:       []byte("h,u,m"),
 			delimiter: []byte(","),
 		},
+		{
+			name: "528874",
+			in: []byte(`"ID_LENILNS","YMGMPN_EIYFYKT","JNA_1_YMGMPN","JNA_2_YMGMPN","IG_NICN","WRJHR","WRJHR_UW","WRJHR_UM","WRJHR_OT","WRJHR_AS","IBQYPUVNYJX","IBQYPUVNYJX_UW","IBQYPUVNYJX_UM","IBQYPUVNYJX_OT","IBQYPUVNYJX_AS","JTBZWWFR","JTBZWWFR_UW","JTBZWWFR_UM","JTBZWWFR_OT","JTBZWWFR_AS","WMU_JTBZWWFR","WMU_JTBZWWFR_UW","WMU_JTBZWWFR_UM","WMU_JTBZWWFR_OT","WMU_JTBZWWFR_AS","HQXHKDUWSXI","HQXHKDUWSXI_UW","HQXHKDUWSXI_UM","HQXHKDUWSXI_OT","HQXHKDUWSXI_AS","WMU_HQXHKDUWSXI","WMU_HQXHKDUWSXI_UW","WMU_HQXHKDUWSXI_UM","WMU_HQXHKDUWSXI_OT","WMU_HQXHKDUWSXI_AS","NKPHL","OCVMVDIPQ","BW_PVQLOJ_ZAARNG","BW_PVQLOJ_ZAARNG_KC","BW_PVQLOJ_ZAARNG_UW","BW_PVQLOJ_ZAARNG_RG","BW_PVQLOJ_ZAARNG_UM","BW_PVQLOJ_ZAARNG_AS","BW_PVQLOJ_ZAARNG_OT","BW_PVQLOJ_ZAARNG_EN","BW_PVQLOJ_ZAARNG_YG","BW_PVQLOJ_ZAARNG_PD","BW_PVQLOJ_ZAARNG_SG","BW_PVQLOJ_ZAARNG_QT","BW_PVQLOJ_ZAARNG_OX","BW_PVQLOJ_ZAARNG_LK","MAOY_ID","WMU_QWLJY_NOTUI","WMU_QWLJY_UBNQYS","WMU_QWLJY_SYQTX","WMU_QWLJY_BGNPF","WMU_QWLJY_WMHS","RENJY","ZMXLLQ","ZMXLLQ_UW","ZMXLLQ_UM","ZMXLLQ_OT","ZMXLLQ_AS","TJGOSNKY","TJGOSNKY_UW","TJGOSNKY_UM","TJGOSNKY_OT","TJGOSNKY_AS","IRNAGF","IRNAGF_UW","IRNAGF_UM","IRNAGF_OT","IRNAGF_AS","PBHLCWEVF_UW","PBHLCWEVF_AG","PBHLCWEVF_UM","PBHLCWEVF_OT","PBHLCWEVF_AS","PBHLCWEVF_YG","PBHLCWEVF_EN","PBHLCWEVF_PD","PBHLCWEVF_OZ","PBHLCWEVF_SG","PBHLCWEVF_ET","PBHLCWEVF_LM","PBHLCWEVF_QT","PBHLCWEVF_OX","WMU_RENJY","KMNDMVC","KMNDMVC_UW","KMNDMVC_UM","KMNDMVC_OT","KMNDMVC_AS","KEGQAJKRI","KEGQAJKRI_UW","KEGQAJKRI_UM","KEGQAJKRI_AS","KEGQAJKRI_OT","KCSQ_UW","KCSQ","KCSQ_OT","KCSQ_AS","KCSQ_UM","NPEZONDW_UW","NPEZONDW_IJ","NPEZONDW_UM","NPEZONDW_OT","NPEZONDW_AS","NPEZONDW_KC","NPEZONDW_YG","NPEZONDW_PD","NPEZONDW_EN","NPEZONDW_QT","NPEZONDW_OX","NPEZONDW_SG","NPEZONDW_ET","NPEZONDW_OZ","NPEZONDW_LM","NPEZONDW_AX","NPEZONDW_LK","WMU_LENILNS","WMU_LENILNS_UW","WMU_LENILNS_IJ","WMU_LENILNS_UM","WMU_LENILNS_OT","WMU_LENILNS_AS","WMU_LENILNS_KC","WMU_LENILNS_YG","WMU_LENILNS_PD","WMU_LENILNS_EN","WMU_LENILNS_SG","WMU_LENILNS_ET","WMU_LENILNS_OZ","WMU_LENILNS_LM","WMU_LENILNS_QT","WMU_LENILNS_OX","WMU_WULWIUT_UW","WMU_WULWIUT_IJ","WMU_WULWIUT_UM","WMU_WULWIUT_OT","WMU_WULWIUT_AS","WMU_WULWIUT_KC","WMU_WULWIUT_YG","WMU_WULWIUT_PD","WMU_WULWIUT_EN","WMU_WULWIUT_SG","WMU_WULWIUT_ET","WMU_WULWIUT_OZ","WMU_WULWIUT_LM","WMU_WULWIUT_QT","WMU_WULWIUT_OX","WMU_WULWIUT_NKPHL_UW","WMU_WULWIUT_NKPHL_IJ","WMU_WULWIUT_NKPHL_UM","WMU_WULWIUT_NKPHL_OT","WMU_WULWIUT_NKPHL_AS","WMU_WULWIUT_NKPHL_KC","WMU_WULWIUT_NKPHL_YG","WMU_WULWIUT_NKPHL_PD","WMU_WULWIUT_NKPHL_EN","WMU_WULWIUT_NKPHL_SG","WMU_WULWIUT_NKPHL_ET","WMU_WULWIUT_NKPHL_OZ","WMU_WULWIUT_NKPHL_LM","WMU_WULWIUT_NKPHL_QT","WMU_WULWIUT_NKPHL_OX","NPEZONDW","XBHOYQNJANT","NXRQZJR","AAIKCG","SPFEGCM","YMGMPN_CJGSXTG_DISWSNW","MO_IXBVZEASRFZ_HSSX","LENILNS_SUGKMPN","MSWB_EDJSEQDED","STCFIDHPC","LENILNS_DEFH_OHAEMSCV_RENJY","IRMDZRMMDVVQ_BYBNA","ITJKAEBGYY_BYBNA","SDYYI_BYBNA","QPTRX_BYBNA","TYID_BYBNA","GGAPDKF_BYBNA","NH_IUIO","CNI_7I","NW_WFRIJKOPUR","SDYYI_FZK","SDYYI_HXK","SDYYI_BKJ","SDYYI_XSR","SDYYI_VLH","SDYYI_CGX","SDYYI_CYG","SDYYI_VFK","SDYYI_YIP","SDYYI_SQO","SDYYI_JWW","SDYYI_MPA","SDYYI_DKM","RPYG_SDYYI_FZK","RPYG_SDYYI_HXK","RPYG_SDYYI_BKJ","RPYG_SDYYI_XSR","RPYG_SDYYI_VLH","RPYG_SDYYI_CGX","RPYG_SDYYI_CYG","RPYG_SDYYI_VFK","RPYG_SDYYI_YIP","RPYG_SDYYI_SQO","RPYG_SDYYI_JWW","RPYG_SDYYI_MPA","RPYG_SDYYI_DKM","NW_PJVTRG","NW_THB_NFDZOZ","NW_QSEGXMONC_NFDZOZ","CEVLD","ZNUMJLD_FWF","HXNI","KARPLHFC_KC","KARPLHFC_IJ","KARPLHFC_PGOMTU","KARPLHFC_LAYA_ZW_TUQO_AS","KARPLHFC_AZJGS","KARPLHFC_LSEI_ZW_HSBMS","KARPLHFC_LSEI_ZW_WJ","KARPLHFC_QT","KARPLHFC_TGQDMIQSC","KARPLHFC_ZQVKRIZFJ","KARPLHFC_LVTPOM","KARPLHFC_LSEI_TH_AWBLX","GEUDUYAA_BYBNA","OWJJSY_LIZO","NW_WFTQ_UJDK","IBQYPUVNYJX_LK","JTBZWWFR_LK","HQXHKDUWSXI_LK","ZMXLLQ_LK","TJGOSNKY_LK","IRNAGF_LK","PBHLCWEVF_LK","KMNDMVC_LK","KEGQAJKRI_LK"
+3612656,"Pgomtu","QCQA","PGOMTU","611490","Imhugkzg","Gmwmjxmb","Qpizuz","Ufebmnek","Eaayaoyk","Kzmay gmwmjxmb, ji Ilai, sznktgklm vgei yono yorgyp uc fip hqxnh sqe uc fip uwpmwj.\r\nVgei svtpsenc cftz.","Vvoce kzmay Ilai gxwé ot ifaîpiu qfvmuo xfb f'ibmxb bd xfb ebs exxwdkhf
+		Dxmq égdskkotjh","Vvoce kzmay Ilai gxwé ot ifaîpiu qfvmuo xfb f'ibmxb bd xfb ebs exxwdkhf
+		Dxmq égdskkotjh","Vvoce kzmay Ilai gxwé ot ifaîpiu qfvmuo xfb f'ibmxb bd xfb ebs exxwdkhf
+		Dxmq égdskkotjh","Vvoce kzmay Ilai gxwé ot ifaîpiu qfvmuo xfb f'ibmxb bd xfb ebs exxwdkhf
+		Dxmq égdskkotjh","RQWFCLEM","YÊVURJNVH","SBTO","JTCLWCHPFKEÜEOG","AZVZMAIBMIDCC","dunyb-rqwfclem/","lkwephhuw-aqmlq/","laqui-sbto/","zbrzd-jansfjop/","sppfa-azvzmaibmidcc/","IMHUGKZG","OTTDJ.EMEMCV","RNHGQLI","UFEBMNEK","FQDDIXPT. VVOCE","dunyb-rqwfclem/","lkwephhuw-aqmlq/","laqui-sbto/","zbrzd-jansfjop/","sppfa-azvzmaibmidcc/","",1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,"https://example.com/xipwodf/3612656-1_1.knn","https://example.com/xipwodf/3612656-1_1.knn","https://example.com/xipwodf/3612656-1_1.knn","https://example.com/xipwodf/3612656-1_1.knn","https://example.com/xipwodf/3612656-1_1.knn","Ilai","kzmay","Kzmay","kzmay","kzmay","kzmay","Txwjvf","Wcuai","Flciyóx","Avevdixgb","Invirn","Wniddr","Aqmlq","Laqui","Zbrzd","Sppfa","Aqmlq > YÊVURJNVH > OTTDJ.EMEMCV","Dunyb > RQWFCLEM > IMHUGKZG","Laqui > SBTO > RNHGQLI","Zbrzd > JTCLWCHPFKEÜEOG > UFEBMNEK","Sppfa > AZVZMAIBMIDCC > FQDDIXPT. VVOCE","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","okao-qctt/Ilai","Rwhct","Uhb","Jlarmsj","Uhb","Prahq djdldexr","Zaht kegqajkri","Gqm émgu","Dicn varrcq","Oaxhw chntk","Azmxu Kanmrtj","","","","","","FZK","BKJ","FZK","FZK","FZK","HXK","XSR","VLH","FZK","CGX","CYG","VFK","YIP","SQO","JWW","MPA","DKM","http://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/gmwmjxmb-ilai-kzmay-ag-wcuai-3612656.dsoyd","https://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/gmwmjxmb-ilai-kzmay-ag-wcuai-3612656.dsoyd?gsySmgauf=1.uw.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=4.ag.BKJ&rrfxaXeOavvbpxo=1","https://example.com/laqui-sbto/dkyzpth-vfjkzecs/ilai/kzmay-qqxtnha-qpizuz-ilai-3612656.dsoyd?gsySmgauf=12.um.FZK&rrfxaXeOavvbpxo=1","https://example.com/zbrzd-jansfjop/ufebmnek/ilai/kzmay-avevdixgb-ufebmnek-ilai-3612656.dsoyd?gsySmgauf=10.ot.FZK&rrfxaXeOavvbpxo=1","https://example.com/sppfa-azvzmaibmidcc/fqddixpt-vvoce/ilai/kzmay-invirn-eaayaoyk-ilai-3612656.dsoyd?gsySmgauf=11.as.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=6.ag.HXK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=16.ag.XSR&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=15.ag.VLH&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=14.ag.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=17.ag.VFK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=5.ag.YIP&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=13.ag.SQO&rrfxaXeOavvbpxo=1","https://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/gmwmjxmb-ilai-kzmay-ag-wcuai-3612656.dsoyd?gsySmgauf=5.uw.JWW&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=18.ag.CGX&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=19.ag.CYG&rrfxaXeOavvbpxo=1","https://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/?lenilns_id=3612656&gsySmgauf=1.uw.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=4.ag.BKJ&rrfxaXeOavvbpxo=1","https://example.com/laqui-sbto/dkyzpth-vfjkzecs/ilai/?lenilns_id=3612656&gsySmgauf=12.um.FZK&rrfxaXeOavvbpxo=1","https://example.com/zbrzd-jansfjop/ufebmnek/ilai/?lenilns_id=3612656&gsySmgauf=10.ot.FZK&rrfxaXeOavvbpxo=1","https://example.com/sppfa-azvzmaibmidcc/fqddixpt-vvoce/ilai/?lenilns_id=3612656&gsySmgauf=11.as.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=6.ag.HXK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=16.ag.XSR&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=15.ag.VLH&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=14.ag.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=17.ag.VFK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=5.ag.YIP&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=13.ag.SQO&rrfxaXeOavvbpxo=1","https://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/?lenilns_id=3612656&gsySmgauf=5.uw.JWW&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=18.ag.CGX&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=19.ag.CYG&rrfxaXeOavvbpxo=1","","","","","","","","","","","","","","","","FZK",0,0,0,"M2M","1","1","0.0961512076","2017-02-13 22:43:31.000","2022-07-01 13:08:12.211 +0200",yslts,-1.625301941,0,-0.7368412799,2,-1.302998143,0.5884873619,0,"",1,95.00,107.95,89.87,777.58,1117.21,866.62,152.99,159.05,142.43,489.90,105.75,14912.88,139117.84,55.00,62.50,52.03,450.18,646.81,501.73,88.57,92.08,82.46,283.62,61.23,8633.77,80541.91,yiit,"","",22,3,"Pgomtu","20 HXK","20 BKJ","15 FZK","15 FZK","15 FZK","25 FZK","30 FZK","200 CGX","60 VFK","30 CYG","40 YIP","60 HXK",3,11,"","","햃본","떅씬똮폫","혺컘싞","찚","쐋쯕겤","쐋쯕겤 > 햃본 > 떅씬똮폫","괾쉍뾺","봌휰"`),
+			multiOut: [][]byte{
+				[]byte(`"ID_LENILNS","YMGMPN_EIYFYKT","JNA_1_YMGMPN","JNA_2_YMGMPN","IG_NICN","WRJHR","WRJHR_UW","WRJHR_UM","WRJHR_OT","WRJHR_AS","IBQYPUVNYJX","IBQYPUVNYJX_UW","IBQYPUVNYJX_UM","IBQYPUVNYJX_OT","IBQYPUVNYJX_AS","JTBZWWFR","JTBZWWFR_UW","JTBZWWFR_UM","JTBZWWFR_OT","JTBZWWFR_AS","WMU_JTBZWWFR","WMU_JTBZWWFR_UW","WMU_JTBZWWFR_UM","WMU_JTBZWWFR_OT","WMU_JTBZWWFR_AS","HQXHKDUWSXI","HQXHKDUWSXI_UW","HQXHKDUWSXI_UM","HQXHKDUWSXI_OT","HQXHKDUWSXI_AS","WMU_HQXHKDUWSXI","WMU_HQXHKDUWSXI_UW","WMU_HQXHKDUWSXI_UM","WMU_HQXHKDUWSXI_OT","WMU_HQXHKDUWSXI_AS","NKPHL","OCVMVDIPQ","BW_PVQLOJ_ZAARNG","BW_PVQLOJ_ZAARNG_KC","BW_PVQLOJ_ZAARNG_UW","BW_PVQLOJ_ZAARNG_RG","BW_PVQLOJ_ZAARNG_UM","BW_PVQLOJ_ZAARNG_AS","BW_PVQLOJ_ZAARNG_OT","BW_PVQLOJ_ZAARNG_EN","BW_PVQLOJ_ZAARNG_YG","BW_PVQLOJ_ZAARNG_PD","BW_PVQLOJ_ZAARNG_SG","BW_PVQLOJ_ZAARNG_QT","BW_PVQLOJ_ZAARNG_OX","BW_PVQLOJ_ZAARNG_LK","MAOY_ID","WMU_QWLJY_NOTUI","WMU_QWLJY_UBNQYS","WMU_QWLJY_SYQTX","WMU_QWLJY_BGNPF","WMU_QWLJY_WMHS","RENJY","ZMXLLQ","ZMXLLQ_UW","ZMXLLQ_UM","ZMXLLQ_OT","ZMXLLQ_AS","TJGOSNKY","TJGOSNKY_UW","TJGOSNKY_UM","TJGOSNKY_OT","TJGOSNKY_AS","IRNAGF","IRNAGF_UW","IRNAGF_UM","IRNAGF_OT","IRNAGF_AS","PBHLCWEVF_UW","PBHLCWEVF_AG","PBHLCWEVF_UM","PBHLCWEVF_OT","PBHLCWEVF_AS","PBHLCWEVF_YG","PBHLCWEVF_EN","PBHLCWEVF_PD","PBHLCWEVF_OZ","PBHLCWEVF_SG","PBHLCWEVF_ET","PBHLCWEVF_LM","PBHLCWEVF_QT","PBHLCWEVF_OX","WMU_RENJY","KMNDMVC","KMNDMVC_UW","KMNDMVC_UM","KMNDMVC_OT","KMNDMVC_AS","KEGQAJKRI","KEGQAJKRI_UW","KEGQAJKRI_UM","KEGQAJKRI_AS","KEGQAJKRI_OT","KCSQ_UW","KCSQ","KCSQ_OT","KCSQ_AS","KCSQ_UM","NPEZONDW_UW","NPEZONDW_IJ","NPEZONDW_UM","NPEZONDW_OT","NPEZONDW_AS","NPEZONDW_KC","NPEZONDW_YG","NPEZONDW_PD","NPEZONDW_EN","NPEZONDW_QT","NPEZONDW_OX","NPEZONDW_SG","NPEZONDW_ET","NPEZONDW_OZ","NPEZONDW_LM","NPEZONDW_AX","NPEZONDW_LK","WMU_LENILNS","WMU_LENILNS_UW","WMU_LENILNS_IJ","WMU_LENILNS_UM","WMU_LENILNS_OT","WMU_LENILNS_AS","WMU_LENILNS_KC","WMU_LENILNS_YG","WMU_LENILNS_PD","WMU_LENILNS_EN","WMU_LENILNS_SG","WMU_LENILNS_ET","WMU_LENILNS_OZ","WMU_LENILNS_LM","WMU_LENILNS_QT","WMU_LENILNS_OX","WMU_WULWIUT_UW","WMU_WULWIUT_IJ","WMU_WULWIUT_UM","WMU_WULWIUT_OT","WMU_WULWIUT_AS","WMU_WULWIUT_KC","WMU_WULWIUT_YG","WMU_WULWIUT_PD","WMU_WULWIUT_EN","WMU_WULWIUT_SG","WMU_WULWIUT_ET","WMU_WULWIUT_OZ","WMU_WULWIUT_LM","WMU_WULWIUT_QT","WMU_WULWIUT_OX","WMU_WULWIUT_NKPHL_UW","WMU_WULWIUT_NKPHL_IJ","WMU_WULWIUT_NKPHL_UM","WMU_WULWIUT_NKPHL_OT","WMU_WULWIUT_NKPHL_AS","WMU_WULWIUT_NKPHL_KC","WMU_WULWIUT_NKPHL_YG","WMU_WULWIUT_NKPHL_PD","WMU_WULWIUT_NKPHL_EN","WMU_WULWIUT_NKPHL_SG","WMU_WULWIUT_NKPHL_ET","WMU_WULWIUT_NKPHL_OZ","WMU_WULWIUT_NKPHL_LM","WMU_WULWIUT_NKPHL_QT","WMU_WULWIUT_NKPHL_OX","NPEZONDW","XBHOYQNJANT","NXRQZJR","AAIKCG","SPFEGCM","YMGMPN_CJGSXTG_DISWSNW","MO_IXBVZEASRFZ_HSSX","LENILNS_SUGKMPN","MSWB_EDJSEQDED","STCFIDHPC","LENILNS_DEFH_OHAEMSCV_RENJY","IRMDZRMMDVVQ_BYBNA","ITJKAEBGYY_BYBNA","SDYYI_BYBNA","QPTRX_BYBNA","TYID_BYBNA","GGAPDKF_BYBNA","NH_IUIO","CNI_7I","NW_WFRIJKOPUR","SDYYI_FZK","SDYYI_HXK","SDYYI_BKJ","SDYYI_XSR","SDYYI_VLH","SDYYI_CGX","SDYYI_CYG","SDYYI_VFK","SDYYI_YIP","SDYYI_SQO","SDYYI_JWW","SDYYI_MPA","SDYYI_DKM","RPYG_SDYYI_FZK","RPYG_SDYYI_HXK","RPYG_SDYYI_BKJ","RPYG_SDYYI_XSR","RPYG_SDYYI_VLH","RPYG_SDYYI_CGX","RPYG_SDYYI_CYG","RPYG_SDYYI_VFK","RPYG_SDYYI_YIP","RPYG_SDYYI_SQO","RPYG_SDYYI_JWW","RPYG_SDYYI_MPA","RPYG_SDYYI_DKM","NW_PJVTRG","NW_THB_NFDZOZ","NW_QSEGXMONC_NFDZOZ","CEVLD","ZNUMJLD_FWF","HXNI","KARPLHFC_KC","KARPLHFC_IJ","KARPLHFC_PGOMTU","KARPLHFC_LAYA_ZW_TUQO_AS","KARPLHFC_AZJGS","KARPLHFC_LSEI_ZW_HSBMS","KARPLHFC_LSEI_ZW_WJ","KARPLHFC_QT","KARPLHFC_TGQDMIQSC","KARPLHFC_ZQVKRIZFJ","KARPLHFC_LVTPOM","KARPLHFC_LSEI_TH_AWBLX","GEUDUYAA_BYBNA","OWJJSY_LIZO","NW_WFTQ_UJDK","IBQYPUVNYJX_LK","JTBZWWFR_LK","HQXHKDUWSXI_LK","ZMXLLQ_LK","TJGOSNKY_LK","IRNAGF_LK","PBHLCWEVF_LK","KMNDMVC_LK","KEGQAJKRI_LK"`),
+				[]byte(`3612656,"Pgomtu","QCQA","PGOMTU","611490","Imhugkzg","Gmwmjxmb","Qpizuz","Ufebmnek","Eaayaoyk","Kzmay gmwmjxmb, ji Ilai, sznktgklm vgei yono yorgyp uc fip hqxnh sqe uc fip uwpmwj.\r\nVgei svtpsenc cftz.","Vvoce kzmay Ilai gxwé ot ifaîpiu qfvmuo xfb f'ibmxb bd xfb ebs exxwdkhf
+		Dxmq égdskkotjh","Vvoce kzmay Ilai gxwé ot ifaîpiu qfvmuo xfb f'ibmxb bd xfb ebs exxwdkhf
+		Dxmq égdskkotjh","Vvoce kzmay Ilai gxwé ot ifaîpiu qfvmuo xfb f'ibmxb bd xfb ebs exxwdkhf
+		Dxmq égdskkotjh","Vvoce kzmay Ilai gxwé ot ifaîpiu qfvmuo xfb f'ibmxb bd xfb ebs exxwdkhf
+		Dxmq égdskkotjh","RQWFCLEM","YÊVURJNVH","SBTO","JTCLWCHPFKEÜEOG","AZVZMAIBMIDCC","dunyb-rqwfclem/","lkwephhuw-aqmlq/","laqui-sbto/","zbrzd-jansfjop/","sppfa-azvzmaibmidcc/","IMHUGKZG","OTTDJ.EMEMCV","RNHGQLI","UFEBMNEK","FQDDIXPT. VVOCE","dunyb-rqwfclem/","lkwephhuw-aqmlq/","laqui-sbto/","zbrzd-jansfjop/","sppfa-azvzmaibmidcc/","",1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,"https://example.com/xipwodf/3612656-1_1.knn","https://example.com/xipwodf/3612656-1_1.knn","https://example.com/xipwodf/3612656-1_1.knn","https://example.com/xipwodf/3612656-1_1.knn","https://example.com/xipwodf/3612656-1_1.knn","Ilai","kzmay","Kzmay","kzmay","kzmay","kzmay","Txwjvf","Wcuai","Flciyóx","Avevdixgb","Invirn","Wniddr","Aqmlq","Laqui","Zbrzd","Sppfa","Aqmlq > YÊVURJNVH > OTTDJ.EMEMCV","Dunyb > RQWFCLEM > IMHUGKZG","Laqui > SBTO > RNHGQLI","Zbrzd > JTCLWCHPFKEÜEOG > UFEBMNEK","Sppfa > AZVZMAIBMIDCC > FQDDIXPT. VVOCE","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","Dunyb > RQWFCLEM > IMHUGKZG","okao-qctt/Ilai","Rwhct","Uhb","Jlarmsj","Uhb","Prahq djdldexr","Zaht kegqajkri","Gqm émgu","Dicn varrcq","Oaxhw chntk","Azmxu Kanmrtj","","","","","","FZK","BKJ","FZK","FZK","FZK","HXK","XSR","VLH","FZK","CGX","CYG","VFK","YIP","SQO","JWW","MPA","DKM","http://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/gmwmjxmb-ilai-kzmay-ag-wcuai-3612656.dsoyd","https://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/gmwmjxmb-ilai-kzmay-ag-wcuai-3612656.dsoyd?gsySmgauf=1.uw.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=4.ag.BKJ&rrfxaXeOavvbpxo=1","https://example.com/laqui-sbto/dkyzpth-vfjkzecs/ilai/kzmay-qqxtnha-qpizuz-ilai-3612656.dsoyd?gsySmgauf=12.um.FZK&rrfxaXeOavvbpxo=1","https://example.com/zbrzd-jansfjop/ufebmnek/ilai/kzmay-avevdixgb-ufebmnek-ilai-3612656.dsoyd?gsySmgauf=10.ot.FZK&rrfxaXeOavvbpxo=1","https://example.com/sppfa-azvzmaibmidcc/fqddixpt-vvoce/ilai/kzmay-invirn-eaayaoyk-ilai-3612656.dsoyd?gsySmgauf=11.as.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=6.ag.HXK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=16.ag.XSR&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=15.ag.VLH&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=14.ag.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=17.ag.VFK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=5.ag.YIP&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=13.ag.SQO&rrfxaXeOavvbpxo=1","https://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/gmwmjxmb-ilai-kzmay-ag-wcuai-3612656.dsoyd?gsySmgauf=5.uw.JWW&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=18.ag.CGX&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/kzmay-txwjvf-imhugkzg-ilai-3612656.dsoyd?gsySmgauf=19.ag.CYG&rrfxaXeOavvbpxo=1","https://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/?lenilns_id=3612656&gsySmgauf=1.uw.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=4.ag.BKJ&rrfxaXeOavvbpxo=1","https://example.com/laqui-sbto/dkyzpth-vfjkzecs/ilai/?lenilns_id=3612656&gsySmgauf=12.um.FZK&rrfxaXeOavvbpxo=1","https://example.com/zbrzd-jansfjop/ufebmnek/ilai/?lenilns_id=3612656&gsySmgauf=10.ot.FZK&rrfxaXeOavvbpxo=1","https://example.com/sppfa-azvzmaibmidcc/fqddixpt-vvoce/ilai/?lenilns_id=3612656&gsySmgauf=11.as.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=6.ag.HXK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=16.ag.XSR&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=15.ag.VLH&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=14.ag.FZK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=17.ag.VFK&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=5.ag.YIP&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=13.ag.SQO&rrfxaXeOavvbpxo=1","https://example.com/lkwephhuw-aqmlq/ottdj-ememcv/ilai/?lenilns_id=3612656&gsySmgauf=5.uw.JWW&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=18.ag.CGX&rrfxaXeOavvbpxo=1","https://example.com/dunyb-rqwfclem/imhugkzg/ilai/?lenilns_id=3612656&gsySmgauf=19.ag.CYG&rrfxaXeOavvbpxo=1","","","","","","","","","","","","","","","","FZK",0,0,0,"M2M","1","1","0.0961512076","2017-02-13 22:43:31.000","2022-07-01 13:08:12.211 +0200",yslts,-1.625301941,0,-0.7368412799,2,-1.302998143,0.5884873619,0,"",1,95.00,107.95,89.87,777.58,1117.21,866.62,152.99,159.05,142.43,489.90,105.75,14912.88,139117.84,55.00,62.50,52.03,450.18,646.81,501.73,88.57,92.08,82.46,283.62,61.23,8633.77,80541.91,yiit,"","",22,3,"Pgomtu","20 HXK","20 BKJ","15 FZK","15 FZK","15 FZK","25 FZK","30 FZK","200 CGX","60 VFK","30 CYG","40 YIP","60 HXK",3,11,"","","햃본","떅씬똮폫","혺컘싞","찚","쐋쯕겤","쐋쯕겤 > 햃본 > 떅씬똮폫","괾쉍뾺","봌휰"`),
+			},
+			advance:   3843,
+			out:       []byte(`"ID_LENILNS","YMGMPN_EIYFYKT","JNA_1_YMGMPN","JNA_2_YMGMPN","IG_NICN","WRJHR","WRJHR_UW","WRJHR_UM","WRJHR_OT","WRJHR_AS","IBQYPUVNYJX","IBQYPUVNYJX_UW","IBQYPUVNYJX_UM","IBQYPUVNYJX_OT","IBQYPUVNYJX_AS","JTBZWWFR","JTBZWWFR_UW","JTBZWWFR_UM","JTBZWWFR_OT","JTBZWWFR_AS","WMU_JTBZWWFR","WMU_JTBZWWFR_UW","WMU_JTBZWWFR_UM","WMU_JTBZWWFR_OT","WMU_JTBZWWFR_AS","HQXHKDUWSXI","HQXHKDUWSXI_UW","HQXHKDUWSXI_UM","HQXHKDUWSXI_OT","HQXHKDUWSXI_AS","WMU_HQXHKDUWSXI","WMU_HQXHKDUWSXI_UW","WMU_HQXHKDUWSXI_UM","WMU_HQXHKDUWSXI_OT","WMU_HQXHKDUWSXI_AS","NKPHL","OCVMVDIPQ","BW_PVQLOJ_ZAARNG","BW_PVQLOJ_ZAARNG_KC","BW_PVQLOJ_ZAARNG_UW","BW_PVQLOJ_ZAARNG_RG","BW_PVQLOJ_ZAARNG_UM","BW_PVQLOJ_ZAARNG_AS","BW_PVQLOJ_ZAARNG_OT","BW_PVQLOJ_ZAARNG_EN","BW_PVQLOJ_ZAARNG_YG","BW_PVQLOJ_ZAARNG_PD","BW_PVQLOJ_ZAARNG_SG","BW_PVQLOJ_ZAARNG_QT","BW_PVQLOJ_ZAARNG_OX","BW_PVQLOJ_ZAARNG_LK","MAOY_ID","WMU_QWLJY_NOTUI","WMU_QWLJY_UBNQYS","WMU_QWLJY_SYQTX","WMU_QWLJY_BGNPF","WMU_QWLJY_WMHS","RENJY","ZMXLLQ","ZMXLLQ_UW","ZMXLLQ_UM","ZMXLLQ_OT","ZMXLLQ_AS","TJGOSNKY","TJGOSNKY_UW","TJGOSNKY_UM","TJGOSNKY_OT","TJGOSNKY_AS","IRNAGF","IRNAGF_UW","IRNAGF_UM","IRNAGF_OT","IRNAGF_AS","PBHLCWEVF_UW","PBHLCWEVF_AG","PBHLCWEVF_UM","PBHLCWEVF_OT","PBHLCWEVF_AS","PBHLCWEVF_YG","PBHLCWEVF_EN","PBHLCWEVF_PD","PBHLCWEVF_OZ","PBHLCWEVF_SG","PBHLCWEVF_ET","PBHLCWEVF_LM","PBHLCWEVF_QT","PBHLCWEVF_OX","WMU_RENJY","KMNDMVC","KMNDMVC_UW","KMNDMVC_UM","KMNDMVC_OT","KMNDMVC_AS","KEGQAJKRI","KEGQAJKRI_UW","KEGQAJKRI_UM","KEGQAJKRI_AS","KEGQAJKRI_OT","KCSQ_UW","KCSQ","KCSQ_OT","KCSQ_AS","KCSQ_UM","NPEZONDW_UW","NPEZONDW_IJ","NPEZONDW_UM","NPEZONDW_OT","NPEZONDW_AS","NPEZONDW_KC","NPEZONDW_YG","NPEZONDW_PD","NPEZONDW_EN","NPEZONDW_QT","NPEZONDW_OX","NPEZONDW_SG","NPEZONDW_ET","NPEZONDW_OZ","NPEZONDW_LM","NPEZONDW_AX","NPEZONDW_LK","WMU_LENILNS","WMU_LENILNS_UW","WMU_LENILNS_IJ","WMU_LENILNS_UM","WMU_LENILNS_OT","WMU_LENILNS_AS","WMU_LENILNS_KC","WMU_LENILNS_YG","WMU_LENILNS_PD","WMU_LENILNS_EN","WMU_LENILNS_SG","WMU_LENILNS_ET","WMU_LENILNS_OZ","WMU_LENILNS_LM","WMU_LENILNS_QT","WMU_LENILNS_OX","WMU_WULWIUT_UW","WMU_WULWIUT_IJ","WMU_WULWIUT_UM","WMU_WULWIUT_OT","WMU_WULWIUT_AS","WMU_WULWIUT_KC","WMU_WULWIUT_YG","WMU_WULWIUT_PD","WMU_WULWIUT_EN","WMU_WULWIUT_SG","WMU_WULWIUT_ET","WMU_WULWIUT_OZ","WMU_WULWIUT_LM","WMU_WULWIUT_QT","WMU_WULWIUT_OX","WMU_WULWIUT_NKPHL_UW","WMU_WULWIUT_NKPHL_IJ","WMU_WULWIUT_NKPHL_UM","WMU_WULWIUT_NKPHL_OT","WMU_WULWIUT_NKPHL_AS","WMU_WULWIUT_NKPHL_KC","WMU_WULWIUT_NKPHL_YG","WMU_WULWIUT_NKPHL_PD","WMU_WULWIUT_NKPHL_EN","WMU_WULWIUT_NKPHL_SG","WMU_WULWIUT_NKPHL_ET","WMU_WULWIUT_NKPHL_OZ","WMU_WULWIUT_NKPHL_LM","WMU_WULWIUT_NKPHL_QT","WMU_WULWIUT_NKPHL_OX","NPEZONDW","XBHOYQNJANT","NXRQZJR","AAIKCG","SPFEGCM","YMGMPN_CJGSXTG_DISWSNW","MO_IXBVZEASRFZ_HSSX","LENILNS_SUGKMPN","MSWB_EDJSEQDED","STCFIDHPC","LENILNS_DEFH_OHAEMSCV_RENJY","IRMDZRMMDVVQ_BYBNA","ITJKAEBGYY_BYBNA","SDYYI_BYBNA","QPTRX_BYBNA","TYID_BYBNA","GGAPDKF_BYBNA","NH_IUIO","CNI_7I","NW_WFRIJKOPUR","SDYYI_FZK","SDYYI_HXK","SDYYI_BKJ","SDYYI_XSR","SDYYI_VLH","SDYYI_CGX","SDYYI_CYG","SDYYI_VFK","SDYYI_YIP","SDYYI_SQO","SDYYI_JWW","SDYYI_MPA","SDYYI_DKM","RPYG_SDYYI_FZK","RPYG_SDYYI_HXK","RPYG_SDYYI_BKJ","RPYG_SDYYI_XSR","RPYG_SDYYI_VLH","RPYG_SDYYI_CGX","RPYG_SDYYI_CYG","RPYG_SDYYI_VFK","RPYG_SDYYI_YIP","RPYG_SDYYI_SQO","RPYG_SDYYI_JWW","RPYG_SDYYI_MPA","RPYG_SDYYI_DKM","NW_PJVTRG","NW_THB_NFDZOZ","NW_QSEGXMONC_NFDZOZ","CEVLD","ZNUMJLD_FWF","HXNI","KARPLHFC_KC","KARPLHFC_IJ","KARPLHFC_PGOMTU","KARPLHFC_LAYA_ZW_TUQO_AS","KARPLHFC_AZJGS","KARPLHFC_LSEI_ZW_HSBMS","KARPLHFC_LSEI_ZW_WJ","KARPLHFC_QT","KARPLHFC_TGQDMIQSC","KARPLHFC_ZQVKRIZFJ","KARPLHFC_LVTPOM","KARPLHFC_LSEI_TH_AWBLX","GEUDUYAA_BYBNA","OWJJSY_LIZO","NW_WFTQ_UJDK","IBQYPUVNYJX_LK","JTBZWWFR_LK","HQXHKDUWSXI_LK","ZMXLLQ_LK","TJGOSNKY_LK","IRNAGF_LK","PBHLCWEVF_LK","KMNDMVC_LK","KEGQAJKRI_LK"`),
+			delimiter: characters.Character_COMMA,
+			debug:     true,
+		},
 	}
 }
 
@@ -493,7 +514,7 @@ func getTestDataFromBolTestfile() TestData {
 	base := "/home/yt/csv2sqlite/testfiles"
 	td.name = "example.com head.csv"
 	td.in, err = ioutil.ReadFile(path.Join(base, "bol_input.csv"))
-	td.delimiter = []byte("|")
+	td.delimiter = characters.Character_PIPE
 	td.debug = false
 	if err != nil {
 		debug.Debug("err: %s", err)
@@ -521,7 +542,7 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 		cc.SetEnclosure(td.enclosure)
 		cc.EOL = characters.Character_NIL
 
-		// normally the code is not re-run so we need to manually set the headerLength to zero again
+		// normally the code is not re-run so we need to manually set the DelimiterCount to zero again
 		cc.DelimiterCount = 0
 		var got [][]byte
 
@@ -534,12 +555,18 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 		}
 
 		debug.DebugLog = td.debug
+		if td.debug {
+			log.Printf("break me")
+		}
 
 		scanner := bufio.NewScanner(reader)
 		scanner.Buffer(readbuf, buffersize)
 		scanner.Split(cc.SplitCsvInput)
 		// i := 0
 		for scanner.Scan() {
+			if scanner.Err() == io.EOF {
+				break
+			}
 			chunk := scanner.Bytes()
 			// header has to be set once
 			if cc.DelimiterCount == 0 {
@@ -549,39 +576,35 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 			}
 			got = append(got, chunk)
 		}
+
 		if err := scanner.Err(); err != nil {
 			t.Fatal(err)
 		}
 
-		if len(td.multiOut) != len(got) {
-			for c := range td.multiOut {
-				if len(got) <= c {
-					t.Errorf("Test (%s): len(td.multiOut) = %d != len(got) = %d\nwanted = %s\ngot = %s",
-						td.name, len(td.multiOut), len(got), td.multiOut, got)
-				}
-			}
-		}
+		// if len(td.multiOut) != len(got) {
+		// 	for c := range td.multiOut {
+		// 		if len(got) <= c {
+		// 			t.Errorf("Test (%s): len(td.multiOut) = %d != len(got) = %d\nwanted = %s\ngot = %s",
+		// 				td.name, len(td.multiOut), len(got), td.multiOut, got)
+		// 		}
+		// 	}
+		// }
 
 		if diff := cmp.Diff(td.multiOut, got); diff != "" {
-			for c := range td.multiOut {
-				if len(got) <= c {
-					t.Fatalf("Test (%s): did not receive all data\nwanted = %s\nGot nothing", td.name, td.multiOut[c])
-				}
-				if d := cmp.Diff(td.multiOut[c], got[c]); d != "" {
-					t.Errorf("ScanWithSplitCSV(): %s\nwant: \t%s\ngot: \t%s\ndiff: \n%s", td.name, td.multiOut[c], got[c], d)
-				}
-			}
-			t.Errorf("ScanWithSplitCSV(): %s, diff: \n%s", td.name, diff)
+			// for c := range td.multiOut {
+			// 	if len(got) <= c {
+			// 		t.Fatalf("Test (%s): did not receive all data\nwanted = %s\nGot nothing", td.name, td.multiOut[c])
+			// 	}
+			// 	if d := cmp.Diff(td.multiOut[c], got[c]); d != "" {
+			// 		t.Errorf("ScanWithSplitCSV(): %s\nwant: \t%s\ngot: \t%s\ndiff: \n%s", td.name, td.multiOut[c], got[c], d)
+			// 	}
+			// }
+			t.Errorf("ScanWithSplitCSV(): %s mismatch (-want +got):\n%s", td.name, diff)
 		}
 	}
 }
 
 func Test_SplitCSV(t *testing.T) {
-	cc := CharacterConfig{}
-	cc.SetDelimiter(characters.Character_NIL)
-	cc.SetEnclosure(characters.Character_NIL)
-	cc.EOL = characters.Character_NIL
-
 	testdata := getTestData()
 
 	type args struct {
@@ -594,6 +617,7 @@ func Test_SplitCSV(t *testing.T) {
 		wantAdvance int
 		wantToken   []byte
 		wantErr     bool
+		debug       bool
 	}
 
 	debug.DebugLog = false
@@ -613,11 +637,20 @@ func Test_SplitCSV(t *testing.T) {
 			wantAdvance: td.advance,
 			wantToken:   td.out,
 			wantErr:     false,
+			debug:       td.debug,
 		})
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cc := CharacterConfig{}
+			cc.SetDelimiter(characters.Character_NIL)
+			cc.SetEnclosure(characters.Character_NIL)
+			cc.EOL = characters.Character_NIL
+
+			if tt.debug == true {
+				log.Printf("break me")
+			}
 			gotAdvance, gotToken, err := cc.SplitCsvInput(tt.args.in, tt.args.atEOF)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("splitCsvInput(): %s error = %v, wantErr %v", tt.name, err, tt.wantErr)
