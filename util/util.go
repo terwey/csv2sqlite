@@ -164,7 +164,6 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 
 		if len(c.EOL) == 0 && len(c.eolBuf) != 0 {
-			log.Printf("recovered EOL from buffer")
 			c.EOL = c.eolBuf
 			break
 		}
