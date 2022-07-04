@@ -2,10 +2,12 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/sqlitehelper"
+	"github.com/terwey/csv2sqlite/util"
 )
 
 var tmpDir = "/tmp/"
@@ -87,5 +89,65 @@ func Test_main(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func Test_docs(t *testing.T) {
+	fu := util.Usage(flags)
+
+	var s strings.Builder
+
+	s.WriteString("## Usage\n\n.Usage\n")
+	s.WriteString("[cols=\"2,1,3\"]\n")
+	s.WriteString("|===\n")
+	s.WriteString("| Name / Shorthand | Default | Usage \n\n")
+
+	for _, f := range fu {
+		s.WriteString(f.GetRow())
+	}
+
+	s.WriteString("\n|===\n")
+
+	err := os.WriteFile(baseDir+"/docs/usage.adoc", []byte(s.String()), 0644)
+	if err != nil {
+		t.Errorf("could not write usage adoc: %s", err)
+	}
+}
+
+func Test_manpage(t *testing.T) {
+	fu := util.Usage(flags)
+
+	var s strings.Builder
+
+	s.WriteString("= csv2sqlite(7)\n")
+	s.WriteString("Yorick Terweijden\n")
+
+	s.WriteString(":doctype: manpage\n")
+	s.WriteString(":manmanual: csv2sqlite\n")
+	s.WriteString(":mansource: csv2sqlite\n")
+	s.WriteString(":man-linkstyle: pass:[blue R < >]\n")
+	s.WriteString(":version: undefined\n")
+	s.WriteString("{version}\n\n")
+
+	s.WriteString("== Name\n\n")
+	s.WriteString("csv2sqlite - converts CSV to SQLite\n\n")
+
+	s.WriteString("== Synopsis\n\n")
+	s.WriteString("csv2sqlite [_OPTION_]... -i _CSV_FILE_ -o _SQLITE_OUT_FILE_\n\n")
+
+	s.WriteString("include::desc.adoc[]\n\n")
+
+	s.WriteString("== Options\n\n")
+
+	for _, f := range fu {
+		s.WriteString(f.GetMan())
+	}
+
+	s.WriteString("\n\n== Resources\n\n")
+	s.WriteString("*Repository:* https://github.com/terwey/csv2sqlite\n")
+
+	err := os.WriteFile(baseDir+"/docs/manpage.adoc", []byte(s.String()), 0644)
+	if err != nil {
+		t.Errorf("could not write manpage adoc: %s", err)
 	}
 }

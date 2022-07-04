@@ -18,3 +18,6 @@ debug:
 	@rm -f csv2sqlite_debug
 	@go build -ldflags "-extldflags=-static -s -w -X main.version=$(GIT_VERSION_NAME) -X main.minversion=`date -u +%Y-%m-%d.%H:%M:%S`" -tags sqlite_omit_load_extension,debug -v -o csv2sqlite_debug cmd/csv2sqlite/main.go
 	#@upx -9 csv2sqlite_debug
+
+markdown:
+	@asciidoctor docs/readme.adoc -b docbook -a leveloffset=+1 -o - | pandoc  --atx-headers --wrap=preserve -t gfm -f docbook - > README.md
