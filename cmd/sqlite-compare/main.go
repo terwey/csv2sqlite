@@ -37,7 +37,7 @@ func init() {
 
 func main() {
 	if err := flags.Parse(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "\nCompare takes 2 SQLite3 connections and compares the data\n"+
+		fmt.Fprintf(os.Stderr, "\nCompare takes 2 SQLite3 databases and compares the data\n"+
 			"It returns an error when data is not the same\n\n"+
 
 			"From both conns it queries for all columns names using\n"+

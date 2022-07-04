@@ -23,6 +23,7 @@ func Test_main(t *testing.T) {
 		enclosure characters.Character
 		want      string
 		null      bool
+		debug     bool
 	}{
 		{
 			name:      "head.csv",
@@ -32,6 +33,15 @@ func Test_main(t *testing.T) {
 			enclosure: characters.Character_QUOTATION_MARK,
 			want:      baseDir + "tests/head.sqlite",
 			null:      false,
+		},
+		{
+			name:      "528874",
+			input:     baseDir + "tests/528874.csv",
+			output:    tmpDir + "528874.sqlite",
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+			want:      baseDir + "tests/528874.sqlite",
+			debug:     true,
 		},
 	}
 	for _, tt := range tests {
@@ -61,14 +71,20 @@ func Test_main(t *testing.T) {
 				)
 			}
 
+			// if tt.debug {
+			// 	os.Args = append(os.Args, "--debug")
+			// }
+
 			main()
 
-			if err := sqlitehelper.CompareFiles("data", tt.output, tt.want, tt.null); err != nil {
-				t.Errorf("CompareFiles() %s: error: %s", tt.name, err)
-			}
+			if tt.want != "" {
+				if err := sqlitehelper.CompareFiles("data", tt.output, tt.want, tt.null); err != nil {
+					t.Errorf("CompareFiles() %s: error: %s", tt.name, err)
+				}
 
-			if err := os.Remove(tt.output); err != nil {
-				t.Logf("Could not clean up output file (%s) from test: %s", tt.output, tt.name)
+				if err := os.Remove(tt.output); err != nil {
+					t.Logf("Could not clean up output file (%s) from test: %s", tt.output, tt.name)
+				}
 			}
 		})
 	}
