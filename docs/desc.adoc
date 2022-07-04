@@ -1,0 +1,10 @@
+== Description
+
+*csv2sqlite* converts CSV files into SQLite databases.
+
+* The delimiter and the enclosure are detected automatically.
+* Delimiters and enclosures can also be multi-byte characters.
+* Fast, with low memory usage.
+* Handles extremely large files.
+
+*sqlite-compare* checks two SQLite files against each other.

@@ -79,8 +79,8 @@ func init() {
 	flags.BoolVar(&showVersion, "version", false, "Prints the version")
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
-	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
-	flags.StringVar(&paramEnclosure, "enclosure", "", "Set the enclosure in case auto-detect should not be used, can be one of: \n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
+	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n\n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
+	flags.StringVar(&paramEnclosure, "enclosure", "", "Set the enclosure in case auto-detect should not be used, can be one of: \n\n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
 
 	flags.IntVar(&p.Start, "start", 0, "The starting position where the header is, useful for CSVs produced by Excel.\nOnly works in combination with newline delimited, -nd enabled if set.")
 	flags.IntVar(&p.Skip, "skip", -1, "Rows to skip after the header")
@@ -90,7 +90,7 @@ func init() {
 	flags.StringVar(&literalEnclosure, "literal-enclosure", "", "Sets the enclosure to use to a literal string, if set the --enclosure is ignored")
 
 	flags.IntSliceVar(&p.Exclude, "exclude", nil, "Column indices to exclude from conversion")
-	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n- LF\n- CR\n- CRLF")
+	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n\n- LF\n- CR\n- CRLF")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
 	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
 	flags.IntVar(&stopCount, "break-count", 15000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
