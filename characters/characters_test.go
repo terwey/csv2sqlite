@@ -71,6 +71,52 @@ func Test_detectDelimiter(t *testing.T) {
 	}
 }
 
+func Test_detectEnclosure(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		want Character
+	}{
+		{
+			name: "Detect triple quotation",
+			data: []byte(`"""fielda""","""fieldb""","""fieldc"""`),
+			want: Character_QUOTATION_MARK_TRIPLE,
+		},
+		{
+			name: "Detect double quotation",
+			data: []byte(`""fielda"",""fieldb"",""fieldc""`),
+			want: Character_QUOTATION_MARK_DOUBLE,
+		},
+		{
+			name: "Detect quote",
+			data: []byte(`"fielda","fieldb","fieldc"`),
+			want: Character_QUOTATION_MARK,
+		},
+		{
+			name: "Detect apostrophe",
+			data: []byte(`'fielda','fieldb','fieldc'`),
+			want: Character_APOSTROPHE,
+		},
+		{
+			name: "Detect asterisk",
+			data: []byte(`*fielda*,*fieldb*,*fieldc*`),
+			want: Character_ASTERISK,
+		},
+		{
+			name: "Detect empty",
+			data: []byte(`fielda,fieldb,fieldc`),
+			want: Character_EMPTY,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := DetectEnclosure(tt.data); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DetectEnclosure() = %v (%s), want %v (%s)", got, got, tt.want, tt.want)
+			}
+		})
+	}
+}
+
 func TestCharacterFromString(t *testing.T) {
 	tests := []struct {
 		name    string

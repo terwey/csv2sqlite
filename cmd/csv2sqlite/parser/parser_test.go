@@ -1906,7 +1906,7 @@ func TestSplit(t *testing.T) {
 	}
 }
 
-func TestSplitRow(t *testing.T) {
+func TestParseRow(t *testing.T) {
 
 	// p.Delimiter = characters.Character_PIPE
 	// p.Enclosure = characters.Character_QUOTATION_MARK
@@ -1920,6 +1920,9 @@ func TestSplitRow(t *testing.T) {
 			p.Characters.SetDelimiter(tt.delimiter)
 			p.Characters.SetEnclosure(tt.enclosure)
 			r := NewRuntime(p, bufio.ScanLines)
+			// fake this
+			r.headerPrinted = true
+
 			if tt.colcount != 0 {
 				r.colCount = tt.colcount
 			} else {
@@ -1927,7 +1930,7 @@ func TestSplitRow(t *testing.T) {
 			}
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
-			if got := util.FlatToMulti(r.SplitRow(tt.args.data)); !cmp.Equal(got, tt.want) {
+			if got := util.FlatToMulti(r.ParseRow(tt.args.data)); !cmp.Equal(got, tt.want) {
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					for i := range got {
 						if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {

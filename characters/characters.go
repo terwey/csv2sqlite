@@ -99,6 +99,11 @@ func (c Character) Rune() rune {
 	return r
 }
 
+func (c Character) String() string {
+	r := c.Rune()
+	return string(r)
+}
+
 func stringValueForCharacter(d Character) string {
 	allChars := getAllCharacters()
 
@@ -126,7 +131,9 @@ func getNames(known []Character) []string {
 
 func detect(data []byte, known []Character) Character {
 	var highestCount int
-	var highestChar Character
+	highestChar := Character_EMPTY
+	var longestLen int
+	var longestChar Character
 	for _, char := range known {
 		if bytes.Compare(char, Character_EMPTY) == 0 {
 			continue
@@ -136,6 +143,17 @@ func detect(data []byte, known []Character) Character {
 			highestCount = count
 			highestChar = char
 		}
+		if count != 0 {
+			if length := len(char); length > longestLen {
+				longestLen = length
+				longestChar = char
+			}
+		}
+	}
+
+	// in the case a character is multiple its always that one
+	if longestLen > 1 {
+		return longestChar
 	}
 
 	return highestChar
