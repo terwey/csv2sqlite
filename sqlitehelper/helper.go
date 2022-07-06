@@ -154,7 +154,7 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 		return fmt.Errorf("Count(A): %w", err)
 	}
 
-	countB, err := Count(table, a)
+	countB, err := Count(table, b)
 	if err != nil {
 		return fmt.Errorf("Count(B): %w", err)
 	}
