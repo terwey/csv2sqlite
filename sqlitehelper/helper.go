@@ -4,14 +4,22 @@
 package sqlitehelper
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/productsupcom/go-sqlite-lite/sqlite3"
+
+	"github.com/schollz/progressbar/v3"
 )
+
+var pv *progressbar.ProgressBar
+var ProgressEnabled bool = false
 
 type TableInfo struct {
 	Cid        int
@@ -26,20 +34,56 @@ type Columns []*TableInfo
 
 func (c Columns) Names() []string {
 	var columns []string
+
 	for _, info := range c {
 		columns = append(columns, `"`+info.Name+`"`)
+	}
+
+	sort.SliceStable(columns, func(i, j int) bool {
+		return columns[i] < columns[j]
+	})
+
+	return columns
+}
+
+func (c Columns) RawNames() []string {
+	var columns []string
+	for _, info := range c {
+		columns = append(columns, info.Name)
 	}
 
 	return columns
 }
 
-func (c Columns) Query() string {
+func (c Columns) Query(table string, limit, offset int) string {
 	names := c.Names()
-	return "select " + strings.Join(names, ", ") + " from data order by " + strings.Join(names, ", ") + ";"
+	return QueryForIndexed(names, names, table, limit, offset)
 }
 
 func (c Columns) Count() int {
 	return len(c)
+}
+
+func QueryForIndexed(columns []string, order []string, table string, limit, offset int) string {
+	var s strings.Builder
+	s.WriteString("SELECT ")
+	s.WriteString(strings.Join(columns, ", "))
+	s.WriteString(" FROM ")
+	s.WriteString(table)
+	s.WriteString(" ORDER BY ")
+	s.WriteString(strings.Join(order, ", "))
+
+	if limit > 0 {
+		s.WriteString(" LIMIT ")
+		s.WriteString(strconv.Itoa(limit))
+	}
+
+	if offset > 0 {
+		s.WriteString(" OFFSET ")
+		s.WriteString(strconv.Itoa(offset))
+	}
+
+	return s.String()
 }
 
 func ColumnsForDB(name string, conn *sqlite3.Conn) (Columns, error) {
@@ -71,10 +115,6 @@ func ColumnsForDB(name string, conn *sqlite3.Conn) (Columns, error) {
 
 		table = append(table, info)
 	}
-
-	sort.SliceStable(table, func(i, j int) bool {
-		return table[i].Name < table[j].Name
-	})
 
 	return table, nil
 }
@@ -121,6 +161,30 @@ func CompareFiles(table, a, b string, null bool) error {
 //  NULL is automatically converted to an empty text field.
 //  If this is unwanted set null to be true.
 func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
+	if err := a.Exec("PRAGMA mmap_size=468435456"); err != nil {
+		return fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
+	if err := b.Exec("PRAGMA mmap_size=468435456"); err != nil {
+		return fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
+	if err := a.Exec("PRAGMA cache_size=-80000"); err != nil {
+		return fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
+	if err := b.Exec("PRAGMA cache_size=-80000"); err != nil {
+		return fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
+	if err := a.Exec("PRAGMA threads=8"); err != nil {
+		return fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
+	if err := b.Exec("PRAGMA threads=8"); err != nil {
+		return fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
 	namesA, err := ColumnsForDB("data", a)
 	if err != nil {
 		return fmt.Errorf("ColumnsForDB(A) err: %w", err)
@@ -134,20 +198,6 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 	if diff := cmp.Diff(namesA.Names(), namesB.Names()); diff != "" {
 		return fmt.Errorf("Compare() Columns mismatch (-a +b):\n%s", diff)
 	}
-
-	stmtA, err := a.Prepare(namesA.Query())
-	if err != nil {
-		return fmt.Errorf("Prepare(A): %w", err)
-	}
-
-	defer stmtA.Close()
-
-	stmtB, err := b.Prepare(namesB.Query())
-	if err != nil {
-		return fmt.Errorf("Prepare(B): %w", err)
-	}
-
-	defer stmtB.Close()
 
 	countA, err := Count(table, a)
 	if err != nil {
@@ -163,6 +213,64 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 		return fmt.Errorf("Rowcount for tables do not match. A: %d B: %d", countA, countB)
 	}
 
+	usedCols, err := AddIndex(table, namesA.RawNames(), a)
+	if err != nil {
+		return fmt.Errorf("AddIndex(A): %w", err)
+	}
+
+	log.Printf("usedCols: %s", usedCols)
+
+	usedCols, err = AddIndex(table, usedCols, b)
+	if err != nil {
+		return fmt.Errorf("AddIndex(B): %w", err)
+	}
+
+	log.Printf("PV enabled")
+	pv = progressbar.Default(int64(countA), "Comparing")
+	if !ProgressEnabled {
+		log.Printf("PV disabled")
+		pv = progressbar.NewOptions(countA, progressbar.OptionSetVisibility(false))
+	}
+
+	max := 20000
+
+	limit := 0
+	offset := 0
+	left := countA
+
+	for {
+		if left <= 0 {
+			break
+		}
+		if left > max {
+			limit = max
+		}
+
+		stmtA, err := a.Prepare(QueryForIndexed([]string{"*"}, usedCols, table, limit, offset))
+		if err != nil {
+			return fmt.Errorf("Prepare(A): %w", err)
+		}
+
+		stmtB, err := b.Prepare(QueryForIndexed([]string{"*"}, usedCols, table, limit, offset))
+		if err != nil {
+			return fmt.Errorf("Prepare(B): %w", err)
+		}
+
+		err = compareStmts(stmtA, stmtB, namesA.Count(), null)
+		if err != nil {
+			return fmt.Errorf("compareStmts: %w", err)
+		}
+
+		stmtA.Close()
+		stmtB.Close()
+		left -= max
+		offset += max
+	}
+
+	return nil
+}
+
+func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool) error {
 	for {
 		hasRowA, err := stmtA.Step()
 		if err != nil {
@@ -187,12 +295,13 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 			break
 		}
 
-		outA := make([]interface{}, 0, namesA.Count())
-		for i := range namesA.Names() {
+		outA := make([]interface{}, 0, cols)
+		for i := 0; i < cols; i++ {
 			val, ok, err := stmtA.ColumnText(i)
 			if err != nil {
 				return fmt.Errorf("ColumnRawBytes(A): %w", err)
 			}
+
 			// ok signifies column was not NULL
 			if ok {
 				outA = append(outA, val)
@@ -205,8 +314,8 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 			}
 		}
 
-		outB := make([]interface{}, 0, namesB.Count())
-		for i := range namesB.Names() {
+		outB := make([]interface{}, 0, cols)
+		for i := 0; i < cols; i++ {
 			val, ok, err := stmtB.ColumnText(i)
 			if err != nil {
 				return fmt.Errorf("ColumnRawBytes(B): %w", err)
@@ -226,9 +335,32 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 		if diff := cmp.Diff(outA, outB); diff != "" {
 			return fmt.Errorf("Compare() Rows mismatch (-a +b):\n%s", diff)
 		}
+
+		pv.Add(1)
 	}
 
 	return nil
+}
+
+func AddIndex(table string, columns []string, conn *sqlite3.Conn) (usedCols []string, err error) {
+	for i := 1; i <= len(columns); i++ {
+		usedCols = columns[:i]
+		sum := md5.Sum([]byte(strings.Join(usedCols, ",")))
+		hash := hex.EncodeToString(sum[:])
+		query := fmt.Sprintf("CREATE UNIQUE INDEX %s ON %s (%s);",
+			hash,
+			table,
+			strings.Join(usedCols, ","),
+		)
+		log.Printf("index query: %s", query)
+		err = conn.Exec(query)
+		if err == nil {
+			log.Printf("index %s created for columns: %s", hash, usedCols)
+			break
+		}
+	}
+
+	return
 }
 
 // Counts the amount of rows in the table for the specified conn
