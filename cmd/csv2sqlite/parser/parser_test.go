@@ -3,12 +3,16 @@ package parser
 import (
 	"bufio"
 	"bytes"
+	"log"
+	"os"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/util"
+	"github.com/schollz/progressbar/v3"
 )
 
 func Benchmark_SplitUnescapedDelimiter(b *testing.B) {
@@ -39,6 +43,7 @@ type TestData struct {
 	enclosure     characters.Character
 	colcount      int
 	optionalDelim bool
+	exclude       []int
 }
 
 func GetTests() []TestData {
@@ -59,6 +64,19 @@ func GetTests() []TestData {
 			},
 			delimiter: characters.Character_PIPE,
 			enclosure: characters.Character_QUOTATION_MARK,
+		},
+		{
+			name: "exclude col 2",
+			args: TestArgs{
+				data: []byte(`"ybj1","ybj2","ybj3"`),
+			},
+			want: [][]byte{
+				[]byte(`ybj1`),
+				[]byte(`ybj3`),
+			},
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+			exclude:   []int{1},
 		},
 		{
 			name: "one",
@@ -1826,6 +1844,7 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 			p := NewParameters()
 			p.Characters.SetDelimiter(tt.delimiter)
 			p.Characters.SetEnclosure(tt.enclosure)
+			p.Exclude = tt.exclude
 			r := NewRuntime(p, bufio.ScanLines)
 
 			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
@@ -1895,9 +1914,11 @@ func TestSplit(t *testing.T) {
 			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(bytes.Split(tt.args.data, p.Characters.Delimiter))); !cmp.Equal(got, tt.want) {
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					for i := range got {
-						// t.Logf("(%s)\nGot:\t%s\nWant:\t%s", tt.name, got[i], tt.want[i])
-						if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
-							t.Errorf("SplitUnescapedDelimiter() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+						if i < len(tt.want) {
+							// t.Logf("(%s)\nGot:\t%s\nWant:\t%s", tt.name, got[i], tt.want[i])
+							if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
+								t.Errorf("SplitUnescapedDelimiter() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+							}
 						}
 					}
 				}
@@ -1919,6 +1940,7 @@ func TestParseRow(t *testing.T) {
 			p := NewParameters()
 			p.Characters.SetDelimiter(tt.delimiter)
 			p.Characters.SetEnclosure(tt.enclosure)
+			p.Exclude = tt.exclude
 			r := NewRuntime(p, bufio.ScanLines)
 			// fake this
 			r.headerPrinted = true
@@ -1933,8 +1955,10 @@ func TestParseRow(t *testing.T) {
 			if got := util.FlatToMulti(r.ParseRow(tt.args.data)); !cmp.Equal(got, tt.want) {
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					for i := range got {
-						if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
-							t.Errorf("SplitRow() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+						if i < len(tt.want) {
+							if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
+								t.Errorf("SplitRow() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+							}
 						}
 					}
 
@@ -1942,4 +1966,60 @@ func TestParseRow(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRuntime(t *testing.T) {
+	debug.DebugLog = false
+	p := NewParameters()
+	p.Drop = true
+	r := NewRuntime(p, p.Characters.SplitCsvInput)
+
+	f, err := os.OpenFile("../../../tests/head.csv", os.O_RDONLY, 0644)
+	if err != nil {
+		t.Errorf("Cannot open file: %s", err)
+	}
+
+	defer f.Close()
+
+	r.Init(f)
+
+	pv := &progressbar.ProgressBar{}
+
+	var readWg sync.WaitGroup
+	var writeWg sync.WaitGroup
+	readWg.Add(1)
+	go r.Parse(&readWg, 5, pv)
+
+	if <-r.HeaderSet {
+		pr := NewParser(p, 1)
+		if err = pr.Init(nil); err != nil {
+			t.Error(err)
+		}
+		pr.ProcessHeader(r.Header)
+
+		writeWg.Add(1)
+
+		go func(chunks <-chan [][]byte, routine *Runtime, w *sync.WaitGroup) {
+			defer w.Done()
+			for {
+				chunk, more := <-chunks
+
+				for i := range chunk {
+					routine.ProcessRow(routine.ParseRow(chunk[i]))
+				}
+
+				if !more {
+					log.Printf("no moar")
+					break
+				}
+			}
+
+			routine.Close()
+
+			return
+		}(r.Data, pr, &writeWg)
+	}
+
+	readWg.Wait()
+	writeWg.Wait()
 }

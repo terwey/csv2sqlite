@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/util"
 	"github.com/terwey/recordwriter/recordwriter"
+	"github.com/schollz/progressbar/v3"
 )
 
 type Params struct {
@@ -61,6 +63,8 @@ func NewParameters() *Params {
 		Buffersize: 4096,
 		Input:      "",
 		Output:     "",
+
+		Limit: -1,
 
 		Characters: util.CharacterConfig{
 			Delimiter:      characters.Character_NIL,
@@ -310,24 +314,34 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 		return
 	}
 
-	if debug.Ultra {
+	// if r.p.RowID {
+	// TODO: if we want the rowid often, we need
+	// to be able to use the Ultra mode
+	// which requires the code to pass an integer
+	// to the sqlite C code
+	// 	// v, pos = util.RowIDToInteger(v, pos)
+	// }
+
+	if !r.p.RowID && debug.Ultra {
 		r.rw.Multibyte(v, pos, r.colCount)
 		r.Rows++
 		r.rw.EORMulti()
 		return
 	}
 
-	if !debug.Ultra {
-		cols := util.FlatToMulti(v, pos)
-		for i, col := range cols {
-			if len(col) == 0 {
-				r.rw.Skip()
-			} else {
-				r.rw.WriteByte(col)
+	cols := util.FlatToMulti(v, pos)
+	for i, col := range cols {
+		if len(col) == 0 {
+			r.rw.Skip()
+		} else {
+			if r.p.RowID && i == len(cols)-1 {
+				r.rw.Write(string(col))
+				continue
 			}
-			if i != len(cols)-1 {
-				r.rw.Next()
-			}
+			r.rw.WriteByte(col)
+		}
+		if i != len(cols)-1 {
+			r.rw.Next()
 		}
 	}
 
@@ -345,6 +359,7 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 	count := util.Count(data, r.p.Characters.Delimiter) + 1 - len(r.p.Exclude)
 	if r.colCount == count {
 		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+		return
 	}
 
 	// r.colCount is set to non-zero on header creation
@@ -579,4 +594,122 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 	// r.debug("columns: %d", len(columns))
 
 	return
+}
+
+func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.ProgressBar) {
+	var err error
+	// var buf []byte
+	var delimSet bool
+	var enclosureSet bool
+	if r.p.Characters.Delimiter != nil {
+		delimSet = true
+	}
+	if r.p.Characters.Enclosure != nil {
+		enclosureSet = true
+	}
+	scanner := r.GetScanner()
+
+	var chunks [][]byte
+	chunks = make([][]byte, 0, chunkCount)
+	var chunk []byte
+
+	// used for p.Start
+	startCounter := 0
+
+	// used for p.Skip
+	skipCounter := 0
+
+	count := 0
+
+	// amount of bytes the chunksize is occupying
+	var chunksSize int
+	for scanner.Scan() {
+		if err = scanner.Err(); err != nil {
+			close(r.Data)
+			wg.Done()
+			log.Fatal(err)
+		}
+
+		if r.p.Start > 0 && startCounter < r.p.Start {
+			startCounter++
+			if startCounter <= r.p.Start {
+				continue
+			}
+		}
+
+		if r.p.Skip > 0 && count != 0 && skipCounter < r.p.Skip {
+			skipCounter++
+			if skipCounter <= r.p.Skip {
+				continue
+			}
+		}
+
+		if count != 0 && r.p.Limit == count-1 {
+			break
+		}
+
+		size := len(scanner.Bytes())
+		chunk = make([]byte, size)
+		copy(chunk, scanner.Bytes())
+		chunksSize += size
+		// if no delimiter was set we detect it once
+		if !delimSet {
+			r.p.Characters.SetDelimiter(characters.DetectDelimiter(chunk))
+			delimSet = true
+		}
+
+		if !enclosureSet {
+			r.p.Characters.SetEnclosure(characters.DetectEnclosure(chunk))
+			enclosureSet = true
+		}
+
+		// header has to be set once
+		if r.p.Characters.DelimiterCount == 0 {
+			// we have to count the delimiters in the header to know for row scanning
+			// how many fields we need
+			r.p.Characters.DelimiterCount = bytes.Count(chunk, r.p.Characters.Delimiter)
+		}
+
+		// log.Printf("chunk: ---\n%s\n---\n", chunk)
+
+		// we have to process a header once
+		if count == 0 {
+			r.ParseRow(chunk)
+			count++
+			continue
+		}
+
+		if len(chunks) >= chunkCount {
+			r.Data <- chunks
+			pv.Add(chunksSize)
+			chunksSize = 0
+			chunks = make([][]byte, 0, chunkCount)
+		}
+
+		if r.p.RowID {
+			// we have to make this a user configurable switch
+			chunk = append(chunk, r.p.Characters.Delimiter...)
+			chunk = append(chunk, r.p.Characters.Enclosure...)
+			chunk = append(chunk, []byte(strconv.Itoa(count))...)
+			chunk = append(chunk, r.p.Characters.Enclosure...)
+		}
+		chunks = append(chunks, chunk)
+		count++
+	}
+
+	if err = scanner.Err(); err != nil {
+		close(r.Data)
+		wg.Done()
+		log.Fatal(err)
+	}
+
+	if len(chunks) != 0 {
+		// send over the last chunks
+		r.Data <- chunks
+		chunks = make([][]byte, 0)
+	}
+
+	close(r.Data)
+	pv.Finish()
+	wg.Done()
 }

@@ -19,6 +19,9 @@ var (
 	table string
 	null  bool
 	write bool
+
+	showProgress bool
+	// pv           *progressbar.ProgressBar
 )
 
 func init() {
@@ -32,6 +35,7 @@ func init() {
 		"If this is unwanted set null to be true.")
 	flags.BoolVar(&write, "write-results", false, "Writes a result file.\n $a.passed when no "+
 		"difference was found.\n $a.failed when a difference was found, file will contain the error.")
+	flags.BoolVar(&showProgress, "progress", false, "Shows progress")
 
 }
 
@@ -63,6 +67,8 @@ func main() {
 	if a == b {
 		log.Fatalf("A (%s) and B (%s) are the same file", a, b)
 	}
+
+	sqlitehelper.ProgressEnabled = showProgress
 
 	err := sqlitehelper.CompareFiles("data", a, b, null)
 	if err != nil {

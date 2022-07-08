@@ -5,7 +5,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -19,8 +18,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"strconv"
 
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
@@ -71,6 +68,8 @@ var (
 	minversion = "undefined"
 
 	overflow = false
+
+	quiet = false
 )
 
 func init() {
@@ -103,6 +102,7 @@ func init() {
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
 	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
+	flags.BoolVarP(&quiet, "quiet", "q", false, "Quiet mode do not output performance data")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
 	flags.BoolVar(&p.RowID, "rowid", false, "When the order of the CSV file must be kept the same in the resulting SQLite, this flag will \n"+
 		"cause each row in the SQLite to receive a RowID for SQLite.")
@@ -316,7 +316,7 @@ func main() {
 	// readWg is used for the main scanner loop and also for the header initialization
 	var readWg sync.WaitGroup
 	readWg.Add(1)
-	go parse(r, &readWg, chunksize, pv)
+	go r.Parse(&readWg, chunksize, pv)
 
 	var parserCount int
 	var threadWorkers sync.WaitGroup
@@ -375,7 +375,7 @@ func main() {
 
 				threadWorkers.Add(1)
 				go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
-					routine *parser.Runtime, readRuntime *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
+					routine *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
 
 					signal := false
 					rowCount := 0
@@ -411,7 +411,7 @@ func main() {
 						stopWorkers <- true
 					}
 					return
-				}(r.Data, &threadWorkers, sem, pr, r, readyForMerge, stop, inserted)
+				}(r.Data, &threadWorkers, sem, pr, readyForMerge, stop, inserted)
 			}
 		}
 	}
@@ -436,137 +436,29 @@ func main() {
 
 	pv.Clear()
 
-	if logHeader == 1 {
-		fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader, capacity\n")
-	}
 	merged := <-mergeElapsed
-	fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d, %d\n",
-		totalTime.Round(time.Millisecond),
-		conversionElapsed.Round(time.Millisecond),
-		merged.Round(time.Millisecond),
-		insertedRows,
-		ops.Round(time.Microsecond),
-		math.Floor(rows),
-		threads,
-		p.Characters.Enclosure.Name(),
-		p.Characters.Delimiter.Name(),
-		chunksize,
-		p.Buffersize/1024,
-		p.CommitRate,
-		stopCount,
-		p.ChannelCapacity,
-		r.RowsCSV,
-		chunksize*p.ChannelCapacity*threads,
-	)
-}
+	if !quiet {
+		if logHeader == 1 {
+			fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader, capacity\n")
+		}
 
-func parse(r *parser.Runtime, wg *sync.WaitGroup, chunkCount int, pv *progressbar.ProgressBar) {
-	var err error
-	// var buf []byte
-	var delimSet bool
-	var enclosureSet bool
-	if p.Characters.Delimiter != nil {
-		delimSet = true
+		fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d, %d\n",
+			totalTime.Round(time.Millisecond),
+			conversionElapsed.Round(time.Millisecond),
+			merged.Round(time.Millisecond),
+			insertedRows,
+			ops.Round(time.Microsecond),
+			math.Floor(rows),
+			threads,
+			p.Characters.Enclosure.Name(),
+			p.Characters.Delimiter.Name(),
+			chunksize,
+			p.Buffersize/1024,
+			p.CommitRate,
+			stopCount,
+			p.ChannelCapacity,
+			r.RowsCSV,
+			chunksize*p.ChannelCapacity*threads,
+		)
 	}
-	if p.Characters.Enclosure != nil {
-		enclosureSet = true
-	}
-	scanner := r.GetScanner()
-
-	var chunks [][]byte
-	chunks = make([][]byte, 0, chunkCount)
-	var chunk []byte
-
-	// used for p.Start
-	startCounter := 0
-
-	// used for p.Skip
-	skipCounter := 0
-
-	count := 0
-	var chunksSize int
-	for scanner.Scan() {
-		if err = scanner.Err(); err != nil {
-			close(r.Data)
-			wg.Done()
-			log.Fatal(err)
-		}
-
-		if p.Start > 0 && startCounter < p.Start {
-			startCounter++
-			if startCounter <= p.Start {
-				continue
-			}
-		}
-
-		if p.Skip > 0 && count != 0 && skipCounter < p.Skip {
-			skipCounter++
-			if skipCounter <= p.Skip {
-				continue
-			}
-		}
-
-		if count != 0 && p.Limit == count-1 {
-			break
-		}
-
-		size := len(scanner.Bytes())
-		chunk = make([]byte, size)
-		copy(chunk, scanner.Bytes())
-		chunksSize += size
-		// if no delimiter was set we detect it once
-		if !delimSet {
-			p.Characters.SetDelimiter(characters.DetectDelimiter(chunk))
-			delimSet = true
-		}
-
-		if !enclosureSet {
-			p.Characters.SetEnclosure(characters.DetectEnclosure(chunk))
-			enclosureSet = true
-		}
-
-		// header has to be set once
-		if p.Characters.DelimiterCount == 0 {
-			// we have to count the delimiters in the header to know for row scanning
-			// how many fields we need
-			p.Characters.DelimiterCount = bytes.Count(chunk, p.Characters.Delimiter)
-		}
-
-		// we have to process a header once
-		if count == 0 {
-			r.ParseRow(chunk)
-			count++
-			continue
-		}
-
-		if len(chunks) >= chunkCount {
-			r.Data <- chunks
-			pv.Add(chunksSize)
-			chunksSize = 0
-			chunks = make([][]byte, 0, chunkCount)
-		}
-
-		if p.RowID {
-			// we have to make this a user configurable switch
-			chunk = append(chunk, p.Characters.Delimiter...)
-			chunk = append(chunk, p.Characters.Enclosure...)
-			chunk = append(chunk, []byte(strconv.Itoa(count))...)
-			chunk = append(chunk, p.Characters.Enclosure...)
-		}
-		chunks = append(chunks, chunk)
-		count++
-	}
-
-	if err = scanner.Err(); err != nil {
-		close(r.Data)
-		wg.Done()
-		log.Fatal(err)
-	}
-
-	// send over the last chunks
-	r.Data <- chunks
-
-	close(r.Data)
-	pv.Finish()
-	wg.Done()
 }
