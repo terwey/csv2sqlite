@@ -45,6 +45,14 @@ func Test_main(t *testing.T) {
 			want:      baseDir + "tests/528874.sqlite",
 			debug:     true,
 		},
+		{
+			name:      "emoji",
+			input:     baseDir + "tests/emoji.csv",
+			output:    tmpDir + "emoji.sqlite",
+			want:      baseDir + "tests/emoji.sqlite",
+			enclosure: []byte("🍆"),
+			delimiter: []byte("💦"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

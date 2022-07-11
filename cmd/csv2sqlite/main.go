@@ -45,7 +45,7 @@ var (
 	paramEnclosure string
 	newline        string
 
-	p *parser.Params
+	p = parser.NewParameters()
 	r *parser.Runtime
 
 	showProgress bool
@@ -72,8 +72,7 @@ var (
 	quiet = false
 )
 
-func init() {
-	p = parser.NewParameters()
+func main() {
 	flags = pflag.NewFlagSet("csv2sqlite", pflag.ContinueOnError)
 	flags.BoolVar(&showVersion, "version", false, "Prints the version")
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
@@ -117,9 +116,7 @@ func init() {
 	}
 	flags.BoolVar(&overflow, "overflow", false, "Overflows the data. Will abort processing.")
 	flags.SortFlags = false
-}
 
-func main() {
 	start := time.Now()
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		if err != pflag.ErrHelp {

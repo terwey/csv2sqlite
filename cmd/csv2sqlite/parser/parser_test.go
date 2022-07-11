@@ -127,6 +127,19 @@ func GetTests() []TestData {
 			optionalDelim: true,
 		},
 		{
+			name: "emoji as delimiter and enclosure",
+			args: TestArgs{
+				data: []byte(`🍆ybj1🍆💦🍆ybj2🍆`),
+			},
+			want: [][]byte{
+				[]byte(`ybj1`),
+				[]byte(`ybj2`),
+			},
+			optionalDelim: false,
+			enclosure:     []byte("🍆"),
+			delimiter:     []byte("💦"),
+		},
+		{
 			name: "comma_in_quotes.csv",
 
 			args: TestArgs{

@@ -213,22 +213,20 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 		return fmt.Errorf("Rowcount for tables do not match. A: %d B: %d", countA, countB)
 	}
 
-	usedCols, err := AddIndex(table, namesA.RawNames(), a)
+	usedCols, indexNameA, err := AddIndex(table, namesA.RawNames(), a)
 	if err != nil {
 		return fmt.Errorf("AddIndex(A): %w", err)
 	}
 
 	log.Printf("usedCols: %s", usedCols)
 
-	usedCols, err = AddIndex(table, usedCols, b)
+	_, indexNameB, err := AddIndex(table, usedCols, b)
 	if err != nil {
 		return fmt.Errorf("AddIndex(B): %w", err)
 	}
 
-	log.Printf("PV enabled")
 	pv = progressbar.Default(int64(countA), "Comparing")
 	if !ProgressEnabled {
-		log.Printf("PV disabled")
 		pv = progressbar.NewOptions(countA, progressbar.OptionSetVisibility(false))
 	}
 
@@ -258,6 +256,12 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 
 		err = compareStmts(stmtA, stmtB, namesA.Count(), null)
 		if err != nil {
+			if err := RemoveIndex(indexNameA, a); err != nil {
+				return fmt.Errorf("RemoveIndex(A): %w", err)
+			}
+			if err := RemoveIndex(indexNameB, b); err != nil {
+				return fmt.Errorf("RemoveIndex(B): %w", err)
+			}
 			return fmt.Errorf("compareStmts: %w", err)
 		}
 
@@ -265,6 +269,13 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 		stmtB.Close()
 		left -= max
 		offset += max
+	}
+
+	if err := RemoveIndex(indexNameA, a); err != nil {
+		return fmt.Errorf("RemoveIndex(A): %w", err)
+	}
+	if err := RemoveIndex(indexNameB, b); err != nil {
+		return fmt.Errorf("RemoveIndex(B): %w", err)
 	}
 
 	return nil
@@ -342,25 +353,30 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool) error {
 	return nil
 }
 
-func AddIndex(table string, columns []string, conn *sqlite3.Conn) (usedCols []string, err error) {
+func AddIndex(table string, columns []string, conn *sqlite3.Conn) (usedCols []string, hash string, err error) {
 	for i := 1; i <= len(columns); i++ {
 		usedCols = columns[:i]
 		sum := md5.Sum([]byte(strings.Join(usedCols, ",")))
-		hash := hex.EncodeToString(sum[:])
+		hash = hex.EncodeToString(sum[:])
 		query := fmt.Sprintf("CREATE UNIQUE INDEX %s ON %s (%s);",
 			hash,
 			table,
 			strings.Join(usedCols, ","),
 		)
-		log.Printf("index query: %s", query)
 		err = conn.Exec(query)
 		if err == nil {
 			log.Printf("index %s created for columns: %s", hash, usedCols)
-			break
+			return
 		}
 	}
 
 	return
+}
+
+func RemoveIndex(indexname string, conn *sqlite3.Conn) error {
+	log.Printf("removing index: %s", indexname)
+	query := fmt.Sprintf("DROP INDEX %s;", indexname)
+	return conn.Exec(query)
 }
 
 // Counts the amount of rows in the table for the specified conn
