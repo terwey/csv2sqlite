@@ -70,17 +70,39 @@ func QueryForIndexed(columns []string, order []string, table string, limit, offs
 	s.WriteString(strings.Join(columns, ", "))
 	s.WriteString(" FROM ")
 	s.WriteString(table)
-	s.WriteString(" ORDER BY ")
-	s.WriteString(strings.Join(order, ", "))
+	if len(order) > 0 {
+		s.WriteString(" ORDER BY ")
+		s.WriteString(strings.Join(order, ", "))
 
-	if limit > 0 {
-		s.WriteString(" LIMIT ")
-		s.WriteString(strconv.Itoa(limit))
-	}
+		if limit > 0 {
+			s.WriteString(" LIMIT ")
+			s.WriteString(strconv.Itoa(limit))
+		}
 
-	if offset > 0 {
-		s.WriteString(" OFFSET ")
-		s.WriteString(strconv.Itoa(offset))
+		if offset > 0 {
+			s.WriteString(" OFFSET ")
+			s.WriteString(strconv.Itoa(offset))
+		}
+	} else {
+		// this can only be used when NOT using an order by
+		// https://stackoverflow.com/questions/12266025/sqlite-query-optimization-using-limit-and-offset
+		// sqlite is slow using offset and limit
+		// we always have a rowid :)
+
+		if offset > 0 {
+			s.WriteString(" WHERE rowid >= ")
+			s.WriteString(strconv.Itoa(offset))
+		}
+
+		if limit > 0 {
+			if offset != 0 {
+				s.WriteString(" AND ")
+			} else {
+				s.WriteString(" WHERE ")
+			}
+			s.WriteString(" rowid < ")
+			s.WriteString(strconv.Itoa(limit + offset))
+		}
 	}
 
 	return s.String()
