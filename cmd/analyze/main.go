@@ -390,12 +390,13 @@ func detectColumnType(v string) (ct ColumnType) {
 		return
 	}
 
-	if gtin.IsGTIN(v) {
-		ct = ColumnType_GTIN
-		return
-	}
+	if !strings.Contains(v, "/") &&
+		(strings.ContainsAny(v[0:1], "0123456789-") && strings.ContainsAny(v[len(v)-1:], "0123456789")) {
+		if gtin.IsGTIN(v) {
+			ct = ColumnType_GTIN
+			return
+		}
 
-	if strings.ContainsAny(v, "0123456789") {
 		_, err := strconv.ParseInt(v, 10, 64)
 		if err == nil {
 			ct = ColumnType_Number
@@ -412,6 +413,14 @@ func detectColumnType(v string) (ct ColumnType) {
 		if err == nil {
 			ct = ColumnType_Number
 			return
+		}
+
+		if strings.Contains(v, ",") {
+			_, err = strconv.ParseFloat(strings.Replace(v, ",", ".", 1), 64)
+			if err == nil {
+				ct = ColumnType_Number
+				return
+			}
 		}
 	}
 
