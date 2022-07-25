@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +21,8 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/pflag"
 	"golang.org/x/sync/semaphore"
+
+	gtin "github.com/godofdream/go-gtin"
 )
 
 var (
@@ -34,6 +37,7 @@ var (
 	threads int = runtime.NumCPU()
 
 	showProgress bool
+	traceprofile string
 
 	pv *progressbar.ProgressBar
 )
@@ -47,6 +51,7 @@ func init() {
 	flags.BoolVar(&showProgress, "progress", false, "Shows progress")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
+	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
 	flags.IntVar(&threads, "threads", threads, "Threads to use, default is set to the amount of cores")
 	flags.IntVar(&max, "max", max, "Maximum amount of rows to fetch")
 
@@ -130,10 +135,8 @@ func (s *Statistics) String() string {
 	return b.String()
 }
 
-func (s *Statistics) Add(ci ColumnInfo) {
+func (s *Statistics) Add(ci *ColumnInfo) {
 	s.data[ci.Pos].mutex.Lock()
-	atomic.AddUint64(&s.data[ci.Pos].AverageLengthSum, ci.Length)
-
 	_, ok := s.data[ci.Pos].LengthDistribution[length(ci.Length)]
 	if !ok {
 		s.data[ci.Pos].LengthDistribution[length(ci.Length)] = new(uint64)
@@ -150,6 +153,8 @@ func (s *Statistics) Add(ci ColumnInfo) {
 	if ci.ColumnType == ColumnType_Empty {
 		atomic.AddUint64(&s.data[ci.Pos].EmptyValues, 1)
 	}
+
+	atomic.AddUint64(&s.data[ci.Pos].AverageLengthSum, ci.Length)
 }
 
 func (s *Statistics) Calculate() {
@@ -213,6 +218,15 @@ func main() {
 		defer pprof.WriteHeapProfile(f)
 	}
 
+	if traceprofile != "" {
+		f, err := os.Create(traceprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		trace.Start(f)
+		defer trace.Stop()
+	}
+
 	conn, err := sqlite3.Open(input)
 	if err != nil {
 		log.Fatalf("Cannot open %s: %s", input, err)
@@ -230,7 +244,7 @@ func main() {
 
 	stats := NewStatistics(names)
 
-	count, err := sqlitehelper.Count(table, conn)
+	count, err := sqlitehelper.Count(table, conn, true)
 	if err != nil {
 		log.Fatalf("Count: %s", err)
 	}
@@ -245,15 +259,11 @@ func main() {
 	sem := semaphore.NewWeighted(int64(threads))
 	ctx := context.Background()
 
-	// max := 10000
-
 	limit := 0
 	offset := 0
 	left := count
 
 	var iterations int64 = 0
-
-	// var results [][]ColumnInfo
 
 	for {
 		if err := sem.Acquire(ctx, 1); err != nil {
@@ -327,8 +337,8 @@ func main() {
 	log.Printf("stats: \n%s\n", stats)
 }
 
-func analyzeColumn(data interface{}, pos int) ColumnInfo {
-	r := ColumnInfo{
+func analyzeColumn(data interface{}, pos int) *ColumnInfo {
+	r := &ColumnInfo{
 		Pos: pos,
 	}
 	if data == nil {
@@ -380,7 +390,10 @@ func detectColumnType(v string) (ct ColumnType) {
 		return
 	}
 
-	// TODO: add GTIN
+	if gtin.IsGTIN(v) {
+		ct = ColumnType_GTIN
+		return
+	}
 
 	if strings.ContainsAny(v, "0123456789") {
 		_, err := strconv.ParseInt(v, 10, 64)

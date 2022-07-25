@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/terwey/csv2sqlite/characters"
-	"github.com/terwey/csv2sqlite/sqlitehelper"
+	"github.com/terwey/csv2sqlite/sqlitehelper/compare"
 	"github.com/terwey/csv2sqlite/util"
 )
 
@@ -88,7 +88,7 @@ func Test_main(t *testing.T) {
 			main()
 
 			if tt.want != "" {
-				if err := sqlitehelper.CompareFiles("data", tt.output, tt.want, tt.null); err != nil {
+				if err := compare.CompareFiles("data", tt.output, tt.want, tt.null); err != nil {
 					t.Errorf("CompareFiles() %s: error: %s", tt.name, err)
 				}
 

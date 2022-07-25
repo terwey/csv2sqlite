@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/godofdream/go-gtin v0.0.0-20180427093133-396fa569836e // indirect
 	github.com/mattn/go-runewidth v0.0.10 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
