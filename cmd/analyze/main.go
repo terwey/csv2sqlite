@@ -11,18 +11,15 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
-	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/productsupcom/go-sqlite-lite/sqlite3"
+	st "github.com/terwey/csv2sqlite/cmd/analyze/stats"
 	"github.com/terwey/csv2sqlite/sqlitehelper"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/pflag"
 	"golang.org/x/sync/semaphore"
-
-	gtin "github.com/godofdream/go-gtin"
 )
 
 var (
@@ -38,6 +35,8 @@ var (
 
 	showProgress bool
 	traceprofile string
+
+	wasmModule string
 
 	pv *progressbar.ProgressBar
 )
@@ -55,141 +54,8 @@ func init() {
 	flags.IntVar(&threads, "threads", threads, "Threads to use, default is set to the amount of cores")
 	flags.IntVar(&max, "max", max, "Maximum amount of rows to fetch")
 
-}
+	flags.StringVar(&wasmModule, "wasm-module", "", "Filename for a WASM module to use to Analyze")
 
-type ColumnType int
-
-const (
-	ColumnType_UNDEFINED ColumnType = iota
-	ColumnType_Text
-	ColumnType_Number
-	ColumnType_URL
-	ColumnType_Image
-	ColumnType_GTIN
-	ColumnType_Empty
-)
-
-func (ct ColumnType) String() string {
-	switch ct {
-	case ColumnType_UNDEFINED:
-		return "UNDEFINED"
-	case ColumnType_Text:
-		return "Text"
-	case ColumnType_Number:
-		return "Number"
-	case ColumnType_URL:
-		return "URL"
-	case ColumnType_Image:
-		return "Image"
-	case ColumnType_GTIN:
-		return "GTIN"
-	case ColumnType_Empty:
-		return "Empty"
-
-	}
-
-	return "UNDEFINED"
-}
-
-type ColumnInfo struct {
-	Length     uint64
-	ColumnType ColumnType
-
-	// the position of the column in the name slice
-	Pos int
-}
-
-func (r ColumnInfo) String() string {
-	return fmt.Sprintf("Length: %d, Type: %s", r.Length, r.ColumnType)
-}
-
-type length uint64
-
-type Statistics struct {
-	// every column will have a Stat in the slice
-	// the order is the same as the name slice
-	data []*Stat
-	rows uint64
-}
-
-func NewStatistics(names []string) *Statistics {
-	s := &Statistics{}
-	for _, name := range names {
-		s.data = append(s.data, &Stat{
-			Name:               name,
-			AverageLengthSum:   0,
-			LengthDistribution: make(map[length]*uint64),
-			ColumnTypes:        make(map[ColumnType]*uint64),
-			EmptyValues:        0,
-		})
-	}
-	return s
-}
-
-func (s *Statistics) String() string {
-	var b strings.Builder
-	for _, stat := range s.data {
-		b.WriteString(stat.String())
-		b.WriteString("\n")
-	}
-	return b.String()
-}
-
-func (s *Statistics) Add(ci *ColumnInfo) {
-	s.data[ci.Pos].mutex.Lock()
-	_, ok := s.data[ci.Pos].LengthDistribution[length(ci.Length)]
-	if !ok {
-		s.data[ci.Pos].LengthDistribution[length(ci.Length)] = new(uint64)
-	}
-	atomic.AddUint64(s.data[ci.Pos].LengthDistribution[length(ci.Length)], 1)
-
-	_, ok = s.data[ci.Pos].ColumnTypes[ci.ColumnType]
-	if !ok {
-		s.data[ci.Pos].ColumnTypes[ci.ColumnType] = new(uint64)
-	}
-	atomic.AddUint64(s.data[ci.Pos].ColumnTypes[ci.ColumnType], 1)
-	s.data[ci.Pos].mutex.Unlock()
-
-	if ci.ColumnType == ColumnType_Empty {
-		atomic.AddUint64(&s.data[ci.Pos].EmptyValues, 1)
-	}
-
-	atomic.AddUint64(&s.data[ci.Pos].AverageLengthSum, ci.Length)
-}
-
-func (s *Statistics) Calculate() {
-	for i := range s.data {
-		sum := s.data[i].AverageLengthSum
-		s.data[i].AverageLength = float64(sum) / float64(s.rows)
-	}
-}
-
-// every Column will have a Stat struct
-type Stat struct {
-	Name string
-
-	// contains all the lengths of all rows summed together
-	AverageLengthSum uint64
-
-	// the resulting average length
-	AverageLength float64
-
-	// for every length a counter is kept
-	LengthDistribution map[length]*uint64
-
-	// counter for every columntype occurance
-	ColumnTypes map[ColumnType]*uint64
-
-	// counter for empty values
-	EmptyValues uint64
-
-	// mutex for the maps
-	mutex sync.Mutex
-}
-
-func (s *Stat) String() string {
-	return fmt.Sprintf("[%s]: \tAverageLength: %f, Counts: (LengthDistribution: %d, ColumnType: %d, Empty: %d",
-		s.Name, s.AverageLength, len(s.LengthDistribution), len(s.ColumnTypes), s.EmptyValues)
 }
 
 func main() {
@@ -227,6 +93,67 @@ func main() {
 		defer trace.Stop()
 	}
 
+	/*
+		if len(wasmModule) != 0 {
+			log.Printf("using wasm module: %s", wasmModule)
+			wasmBytes, err := ioutil.ReadFile(wasmModule)
+			if err != nil {
+				log.Fatalf("error reading wasm file from disk: %s", err)
+			}
+
+			engine := wasmer.NewEngine()
+			store := wasmer.NewStore(engine)
+
+			// Compiles the module
+			module, err := wasmer.NewModule(store, wasmBytes)
+			if err != nil {
+				log.Fatalf("error compiling wasm module: %s", err)
+			}
+
+			wasiEnv, err := wasmer.NewWasiStateBuilder("wasi-program").Finalize()
+			if err != nil {
+				log.Fatalf("error creating WASI Env for wasm module: %s", err)
+			}
+
+			importObject, err := wasiEnv.GenerateImportObject(store, module)
+			if err != nil {
+				log.Fatalf("error generating import object for wasm module: %s", err)
+			}
+
+			// // Instantiates the module
+			// importObject := wasmer.NewImportObject()
+			instance, err := wasmer.NewInstance(module, importObject)
+			if err != nil {
+				log.Fatalf("error creating instance for wasm module: %s", err)
+			}
+
+			// start, err := instance.Exports.GetWasiStartFunction()
+			// if err != nil {
+			// 	log.Fatalf("error getting WASI Start function: %s", err)
+			// }
+
+			// foo, err := start()
+			// if err != nil {
+			// 	log.Fatalf("error calling WASI start func: %s", err)
+			// }
+
+			// log.Printf("foo contains: %v", foo)
+
+			// Gets the `sum` exported function from the WebAssembly instance.
+			wasmAnalyze, err := instance.Exports.GetFunction("analyzeColumn")
+			if err != nil {
+				log.Fatalf("error getting function from wasm module: %s", err)
+			}
+
+			ci, err := wasmAnalyze("foo", 1, 3, 4)
+			if err != nil {
+				log.Fatalf("wasmAnalyze: %s", err)
+			}
+
+			log.Printf("ci: %v", ci)
+		}
+	*/
+
 	conn, err := sqlite3.Open(input)
 	if err != nil {
 		log.Fatalf("Cannot open %s: %s", input, err)
@@ -242,7 +169,7 @@ func main() {
 	colCount := cols.Count()
 	names := cols.RawNames()
 
-	stats := NewStatistics(names)
+	stats := st.NewStatistics(names)
 
 	count, err := sqlitehelper.Count(table, conn, true)
 	if err != nil {
@@ -265,6 +192,16 @@ func main() {
 
 	var iterations int64 = 0
 
+	var providerWg sync.WaitGroup
+	provider := make(chan *st.Statistics, threads*10)
+	providerWg.Add(1)
+	go func(mainstats *st.Statistics, provider chan *st.Statistics, wg *sync.WaitGroup) {
+		defer wg.Done()
+		for in := range provider {
+			mainstats.Merge(in)
+		}
+	}(stats, provider, &providerWg)
+
 	for {
 		if err := sem.Acquire(ctx, 1); err != nil {
 			log.Printf("Cannot acquire semaphore")
@@ -279,19 +216,21 @@ func main() {
 		}
 
 		wg.Add(1)
-		go func(stats *Statistics, w *sync.WaitGroup, sem *semaphore.Weighted, limit, offset int, pv *progressbar.ProgressBar, iter *int64) {
+		go func(provider chan<- *st.Statistics, w *sync.WaitGroup, sem *semaphore.Weighted, limit, offset int, pv *progressbar.ProgressBar, iter *int64) {
 			conn, err := sqlite3.Open(input)
 			if err != nil {
 				log.Fatalf("Cannot open %s: %s", input, err)
 			}
 			defer conn.Close()
-			// log.Printf("preparing: %d limit %d offset", limit, offset)
+
 			stmt, err := conn.Prepare(sqlitehelper.QueryForIndexed([]string{"*"}, nil, table, limit, offset))
 			if err != nil {
 				log.Fatalf("Prepare: %s", err)
 			}
 
 			defer stmt.Close()
+
+			stat := st.NewStatistics(names)
 
 			for {
 				more, err := stmt.Step()
@@ -309,16 +248,17 @@ func main() {
 						log.Fatalf("ColumnRawString: %s", err)
 					}
 
-					stats.Add(analyzeColumn(val, i))
+					stat.Add(AnalyzeColumn(val, i))
 				}
 
 				pv.Add(1)
 				atomic.AddInt64(iter, 1)
 			}
 
+			provider <- stat
 			w.Done()
 			sem.Release(1)
-		}(stats, &wg, sem, limit, offset, pv, &iterations)
+		}(provider, &wg, sem, limit, offset, pv, &iterations)
 
 		//           					   5591303 takes 0m28.078s
 		// if atomic.LoadInt64(&iterations) > 200000 {
@@ -330,20 +270,50 @@ func main() {
 	}
 
 	wg.Wait()
+	close(provider)
+	providerWg.Wait()
 
 	// TODO: the count should be equal to iter
-	stats.rows = uint64(iterations)
+	stats.Rows = uint64(iterations)
 	stats.Calculate()
 	log.Printf("stats: \n%s\n", stats)
 }
 
-func analyzeColumn(data interface{}, pos int) *ColumnInfo {
-	r := &ColumnInfo{
+func fanIn(chans ...<-chan st.ColumnInfo) <-chan st.ColumnInfo {
+	out := make(chan st.ColumnInfo, 10)
+	var wg sync.WaitGroup
+	wg.Add(len(chans))
+
+	for _, c := range chans {
+		go func(workerChannel <-chan st.ColumnInfo, wg *sync.WaitGroup) {
+			for r := range workerChannel {
+				out <- r
+			}
+			wg.Done()
+		}(c, &wg)
+	}
+	go func(wg *sync.WaitGroup) {
+		wg.Wait()
+		close(out)
+	}(&wg)
+
+	return out
+}
+
+func AnalyzeColumn(data interface{}, pos int) *st.ColumnInfo {
+	// disk read test
+	// return &ColumnInfo{
+	// 	Pos:        pos,
+	// 	ColumnType: ColumnType_Number,
+	// 	Length:     10,
+	// }
+
+	r := &st.ColumnInfo{
 		Pos: pos,
 	}
 	if data == nil {
 		r.Length = 0
-		r.ColumnType = ColumnType_Empty
+		r.ColumnType = st.ColumnType_Empty
 
 		return r
 	}
@@ -351,81 +321,33 @@ func analyzeColumn(data interface{}, pos int) *ColumnInfo {
 	if v, ok := data.(string); ok {
 		r.Length = uint64(len(v))
 		if r.Length == 0 {
-			r.ColumnType = ColumnType_Empty
+			r.ColumnType = st.ColumnType_Empty
 			return r
 		} else {
-			r.ColumnType = detectColumnType(v)
+			r.ColumnType = st.DetectColumnType(v)
 		}
 	}
 
 	if v, ok := data.(sqlite3.RawString); ok {
 		r.Length = uint64(len(v))
 		if r.Length == 0 {
-			r.ColumnType = ColumnType_Empty
+			r.ColumnType = st.ColumnType_Empty
 			return r
 		} else {
-			r.ColumnType = detectColumnType(string(v))
+			r.ColumnType = st.DetectColumnType(string(v))
 		}
 	}
 
 	return r
 }
 
-func detectColumnType(v string) (ct ColumnType) {
-	if strings.HasPrefix(v, "http://") ||
-		strings.HasPrefix(v, "https://") {
-		ct = ColumnType_URL
-	}
+// type SQLiteConn struct {
+// 	*sqlite3.Conn
+// }
 
-	if strings.HasSuffix(v, "jpg") ||
-		strings.HasSuffix(v, "jpeg") ||
-		strings.HasSuffix(v, "png") ||
-		strings.HasSuffix(v, "gif") ||
-		strings.HasSuffix(v, "bmp") {
-		ct = ColumnType_Image
-		return
-	}
-
-	if ct == ColumnType_URL {
-		return
-	}
-
-	if !strings.Contains(v, "/") &&
-		(strings.ContainsAny(v[0:1], "0123456789-") && strings.ContainsAny(v[len(v)-1:], "0123456789")) {
-		if gtin.IsGTIN(v) {
-			ct = ColumnType_GTIN
-			return
-		}
-
-		_, err := strconv.ParseInt(v, 10, 64)
-		if err == nil {
-			ct = ColumnType_Number
-			return
-		}
-
-		_, err = strconv.ParseUint(v, 10, 64)
-		if err == nil {
-			ct = ColumnType_Number
-			return
-		}
-
-		_, err = strconv.ParseFloat(v, 64)
-		if err == nil {
-			ct = ColumnType_Number
-			return
-		}
-
-		if strings.Contains(v, ",") {
-			_, err = strconv.ParseFloat(strings.Replace(v, ",", ".", 1), 64)
-			if err == nil {
-				ct = ColumnType_Number
-				return
-			}
-		}
-	}
-
-	// nothing left, must be text
-	ct = ColumnType_Text
-
-	return
-}
+// func (c *SQLiteConn) RowInfo(sql string) []*ColumnInfo {
+// 	if rc := C.sqlite3_exec(c.db, sql, nil, nil, nil); rc != OK {
+// 		return libErr(rc, c.db)
+// 	}
+// 	return nil
+// }
