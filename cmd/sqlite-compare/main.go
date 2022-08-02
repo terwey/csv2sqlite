@@ -8,7 +8,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/terwey/csv2sqlite/sqlitehelper"
+	"github.com/terwey/csv2sqlite/sqlitehelper/compare"
 	"github.com/spf13/pflag"
 )
 
@@ -68,9 +68,9 @@ func main() {
 		log.Fatalf("A (%s) and B (%s) are the same file", a, b)
 	}
 
-	sqlitehelper.ProgressEnabled = showProgress
+	compare.ProgressEnabled = showProgress
 
-	err := sqlitehelper.CompareFiles("data", a, b, null)
+	err := compare.CompareFiles("data", a, b, null)
 	if err != nil {
 		if write {
 			log.Printf("%s.failed written\n", a)

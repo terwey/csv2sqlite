@@ -2,6 +2,8 @@ github.com/bvinc/go-sqlite-lite v0.6.1 h1:JU8Rz5YAOZQiU3WEulKF084wfXpytRiqD2IaW2
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/godofdream/go-gtin v0.0.0-20180427093133-396fa569836e h1:EBgdS2PYpZ+AzxYHE1Uddtzgrz1hRUHIoF8aagjLWUg=
+github.com/godofdream/go-gtin v0.0.0-20180427093133-396fa569836e/go.mod h1:C75m6h5wP5LXXagc4VwxAF9QMLvpSQBzvupILl4PdzU=
 github.com/google/go-cmp v0.5.8 h1:e6P7q2lk1O+qJJb4BtCQXlK8vWEO8V1ZeuEdJNOqZyg=
 github.com/google/go-cmp v0.5.8/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/k0kubun/go-ansi v0.0.0-20180517002512-3bf9e2903213/go.mod h1:vNUNkEQ1e29fT/6vq2aBdFsgNPmy8qMdSay1npru+Sw=
