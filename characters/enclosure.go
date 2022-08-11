@@ -20,6 +20,6 @@ func GetEnclosureNames() []string {
 	return getNames(knownEnclosures())
 }
 
-func DetectEnclosure(data []byte) Character {
+func DetectEnclosure(data []byte) (Character, int) {
 	return detect(data, knownEnclosures())
 }

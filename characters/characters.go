@@ -129,11 +129,12 @@ func getNames(known []Character) []string {
 	return names
 }
 
-func detect(data []byte, known []Character) Character {
+func detect(data []byte, known []Character) (Character, int) {
 	var highestCount int
 	highestChar := Character_EMPTY
 	var longestLen int
 	var longestChar Character
+	var longestCharCount int
 	for _, char := range known {
 		if bytes.Compare(char, Character_EMPTY) == 0 {
 			continue
@@ -147,14 +148,15 @@ func detect(data []byte, known []Character) Character {
 			if length := len(char); length > longestLen {
 				longestLen = length
 				longestChar = char
+				longestCharCount = count
 			}
 		}
 	}
 
 	// in the case a character is multiple its always that one
 	if longestLen > 1 {
-		return longestChar
+		return longestChar, longestCharCount
 	}
 
-	return highestChar
+	return highestChar, highestCount
 }

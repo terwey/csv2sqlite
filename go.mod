@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/google/go-cmp v0.5.8
-	github.com/productsupcom/go-sqlite-lite v0.7.1
+	github.com/productsupcom/go-sqlite-lite v0.8.0
 	github.com/terwey/recordwriter v0.1.7
 	github.com/schollz/progressbar/v3 v3.7.4
 	github.com/spf13/pflag v1.0.5
@@ -13,10 +13,11 @@ require (
 )
 
 require (
-	github.com/godofdream/go-gtin v0.0.0-20180427093133-396fa569836e // indirect
+	github.com/mattn/go-pointer v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.10 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/sys v0.0.0-20211019181941-9d821ace8654 // indirect
 	golang.org/x/term v0.0.0-20201210144234-2321bbc49cbf // indirect

@@ -44,6 +44,7 @@ type TestData struct {
 	colcount      int
 	optionalDelim bool
 	exclude       []int
+	excel         bool
 }
 
 func GetTests() []TestData {
@@ -92,6 +93,7 @@ func GetTests() []TestData {
 			},
 			delimiter: characters.Character_PIPE,
 			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     false,
 		},
 		{
 			name: "two",
@@ -167,7 +169,6 @@ func GetTests() []TestData {
 			},
 			delimiter: characters.Character_PIPE,
 			enclosure: characters.Character_QUOTATION_MARK,
-			debug:     true,
 		},
 		{
 			name: "broken chars",
@@ -1834,19 +1835,66 @@ func GetTests() []TestData {
 			optionalDelim: false,
 			debug:         false,
 		},
+		{
+			name: "1084854.00215778 500052",
+			args: TestArgs{
+				// originally this line ends with an extraneous delimiter, the scanner removes this
+				data: []byte(`"500052";Msiwq-Xfa rüt Ctgtp Cqtifxrxd;"Nxjfjf 0 21 yslts yslts yslts OT L-DFTR L-DFTR /* Qptrx Iztxwlfdwua */ jwpdr.RluVvjontDnusa {ron-qptrx-name:""Gfcsdqz Bkpwxhw""; ron-genupy-qopluij-kcsq:0; ron-genupy-rpdixqr-kcsq:0; ron-qptrx-joflfx:roj; ron-qptrx-jbabytaj:99; ron-qptrx-vfdpux:""""; ron-msazdlb-zrb:0he 5.4sq 0he 5.4sq; ron-cihx-ampffd-umr:0he; ron-cihx-ampffd-talue:0he; ron-cihx-ampffd-tbkwcs:8.0sq; ron-cihx-ampffd-xweb:0he; xxto-btyliv:107%; ron-mjssqbdqaj:toihl-ludunw; leip-kcsq:11.0sq; leip-ebuoai:""Owfliwh"",xylc-lfxbl; ron-ziznc-leip-ebuoai:Owfliwh; ron-ziznc-yihrp-leip:bhmdz-lbjgv; ron-rimpu-leip-ebuoai:Owfliwh; ron-rimpu-yihrp-leip:bhmdz-lbjgv; ron-ykeu-leip-ebuoai:""Usfyp Fxm Enklk""; ron-ykeu-yihrp-leip:bhmdz-ykeu; ron-lnrxhgr-tbisnhjt:AG-KC;} Gd ppzlpj sdl hgatax czf Twoosl uck heieki Ctgtp Cqtifxrxd owgk Duknpke jqax! Uck nbo Msiwq-Xfa fqwmea iy opk Xfoghrcycovgcktecwzz gbapgg Ipbcvc üiwvdcc rko vwhrfwwpw! Vpwl Ctgtp Msiwq-Xfa aeovncu pmx vjins djtßxn Kbgghispipl fjc 2 Jkqasnxknqyx (emsfb 1 Bekxovmofonb). Uck Ncwei gqrck djwpszkn Nyjkrihyyjvd glfr iy vqcag dc mjm Ypxu opk Pumfnndhmtngxzx gbapgg Ctgtp Wssxjmztnxk ykn nzs Dybvnjx hl keqxkgochgx. Mjm yphrolthxs Pumfnndhmtngxzx fjc mjm Hczulmnbzg ihmhfh kkoh qfdltnup dc hwu qwhdngvjeogio Pzbayqsruiqywcb. Gkßk Ctgtp Kbgghispipl: 58 he l 50 he l 26 he (ErVeG) Mqqxzakwm: ? Ctgtp- Pumfnndhmtngxzx kirolixi ? vkeb Asxmd! ? dc opk Jkqasnxknqyx blnii. ? Jkqasnxknqyx ibgulfve vzf Kztgmxa puwgcfvtz flpzkpkiaßje. ? Opk Vihxjqxdoud dc czf utöpkukse jjszg Njevymzlctjjk ovsnqko fjc wvhbxt, xbm hfbon Rdar jqax nr Jkqasnxknqyx sdl. Kkoh ppzlpj Njevymzlctjjk gklwpcuj. ? Jkqasnxknqyx fjc Izcnykffkthsokp dc mjm Iusebanqvpf warhhhuej. ? Xjb Sci nkxnsgo soq czf Vpbhke vzf Unljllmoeqiak ökxykk fjc czf Ctgtp gbapgg Ipbcvc tcrty lrfygrcdq yep Dgeunxy dldhw Bnioctxnjufkg idhakf bs, vkeb bs Xtpyxxqhxnfxäl ilqjoxtq hl vebjk! ? Iy fqwmea czf Ctgtp rliuqahs rvo ?utypnlunvd?.";"https://example.com/rpyg/274/msiwq-xfa-eylw-ctgtp-cqtifxrxd?szg_goqkhf=ejcktovf&szg_ubnqys=djs";https://example.com/nnpma/qwljy/49/kq/9x/upsyc_msiwq_xfa_eylw_ctgtp_cqtifxrxd_rpyg_600x600.knn;"https://example.com/nnpma/qwljy/91/7x/i5/upsyc_msiwq_xfa_eylw_ctgtp_cqtifxrxd_rpyg_1280x1280.knn";;;;;;;;FZK;12,00;5.99;500052;"";zqm;19.00;3-4 Udnk;;;;"UPSYC";Rvuaivyrbhxbdäilr>Cqtifxrxd Ctgtp & Ucgypöx;;he;;he;;he;0.32;90`),
+			},
+			want: [][]byte{
+				[]byte(`500052`),
+				[]byte(`Msiwq-Xfa rüt Ctgtp Cqtifxrxd`),
+				[]byte(`Nxjfjf 0 21 yslts yslts yslts OT L-DFTR L-DFTR /* Qptrx Iztxwlfdwua */ jwpdr.RluVvjontDnusa {ron-qptrx-name:"Gfcsdqz Bkpwxhw"; ron-genupy-qopluij-kcsq:0; ron-genupy-rpdixqr-kcsq:0; ron-qptrx-joflfx:roj; ron-qptrx-jbabytaj:99; ron-qptrx-vfdpux:""; ron-msazdlb-zrb:0he 5.4sq 0he 5.4sq; ron-cihx-ampffd-umr:0he; ron-cihx-ampffd-talue:0he; ron-cihx-ampffd-tbkwcs:8.0sq; ron-cihx-ampffd-xweb:0he; xxto-btyliv:107%; ron-mjssqbdqaj:toihl-ludunw; leip-kcsq:11.0sq; leip-ebuoai:"Owfliwh",xylc-lfxbl; ron-ziznc-leip-ebuoai:Owfliwh; ron-ziznc-yihrp-leip:bhmdz-lbjgv; ron-rimpu-leip-ebuoai:Owfliwh; ron-rimpu-yihrp-leip:bhmdz-lbjgv; ron-ykeu-leip-ebuoai:"Usfyp Fxm Enklk"; ron-ykeu-yihrp-leip:bhmdz-ykeu; ron-lnrxhgr-tbisnhjt:AG-KC;} Gd ppzlpj sdl hgatax czf Twoosl uck heieki Ctgtp Cqtifxrxd owgk Duknpke jqax! Uck nbo Msiwq-Xfa fqwmea iy opk Xfoghrcycovgcktecwzz gbapgg Ipbcvc üiwvdcc rko vwhrfwwpw! Vpwl Ctgtp Msiwq-Xfa aeovncu pmx vjins djtßxn Kbgghispipl fjc 2 Jkqasnxknqyx (emsfb 1 Bekxovmofonb). Uck Ncwei gqrck djwpszkn Nyjkrihyyjvd glfr iy vqcag dc mjm Ypxu opk Pumfnndhmtngxzx gbapgg Ctgtp Wssxjmztnxk ykn nzs Dybvnjx hl keqxkgochgx. Mjm yphrolthxs Pumfnndhmtngxzx fjc mjm Hczulmnbzg ihmhfh kkoh qfdltnup dc hwu qwhdngvjeogio Pzbayqsruiqywcb. Gkßk Ctgtp Kbgghispipl: 58 he l 50 he l 26 he (ErVeG) Mqqxzakwm: ? Ctgtp- Pumfnndhmtngxzx kirolixi ? vkeb Asxmd! ? dc opk Jkqasnxknqyx blnii. ? Jkqasnxknqyx ibgulfve vzf Kztgmxa puwgcfvtz flpzkpkiaßje. ? Opk Vihxjqxdoud dc czf utöpkukse jjszg Njevymzlctjjk ovsnqko fjc wvhbxt, xbm hfbon Rdar jqax nr Jkqasnxknqyx sdl. Kkoh ppzlpj Njevymzlctjjk gklwpcuj. ? Jkqasnxknqyx fjc Izcnykffkthsokp dc mjm Iusebanqvpf warhhhuej. ? Xjb Sci nkxnsgo soq czf Vpbhke vzf Unljllmoeqiak ökxykk fjc czf Ctgtp gbapgg Ipbcvc tcrty lrfygrcdq yep Dgeunxy dldhw Bnioctxnjufkg idhakf bs, vkeb bs Xtpyxxqhxnfxäl ilqjoxtq hl vebjk! ? Iy fqwmea czf Ctgtp rliuqahs rvo ?utypnlunvd?.`),
+				[]byte(`https://example.com/rpyg/274/msiwq-xfa-eylw-ctgtp-cqtifxrxd?szg_goqkhf=ejcktovf&szg_ubnqys=djs`),
+				[]byte(`https://example.com/nnpma/qwljy/49/kq/9x/upsyc_msiwq_xfa_eylw_ctgtp_cqtifxrxd_rpyg_600x600.knn`),
+				[]byte(`https://example.com/nnpma/qwljy/91/7x/i5/upsyc_msiwq_xfa_eylw_ctgtp_cqtifxrxd_rpyg_1280x1280.knn`),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(`FZK`),
+				[]byte(`12,00`),
+				[]byte(`5.99`),
+				[]byte(`500052`),
+				[]byte(``),
+				[]byte(`zqm`),
+				[]byte(`19.00`),
+				[]byte(`3-4 Udnk`),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(`UPSYC`),
+				[]byte(`Rvuaivyrbhxbdäilr>Cqtifxrxd Ctgtp & Ucgypöx`),
+				[]byte(``),
+				[]byte(`he`),
+				[]byte(``),
+				[]byte(`he`),
+				[]byte(``),
+				[]byte(`he`),
+				[]byte(`0.32`),
+				[]byte(`90`),
+			},
+			delimiter: characters.Character_SEMICOLON,
+			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     false,
+			excel:     true,
+		},
 	}
 
 	return tests
 
 }
 
-func TestSplitUnescapedDelimiter(t *testing.T) {
+func TestSplitRow(t *testing.T) {
 
 	tests := GetTests()
 
 	for _, tt := range tests {
 		if tt.optionalDelim {
-			t.Logf("TestSplitUnescapedDelimiter() %s has optional delim, skipping", tt.name)
+			t.Logf("SplitRow() %s has optional delim, skipping", tt.name)
 			continue
 		}
 		t.Run(tt.name, func(t *testing.T) {
@@ -1859,19 +1907,27 @@ func TestSplitUnescapedDelimiter(t *testing.T) {
 			p.Characters.SetEnclosure(tt.enclosure)
 			p.Exclude = tt.exclude
 			r := NewRuntime(p, bufio.ScanLines)
+			if tt.colcount != 0 {
+				r.colCount = tt.colcount
+			} else {
+				r.colCount = len(tt.want)
+			}
 
-			// if got := r.SplitRow(tt.args.data); !cmp.Equal(got, tt.want) {
-			if got := util.FlatToMulti(r.ParseUnescapedDelimiter(util.ColSplit(tt.args.data, p.Characters.Delimiter, p.Characters.Enclosure, -1))); !cmp.Equal(got, tt.want) {
+			p.Characters.Excel = tt.excel
+
+			if got := util.FlatToMulti(r.SplitRow(tt.args.data)); !cmp.Equal(got, tt.want) {
+				// if got := util.FlatToMulti(r.ParseUnescapedDelimiter(util.ColSplit(tt.args.data, p.Characters.Delimiter, p.Characters.Enclosure, -1))); !cmp.Equal(got, tt.want) {
 				if len(got) != len(tt.want) {
 
-					t.Errorf("ParseUnescapedDelimiter(): %s len(got) = %d != len(want) = %d", tt.name, len(got), len(tt.want))
-					t.Errorf("ParseUnescapedDelimiter(): %s got:\n%s\nwant:\n%s\n", tt.name, got, tt.want)
+					t.Errorf("SplitRow(): %s len(got) = %d != len(want) = %d", tt.name, len(got), len(tt.want))
+					t.Errorf("SplitRow(): %s got:\n%s\nwant:\n%s\n", tt.name, got, tt.want)
 				}
 				if diff := cmp.Diff(tt.want, got); diff != "" {
+					// t.Errorf("ParseUnescapedDelimiter(): %s Mismatch (-want +got):\n%s", tt.name, diff)
 					for i := range got {
 						if i < len(tt.want) {
 							if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
-								t.Errorf("ParseUnescapedDelimiter(): %s Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+								t.Errorf("SplitRow(): %s Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
 							}
 						}
 					}
@@ -1970,7 +2026,7 @@ func TestParseRow(t *testing.T) {
 					for i := range got {
 						if i < len(tt.want) {
 							if textdiff := cmp.Diff(string(tt.want[i]), string(got[i])); textdiff != "" {
-								t.Errorf("SplitRow() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
+								t.Errorf("ParseRow() %s: Mismatch (byte slice %d) (-want +got):\n%s", tt.name, i, textdiff)
 							}
 						}
 					}

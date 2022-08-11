@@ -25,5 +25,6 @@ func GetDelimiterNames() []string {
 }
 
 func DetectDelimiter(data []byte) Character {
-	return detect(data, knownDelimiters())
+	delim, _ := detect(data, knownDelimiters())
+	return delim
 }

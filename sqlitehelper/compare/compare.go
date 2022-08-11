@@ -6,6 +6,7 @@ package compare
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/productsupcom/go-sqlite-lite/sqlite3"
@@ -16,6 +17,9 @@ import (
 
 var pv *progressbar.ProgressBar
 var ProgressEnabled bool = false
+var IgnoreCount bool = false
+var MaxErrors int = 0
+var Limit int = 2000
 
 // CompareFiles is a convenience method around Compare
 //  It takes two filenames of a SQLite file, opens them
@@ -94,6 +98,8 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 	}
 
 	if diff := cmp.Diff(namesA.Names(), namesB.Names()); diff != "" {
+		fmt.Fprintf(os.Stderr, "Columns A: %v\n", namesA.Names())
+		fmt.Fprintf(os.Stderr, "Columns B: %v\n", namesB.Names())
 		return fmt.Errorf("Compare() Columns mismatch (-a +b):\n%s", diff)
 	}
 
@@ -108,7 +114,12 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 	}
 
 	if countA != countB {
-		return fmt.Errorf("Rowcount for tables do not match. A: %d B: %d", countA, countB)
+		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d", countA, countB)
+		if !IgnoreCount {
+			return fmt.Errorf(msg)
+		}
+
+		log.Printf("WARN: %s", msg)
 	}
 
 	usedCols, indexNameA, err := AddIndex(table, namesA.RawNames(), a)
@@ -128,7 +139,8 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 		pv = progressbar.NewOptions(countA, progressbar.OptionSetVisibility(false))
 	}
 
-	max := 2000
+	var errors int
+	max := Limit
 
 	limit := 0
 	offset := 0
@@ -154,13 +166,20 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 
 		err = compareStmts(stmtA, stmtB, namesA.Count(), null)
 		if err != nil {
-			if err := RemoveIndex(indexNameA, a); err != nil {
-				return fmt.Errorf("RemoveIndex(A): %w", err)
+			if errors >= MaxErrors-1 {
+				stmtA.Close()
+				stmtB.Close()
+				if ierr := RemoveIndex(indexNameA, a); ierr != nil {
+					return fmt.Errorf("RemoveIndex(A): %w, previous error: %s", ierr, err)
+				}
+				if ierr := RemoveIndex(indexNameB, b); ierr != nil {
+					return fmt.Errorf("RemoveIndex(B): %w, previous error: %s", ierr, err)
+				}
+				return fmt.Errorf("WARN: %w", err)
+			} else {
+				errors++
+				log.Printf("WARN: %s", err)
 			}
-			if err := RemoveIndex(indexNameB, b); err != nil {
-				return fmt.Errorf("RemoveIndex(B): %w", err)
-			}
-			return fmt.Errorf("compareStmts: %w", err)
 		}
 
 		stmtA.Close()
@@ -242,6 +261,8 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool) error {
 		}
 
 		if diff := cmp.Diff(outA, outB); diff != "" {
+			log.Printf("A: \n---\n%s\n---", outA)
+			log.Printf("B: \n---\n%s\n---", outB)
 			return fmt.Errorf("Compare() Rows mismatch (-a +b):\n%s", diff)
 		}
 

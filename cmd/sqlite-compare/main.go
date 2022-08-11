@@ -36,7 +36,9 @@ func init() {
 	flags.BoolVar(&write, "write-results", false, "Writes a result file.\n $a.passed when no "+
 		"difference was found.\n $a.failed when a difference was found, file will contain the error.")
 	flags.BoolVar(&showProgress, "progress", false, "Shows progress")
-
+	flags.BoolVar(&compare.IgnoreCount, "ignore-count", false, "Ignore the rowcount, show the rows that are different")
+	flags.IntVar(&compare.MaxErrors, "max-errors", 0, "Maximum amount of errors to allow before exiting")
+	flags.IntVar(&compare.Limit, "limit", 2000, "Row limit per query")
 }
 
 func main() {
