@@ -160,14 +160,7 @@ func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 	i := 0
 	for i < sn {
 		curPos = 0
-
-		if lastPos > 0 {
-			// debug.Debug("searching in s[lastPos:]: \"%s\"", s[lastPos:])
-			m = bytes.Index(s[lastPos:], sep)
-		} else {
-			// debug.Debug("searching in s: \"%s\"", s)
-			m = bytes.Index(s, sep)
-		}
+		m = bytes.Index(s[lastPos:], sep)
 
 		if m < 0 {
 			break
@@ -412,13 +405,7 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 		// }
 		curPos = 0
 
-		if lastPos > 0 {
-			// debug.Debug("searching in s[lastPos:]: %s", s[lastPos:])
-			m = bytes.Index(s[lastPos:], sep)
-		} else {
-			// debug.Debug("searching in s: %s", s)
-			m = bytes.Index(s, sep)
-		}
+		m = bytes.Index(s[lastPos:], sep)
 
 		if m < 0 {
 			break
@@ -491,14 +478,7 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 		curPos = 0
 
 		// debug.Debug("i: %d n: %d", i, n)
-
-		if lastPos > 0 {
-			// debug.Debug("searching in s[lastPos:]: \"%s\"", s[lastPos:])
-			m = bytes.Index(s[lastPos:], sep)
-		} else {
-			// debug.Debug("searching in s: \"%s\"", s)
-			m = bytes.Index(s, sep)
-		}
+		m = bytes.Index(s[lastPos:], sep)
 
 		if m < 0 {
 			break
