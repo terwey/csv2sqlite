@@ -194,7 +194,7 @@ func ColSplitTests() []ColSplitTest {
 				[]byte(`"9.89"`),
 				[]byte(`""`),
 				[]byte(`"[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`),
-			}, debug: true,
+			}, debug: false,
 		},
 	}
 
@@ -222,7 +222,7 @@ func TestColSplitFlat(t *testing.T) {
 			debug.DebugLog = true
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			v, pos := ColSplitFlat(tt.args.s, tt.args.sep, tt.args.enclosure, tt.args.n)
+			v, pos := ColSplitFlat(tt.args.s, tt.args.sep, tt.args.enclosure, tt.args.n, func(data []byte, prefix, suffix bool) []byte { return data })
 			got := FlatToMulti(v, pos)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				debug.DebugColumns(got)
@@ -254,7 +254,7 @@ func Benchmark_ColSplitFlat(b *testing.B) {
 	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		v, pos = ColSplitFlat(in, characters.Character_QUOTATION_MARK, characters.Character_COMMA, -1)
+		v, pos = ColSplitFlat(in, characters.Character_QUOTATION_MARK, characters.Character_COMMA, -1, func(data []byte, prefix, suffix bool) []byte { return data })
 	}
 
 	resultColSplitFlat = v
@@ -300,9 +300,10 @@ func Benchmark_GenSplitClean(b *testing.B) {
 
 var resultOut []byte
 
+var CleanerIn []byte = []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
+
 func Benchmark_Cleaner(b *testing.B) {
 	var out []byte
-	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
 	c := CharacterConfig{
 		Enclosure:       characters.Character_QUOTATION_MARK,
 		DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
@@ -311,7 +312,7 @@ func Benchmark_Cleaner(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		out = c.Clean(in, false, false)
+		out = c.Clean(CleanerIn, false, false)
 	}
 
 	resultOut = out
@@ -340,6 +341,7 @@ func getTestData() []TestData {
 			},
 			advance:   27,
 			delimiter: characters.Character_COMMA,
+			debug:     false,
 		},
 		{
 			name: "header with quotes",
@@ -433,6 +435,7 @@ func getTestData() []TestData {
 			out:       []byte("h,u"),
 			delimiter: []byte(","),
 			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     true,
 		},
 		{
 			name: "utf8.csv",
@@ -465,7 +468,35 @@ func getTestData() []TestData {
 			advance:   3843,
 			out:       []byte(`"ID_LENILNS","YMGMPN_EIYFYKT","JNA_1_YMGMPN","JNA_2_YMGMPN","IG_NICN","WRJHR","WRJHR_UW","WRJHR_UM","WRJHR_OT","WRJHR_AS","IBQYPUVNYJX","IBQYPUVNYJX_UW","IBQYPUVNYJX_UM","IBQYPUVNYJX_OT","IBQYPUVNYJX_AS","JTBZWWFR","JTBZWWFR_UW","JTBZWWFR_UM","JTBZWWFR_OT","JTBZWWFR_AS","WMU_JTBZWWFR","WMU_JTBZWWFR_UW","WMU_JTBZWWFR_UM","WMU_JTBZWWFR_OT","WMU_JTBZWWFR_AS","HQXHKDUWSXI","HQXHKDUWSXI_UW","HQXHKDUWSXI_UM","HQXHKDUWSXI_OT","HQXHKDUWSXI_AS","WMU_HQXHKDUWSXI","WMU_HQXHKDUWSXI_UW","WMU_HQXHKDUWSXI_UM","WMU_HQXHKDUWSXI_OT","WMU_HQXHKDUWSXI_AS","NKPHL","OCVMVDIPQ","BW_PVQLOJ_ZAARNG","BW_PVQLOJ_ZAARNG_KC","BW_PVQLOJ_ZAARNG_UW","BW_PVQLOJ_ZAARNG_RG","BW_PVQLOJ_ZAARNG_UM","BW_PVQLOJ_ZAARNG_AS","BW_PVQLOJ_ZAARNG_OT","BW_PVQLOJ_ZAARNG_EN","BW_PVQLOJ_ZAARNG_YG","BW_PVQLOJ_ZAARNG_PD","BW_PVQLOJ_ZAARNG_SG","BW_PVQLOJ_ZAARNG_QT","BW_PVQLOJ_ZAARNG_OX","BW_PVQLOJ_ZAARNG_LK","MAOY_ID","WMU_QWLJY_NOTUI","WMU_QWLJY_UBNQYS","WMU_QWLJY_SYQTX","WMU_QWLJY_BGNPF","WMU_QWLJY_WMHS","RENJY","ZMXLLQ","ZMXLLQ_UW","ZMXLLQ_UM","ZMXLLQ_OT","ZMXLLQ_AS","TJGOSNKY","TJGOSNKY_UW","TJGOSNKY_UM","TJGOSNKY_OT","TJGOSNKY_AS","IRNAGF","IRNAGF_UW","IRNAGF_UM","IRNAGF_OT","IRNAGF_AS","PBHLCWEVF_UW","PBHLCWEVF_AG","PBHLCWEVF_UM","PBHLCWEVF_OT","PBHLCWEVF_AS","PBHLCWEVF_YG","PBHLCWEVF_EN","PBHLCWEVF_PD","PBHLCWEVF_OZ","PBHLCWEVF_SG","PBHLCWEVF_ET","PBHLCWEVF_LM","PBHLCWEVF_QT","PBHLCWEVF_OX","WMU_RENJY","KMNDMVC","KMNDMVC_UW","KMNDMVC_UM","KMNDMVC_OT","KMNDMVC_AS","KEGQAJKRI","KEGQAJKRI_UW","KEGQAJKRI_UM","KEGQAJKRI_AS","KEGQAJKRI_OT","KCSQ_UW","KCSQ","KCSQ_OT","KCSQ_AS","KCSQ_UM","NPEZONDW_UW","NPEZONDW_IJ","NPEZONDW_UM","NPEZONDW_OT","NPEZONDW_AS","NPEZONDW_KC","NPEZONDW_YG","NPEZONDW_PD","NPEZONDW_EN","NPEZONDW_QT","NPEZONDW_OX","NPEZONDW_SG","NPEZONDW_ET","NPEZONDW_OZ","NPEZONDW_LM","NPEZONDW_AX","NPEZONDW_LK","WMU_LENILNS","WMU_LENILNS_UW","WMU_LENILNS_IJ","WMU_LENILNS_UM","WMU_LENILNS_OT","WMU_LENILNS_AS","WMU_LENILNS_KC","WMU_LENILNS_YG","WMU_LENILNS_PD","WMU_LENILNS_EN","WMU_LENILNS_SG","WMU_LENILNS_ET","WMU_LENILNS_OZ","WMU_LENILNS_LM","WMU_LENILNS_QT","WMU_LENILNS_OX","WMU_WULWIUT_UW","WMU_WULWIUT_IJ","WMU_WULWIUT_UM","WMU_WULWIUT_OT","WMU_WULWIUT_AS","WMU_WULWIUT_KC","WMU_WULWIUT_YG","WMU_WULWIUT_PD","WMU_WULWIUT_EN","WMU_WULWIUT_SG","WMU_WULWIUT_ET","WMU_WULWIUT_OZ","WMU_WULWIUT_LM","WMU_WULWIUT_QT","WMU_WULWIUT_OX","WMU_WULWIUT_NKPHL_UW","WMU_WULWIUT_NKPHL_IJ","WMU_WULWIUT_NKPHL_UM","WMU_WULWIUT_NKPHL_OT","WMU_WULWIUT_NKPHL_AS","WMU_WULWIUT_NKPHL_KC","WMU_WULWIUT_NKPHL_YG","WMU_WULWIUT_NKPHL_PD","WMU_WULWIUT_NKPHL_EN","WMU_WULWIUT_NKPHL_SG","WMU_WULWIUT_NKPHL_ET","WMU_WULWIUT_NKPHL_OZ","WMU_WULWIUT_NKPHL_LM","WMU_WULWIUT_NKPHL_QT","WMU_WULWIUT_NKPHL_OX","NPEZONDW","XBHOYQNJANT","NXRQZJR","AAIKCG","SPFEGCM","YMGMPN_CJGSXTG_DISWSNW","MO_IXBVZEASRFZ_HSSX","LENILNS_SUGKMPN","MSWB_EDJSEQDED","STCFIDHPC","LENILNS_DEFH_OHAEMSCV_RENJY","IRMDZRMMDVVQ_BYBNA","ITJKAEBGYY_BYBNA","SDYYI_BYBNA","QPTRX_BYBNA","TYID_BYBNA","GGAPDKF_BYBNA","NH_IUIO","CNI_7I","NW_WFRIJKOPUR","SDYYI_FZK","SDYYI_HXK","SDYYI_BKJ","SDYYI_XSR","SDYYI_VLH","SDYYI_CGX","SDYYI_CYG","SDYYI_VFK","SDYYI_YIP","SDYYI_SQO","SDYYI_JWW","SDYYI_MPA","SDYYI_DKM","RPYG_SDYYI_FZK","RPYG_SDYYI_HXK","RPYG_SDYYI_BKJ","RPYG_SDYYI_XSR","RPYG_SDYYI_VLH","RPYG_SDYYI_CGX","RPYG_SDYYI_CYG","RPYG_SDYYI_VFK","RPYG_SDYYI_YIP","RPYG_SDYYI_SQO","RPYG_SDYYI_JWW","RPYG_SDYYI_MPA","RPYG_SDYYI_DKM","NW_PJVTRG","NW_THB_NFDZOZ","NW_QSEGXMONC_NFDZOZ","CEVLD","ZNUMJLD_FWF","HXNI","KARPLHFC_KC","KARPLHFC_IJ","KARPLHFC_PGOMTU","KARPLHFC_LAYA_ZW_TUQO_AS","KARPLHFC_AZJGS","KARPLHFC_LSEI_ZW_HSBMS","KARPLHFC_LSEI_ZW_WJ","KARPLHFC_QT","KARPLHFC_TGQDMIQSC","KARPLHFC_ZQVKRIZFJ","KARPLHFC_LVTPOM","KARPLHFC_LSEI_TH_AWBLX","GEUDUYAA_BYBNA","OWJJSY_LIZO","NW_WFTQ_UJDK","IBQYPUVNYJX_LK","JTBZWWFR_LK","HQXHKDUWSXI_LK","ZMXLLQ_LK","TJGOSNKY_LK","IRNAGF_LK","PBHLCWEVF_LK","KMNDMVC_LK","KEGQAJKRI_LK"`),
 			delimiter: characters.Character_COMMA,
-			debug:     true,
+			debug:     false,
+		},
+		{
+			name: "1084854.00215778 8341170105289",
+			in: []byte(`bzi_rl;bzi_name;bzi_bcihkzddhflf;bzi_wmu;bzi_fmy_wmu;bzi_fmy_wmu2;bzi_fmy_wmu3;bzi_fmy_wmu4;bzi_fmy_wmu5;bzi_fmy_wmu6;bzi_fmy_wmu7;bzi_fmy_wmu8;bzi_fmy_wmu9;bzi_kvzajrma;bzi_yeegp;bzi_tndfkclagyrd;bzi_sgdko;bzi_pdg;umr-zqm-izc;bzi_vdxjbadlervz;bzi_mcerokyxwj;bzi_sbvqo;bzi_rovmeysdtn;bzi_tjgosnky;bzi_fdfqs;bzi_ncwxupevz;bzi_myapv;bzi_myapv_ubhwkkb;bzi_utalb;bzi_utalb_ubhwkkb;bzi_dgsbav;bzi_dgsbav_ubhwkkb;bzi_rsdilbb.wiqRwletmv;bzi_rsdilbb.ydpxemDhfhvi;
+"500133";Hjgmsxfqbjz Lobsozgzazvo: Sclaznrröfhrxkw Ysfoy;"Gfaysvsit Jrftrqxzeet hl gogxagw Sclaznrröfhrxkw. Opk Jrftrqxzeet msuävzbg iy roiodwd hl opk Vöyptiev dc Ltößu S/P fjc F/AR. Ueogzsynza Phlituwkubo pmx Ysfoy Dsfyix uck yggzdd, qdqyux Jtrx Rllxt gmwyf zjhemiylz: xbm hl 380 w/p2 Gtltt wwiiw Owgk Yemyuppm mjm Dazpnknszv dc pbuu raxatfddanqev Spößze fjc qisqfqcumd dcisci, lprutc Abcrlöeft jvpäfnzylm rüt Sujvaiffxq wjcrlbtu lmuh rdpnsvqkufoinu Qjzovhstqnu mjm Tdßqbcoshq (Ysfoy Dsfyix) sdl jyc 40 Hbou ehmyxjlu fjc dgsacmfpbafplpyp   Nxjfjf 0 21 yslts yslts yslts OT L-DFTR L-DFTR /* Qptrx Iztxwlfdwua */ jwpdr.RluVvjontDnusa {ron-qptrx-name:""Gfcsdqz Bkpwxhw""; ron-genupy-qopluij-kcsq:0; ron-genupy-rpdixqr-kcsq:0; ron-qptrx-joflfx:roj; ron-qptrx-jbabytaj:99; ron-qptrx-vfdpux:""""; ron-msazdlb-zrb:0he 5.4sq 0he 5.4sq; ron-cihx-ampffd-umr:0he; ron-cihx-ampffd-talue:0he; ron-cihx-ampffd-tbkwcs:8.0sq; ron-cihx-ampffd-xweb:0he; xxto-btyliv:107%; ron-mjssqbdqaj:toihl-ludunw; leip-kcsq:11.0sq; leip-ebuoai:""Owfliwh"",xylc-lfxbl; ron-ziznc-leip-ebuoai:Owfliwh; ron-ziznc-yihrp-leip:bhmdz-lbjgv; ron-rimpu-leip-ebuoai:Owfliwh; ron-rimpu-yihrp-leip:bhmdz-lbjgv; ron-ykeu-leip-ebuoai:""Usfyp Fxm Enklk""; ron-ykeu-yihrp-leip:bhmdz-ykeu; ron-lnrxhgr-tbisnhjt:AG-KC;}";"https://example.com/mfgqxjdlcsfbsbmjmn/yoapnjtyblryi-eylw-ctgtp-ijhdkahfkvl-odhnqqaxdey-jhhdgg/357/hjgmsxfqbjz-lobsozgzazvo-rcuraztqxpwzuonz-ysfoy?szg_goqkhf=ejcktovf&szg_ubnqys=djs";https://example.com/nnpma/qwljy/a9/0a/i7/Upsyc_250821_30399_600x600.knn;"https://example.com/nnpma/qwljy/a8/x7/a5/Upsyc_250821_30398_1280x1280.knn";"https://example.com/nnpma/qwljy/m2/67/96/Upsyc_250821_30420_1280x1280.knn";;;;;;;FZK;29,00;5.99;500133;"8341170105289";zqm;0.00;3-4 Udnk;Gvmih;Gvmih;;"UPSYC";Rvuaivyrbhxbdäilr>Jhpweohxmürg rüt Ctgtp Ijhdkahfkvl, Odhnqqaxdey & Jhhdgg;;he;;he;;he;0.32;90;
+"500134";Asxmd rüt Brntkrsqpptysdg Kweamljf Ysfoy;"Gfaysvsit Jrftrqxzeet hl gogxagw Kweamljf-Odhnqqaxdey. Opk Jrftrqxzeet msuävzbg iy roiodwd hl nxagqb Vadaqwsqfx dc opk Spößze S/P - HJU. Ueogzsynza Phlituwkubo pmx Ysfoy Dsfyix uck yggzdd, qdqyux Jtrx Rllxt gmwyf zjhemiylz: xbm hl 380 w/p2 Gtltt wwiiw Owgk Yemyuppm mjm Dazpnknszv dc pbuu raxatfddanqev Spößze fjc qisqfqcumd dcisci, lprutc Abcrlöeft jvpäfnzylm rüt Sujvaiffxq wjcrlbtu lmuh rdpnsvqkufoinu Qjzovhstqnu mjm Tdßqbcoshq (Ysfoy Dsfyix) sdl jyc 40 Hbou ehmyxjlu fjc dgsacmfpbafplpyp";"https://example.com/mfgqxjdlcsfbsbmjmn/yoapnjtyblryi-eylw-ctgtp-ijhdkahfkvl-odhnqqaxdey-jhhdgg/358/asxmd-eylw-brntkrsqpptysdg-kweamljf-ysfoy?szg_goqkhf=ejcktovf&szg_ubnqys=djs";https://example.com/nnpma/qwljy/or/13/7i/Upsyc_250821_30390aBMThEFu3RAED_600x600.knn;"https://example.com/nnpma/qwljy/a2/3u/9h/Upsyc_250821_30379QDmySWY6mtCjg_1280x1280.knn";"https://example.com/nnpma/qwljy/18/i4/6a/Upsyc_250821_30378VZKyuG7UTxwsR_1280x1280.knn";"https://example.com/nnpma/qwljy/m2/67/96/Upsyc_250821_30420_1280x1280.knn";;;;;;FZK;64,00;5.99;500134;"2415730296599";zqm;0.00;3-4 Udnk;Gvmih;Gvmih;;"UPSYC";Rvuaivyrbhxbdäilr>Jhpweohxmürg rüt Ctgtp Ijhdkahfkvl, Odhnqqaxdey & Jhhdgg;;he;;he;;he;0.32;90;`),
+			multiOut: [][]byte{
+				[]byte(`bzi_rl;bzi_name;bzi_bcihkzddhflf;bzi_wmu;bzi_fmy_wmu;bzi_fmy_wmu2;bzi_fmy_wmu3;bzi_fmy_wmu4;bzi_fmy_wmu5;bzi_fmy_wmu6;bzi_fmy_wmu7;bzi_fmy_wmu8;bzi_fmy_wmu9;bzi_kvzajrma;bzi_yeegp;bzi_tndfkclagyrd;bzi_sgdko;bzi_pdg;umr-zqm-izc;bzi_vdxjbadlervz;bzi_mcerokyxwj;bzi_sbvqo;bzi_rovmeysdtn;bzi_tjgosnky;bzi_fdfqs;bzi_ncwxupevz;bzi_myapv;bzi_myapv_ubhwkkb;bzi_utalb;bzi_utalb_ubhwkkb;bzi_dgsbav;bzi_dgsbav_ubhwkkb;bzi_rsdilbb.wiqRwletmv;bzi_rsdilbb.ydpxemDhfhvi;`),
+				[]byte(`"500133";Hjgmsxfqbjz Lobsozgzazvo: Sclaznrröfhrxkw Ysfoy;"Gfaysvsit Jrftrqxzeet hl gogxagw Sclaznrröfhrxkw. Opk Jrftrqxzeet msuävzbg iy roiodwd hl opk Vöyptiev dc Ltößu S/P fjc F/AR. Ueogzsynza Phlituwkubo pmx Ysfoy Dsfyix uck yggzdd, qdqyux Jtrx Rllxt gmwyf zjhemiylz: xbm hl 380 w/p2 Gtltt wwiiw Owgk Yemyuppm mjm Dazpnknszv dc pbuu raxatfddanqev Spößze fjc qisqfqcumd dcisci, lprutc Abcrlöeft jvpäfnzylm rüt Sujvaiffxq wjcrlbtu lmuh rdpnsvqkufoinu Qjzovhstqnu mjm Tdßqbcoshq (Ysfoy Dsfyix) sdl jyc 40 Hbou ehmyxjlu fjc dgsacmfpbafplpyp   Nxjfjf 0 21 yslts yslts yslts OT L-DFTR L-DFTR /* Qptrx Iztxwlfdwua */ jwpdr.RluVvjontDnusa {ron-qptrx-name:""Gfcsdqz Bkpwxhw""; ron-genupy-qopluij-kcsq:0; ron-genupy-rpdixqr-kcsq:0; ron-qptrx-joflfx:roj; ron-qptrx-jbabytaj:99; ron-qptrx-vfdpux:""""; ron-msazdlb-zrb:0he 5.4sq 0he 5.4sq; ron-cihx-ampffd-umr:0he; ron-cihx-ampffd-talue:0he; ron-cihx-ampffd-tbkwcs:8.0sq; ron-cihx-ampffd-xweb:0he; xxto-btyliv:107%; ron-mjssqbdqaj:toihl-ludunw; leip-kcsq:11.0sq; leip-ebuoai:""Owfliwh"",xylc-lfxbl; ron-ziznc-leip-ebuoai:Owfliwh; ron-ziznc-yihrp-leip:bhmdz-lbjgv; ron-rimpu-leip-ebuoai:Owfliwh; ron-rimpu-yihrp-leip:bhmdz-lbjgv; ron-ykeu-leip-ebuoai:""Usfyp Fxm Enklk""; ron-ykeu-yihrp-leip:bhmdz-ykeu; ron-lnrxhgr-tbisnhjt:AG-KC;}";"https://example.com/mfgqxjdlcsfbsbmjmn/yoapnjtyblryi-eylw-ctgtp-ijhdkahfkvl-odhnqqaxdey-jhhdgg/357/hjgmsxfqbjz-lobsozgzazvo-rcuraztqxpwzuonz-ysfoy?szg_goqkhf=ejcktovf&szg_ubnqys=djs";https://example.com/nnpma/qwljy/a9/0a/i7/Upsyc_250821_30399_600x600.knn;"https://example.com/nnpma/qwljy/a8/x7/a5/Upsyc_250821_30398_1280x1280.knn";"https://example.com/nnpma/qwljy/m2/67/96/Upsyc_250821_30420_1280x1280.knn";;;;;;;FZK;29,00;5.99;500133;"8341170105289";zqm;0.00;3-4 Udnk;Gvmih;Gvmih;;"UPSYC";Rvuaivyrbhxbdäilr>Jhpweohxmürg rüt Ctgtp Ijhdkahfkvl, Odhnqqaxdey & Jhhdgg;;he;;he;;he;0.32;90;`),
+				[]byte(`"500134";Asxmd rüt Brntkrsqpptysdg Kweamljf Ysfoy;"Gfaysvsit Jrftrqxzeet hl gogxagw Kweamljf-Odhnqqaxdey. Opk Jrftrqxzeet msuävzbg iy roiodwd hl nxagqb Vadaqwsqfx dc opk Spößze S/P - HJU. Ueogzsynza Phlituwkubo pmx Ysfoy Dsfyix uck yggzdd, qdqyux Jtrx Rllxt gmwyf zjhemiylz: xbm hl 380 w/p2 Gtltt wwiiw Owgk Yemyuppm mjm Dazpnknszv dc pbuu raxatfddanqev Spößze fjc qisqfqcumd dcisci, lprutc Abcrlöeft jvpäfnzylm rüt Sujvaiffxq wjcrlbtu lmuh rdpnsvqkufoinu Qjzovhstqnu mjm Tdßqbcoshq (Ysfoy Dsfyix) sdl jyc 40 Hbou ehmyxjlu fjc dgsacmfpbafplpyp";"https://example.com/mfgqxjdlcsfbsbmjmn/yoapnjtyblryi-eylw-ctgtp-ijhdkahfkvl-odhnqqaxdey-jhhdgg/358/asxmd-eylw-brntkrsqpptysdg-kweamljf-ysfoy?szg_goqkhf=ejcktovf&szg_ubnqys=djs";https://example.com/nnpma/qwljy/or/13/7i/Upsyc_250821_30390aBMThEFu3RAED_600x600.knn;"https://example.com/nnpma/qwljy/a2/3u/9h/Upsyc_250821_30379QDmySWY6mtCjg_1280x1280.knn";"https://example.com/nnpma/qwljy/18/i4/6a/Upsyc_250821_30378VZKyuG7UTxwsR_1280x1280.knn";"https://example.com/nnpma/qwljy/m2/67/96/Upsyc_250821_30420_1280x1280.knn";;;;;;FZK;64,00;5.99;500134;"2415730296599";zqm;0.00;3-4 Udnk;Gvmih;Gvmih;;"UPSYC";Rvuaivyrbhxbdäilr>Jhpweohxmürg rüt Ctgtp Ijhdkahfkvl, Odhnqqaxdey & Jhhdgg;;he;;he;;he;0.32;90;`),
+			},
+			advance: 456,
+			out:     []byte(`bzi_rl;bzi_name;bzi_bcihkzddhflf;bzi_wmu;bzi_fmy_wmu;bzi_fmy_wmu2;bzi_fmy_wmu3;bzi_fmy_wmu4;bzi_fmy_wmu5;bzi_fmy_wmu6;bzi_fmy_wmu7;bzi_fmy_wmu8;bzi_fmy_wmu9;bzi_kvzajrma;bzi_yeegp;bzi_tndfkclagyrd;bzi_sgdko;bzi_pdg;umr-zqm-izc;bzi_vdxjbadlervz;bzi_mcerokyxwj;bzi_sbvqo;bzi_rovmeysdtn;bzi_tjgosnky;bzi_fdfqs;bzi_ncwxupevz;bzi_myapv;bzi_myapv_ubhwkkb;bzi_utalb;bzi_utalb_ubhwkkb;bzi_dgsbav;bzi_dgsbav_ubhwkkb;bzi_rsdilbb.wiqRwletmv;bzi_rsdilbb.ydpxemDhfhvi;`),
+			// multiOut: [][]byte{
+			// 	[]byte(`"500133"`),
+			// 	[]byte(`Hjgmsxfqbjz Lobsozgzazvo: Sclaznrröfhrxkw Ysfoy`),
+			// 	[]byte(`"Gfaysvsit Jrftrqxzeet hl gogxagw Sclaznrröfhrxkw. Opk Jrftrqxzeet msuävzbg iy roiodwd hl opk Vöyptiev dc Ltößu S/P fjc F/AR. Ueogzsynza Phlituwkubo pmx Ysfoy Dsfyix uck yggzdd, qdqyux Jtrx Rllxt gmwyf zjhemiylz: xbm hl 380 w/p2 Gtltt wwiiw Owgk Yemyuppm mjm Dazpnknszv dc pbuu raxatfddanqev Spößze fjc qisqfqcumd dcisci, lprutc Abcrlöeft jvpäfnzylm rüt Sujvaiffxq wjcrlbtu lmuh rdpnsvqkufoinu Qjzovhstqnu mjm Tdßqbcoshq (Ysfoy Dsfyix) sdl jyc 40 Hbou ehmyxjlu fjc dgsacmfpbafplpyp   Nxjfjf 0 21 yslts yslts yslts OT L-DFTR L-DFTR /* Qptrx Iztxwlfdwua */ jwpdr.RluVvjontDnusa {ron-qptrx-name:""Gfcsdqz Bkpwxhw""; ron-genupy-qopluij-kcsq:0; ron-genupy-rpdixqr-kcsq:0; ron-qptrx-joflfx:roj; ron-qptrx-jbabytaj:99; ron-qptrx-vfdpux:""""; ron-msazdlb-zrb:0he 5.4sq 0he 5.4sq; ron-cihx-ampffd-umr:0he; ron-cihx-ampffd-talue:0he; ron-cihx-ampffd-tbkwcs:8.0sq; ron-cihx-ampffd-xweb:0he; xxto-btyliv:107%; ron-mjssqbdqaj:toihl-ludunw; leip-kcsq:11.0sq; leip-ebuoai:""Owfliwh"",xylc-lfxbl; ron-ziznc-leip-ebuoai:Owfliwh; ron-ziznc-yihrp-leip:bhmdz-lbjgv; ron-rimpu-leip-ebuoai:Owfliwh; ron-rimpu-yihrp-leip:bhmdz-lbjgv; ron-ykeu-leip-ebuoai:""Usfyp Fxm Enklk""; ron-ykeu-yihrp-leip:bhmdz-ykeu; ron-lnrxhgr-tbisnhjt:AG-KC;}"`),
+			// 	[]byte(`"https://example.com/mfgqxjdlcsfbsbmjmn/yoapnjtyblryi-eylw-ctgtp-ijhdkahfkvl-odhnqqaxdey-jhhdgg/357/hjgmsxfqbjz-lobsozgzazvo-rcuraztqxpwzuonz-ysfoy?szg_goqkhf=ejcktovf&szg_ubnqys=djs"`),
+			// 	[]byte(`https://example.com/nnpma/qwljy/a9/0a/i7/Upsyc_250821_30399_600x600.knn`),
+			// 	[]byte(`"https://example.com/nnpma/qwljy/a8/x7/a5/Upsyc_250821_30398_1280x1280.knn"`),
+			// 	[]byte(`"https://example.com/nnpma/qwljy/m2/67/96/Upsyc_250821_30420_1280x1280.knn"`),
+			// 	[]byte(`;`), []byte(`;`), []byte(`;`), []byte(`;`), []byte(`;`), []byte(`;`), []byte(`FZK`), []byte(`29,00`), []byte(`5.99`), []byte(`500133`), []byte(`"8341170105289"`), []byte(`zqm`),
+			// 	[]byte(`0.00`), []byte(`3-4 Udnk`), []byte(`Gvmih`), []byte(`Gvmih`), []byte(``), []byte(`"UPSYC"`), []byte(`Rvuaivyrbhxbdäilr>Jhpweohxmürg rüt Ctgtp Ijhdkahfkvl, Odhnqqaxdey & Jhhdgg`), []byte(``), []byte(``),
+			// 	[]byte(`he`), []byte(``), []byte(``), []byte(`he`), []byte(``), []byte(``), []byte(`he`), []byte(`0.32`), []byte(`90`), []byte(``),
+			// },
+			delimiter: characters.Character_SEMICOLON,
+			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     false,
 		},
 	}
 }
@@ -537,70 +568,72 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 	testdata := getTestData()
 	testdata = append(testdata, getTestDataFromBolTestfile())
 	for _, td := range testdata {
-		cc := CharacterConfig{}
-		cc.SetDelimiter(td.delimiter)
-		cc.SetEnclosure(td.enclosure)
-		cc.EOL = characters.Character_NIL
+		t.Run(td.name, func(t *testing.T) {
+			cc := CharacterConfig{}
+			cc.SetDelimiter(td.delimiter)
+			cc.SetEnclosure(td.enclosure)
+			cc.EOL = characters.Character_NIL
 
-		// normally the code is not re-run so we need to manually set the DelimiterCount to zero again
-		cc.DelimiterCount = 0
-		var got [][]byte
+			// normally the code is not re-run so we need to manually set the DelimiterCount to zero again
+			cc.DelimiterCount = 0
+			var got [][]byte
 
-		buffersize := 4096 * 1024
-		readbuf := make([]byte, 0, buffersize)
-		reader := bufio.NewReaderSize(bytes.NewReader(td.in), buffersize)
+			buffersize := 4096 * 1024
+			readbuf := make([]byte, 0, buffersize)
+			reader := bufio.NewReaderSize(bytes.NewReader(td.in), buffersize)
 
-		if _, err := io.ReadFull(reader, readbuf); err != nil && err != io.ErrUnexpectedEOF {
-			t.Fatal(err)
-		}
-
-		debug.DebugLog = td.debug
-		if td.debug {
-			log.Printf("break me")
-		}
-
-		scanner := bufio.NewScanner(reader)
-		scanner.Buffer(readbuf, buffersize)
-		scanner.Split(cc.SplitCsvInput)
-		// i := 0
-		for scanner.Scan() {
-			if scanner.Err() == io.EOF {
-				break
+			if _, err := io.ReadFull(reader, readbuf); err != nil && err != io.ErrUnexpectedEOF {
+				t.Fatal(err)
 			}
-			chunk := scanner.Bytes()
-			// header has to be set once
-			if cc.DelimiterCount == 0 {
-				// we have to count the delimiters in the header to know for row scanning
-				// how many fields we need
-				cc.DelimiterCount = bytes.Count(chunk, cc.Delimiter)
+
+			debug.DebugLog = td.debug
+			if td.debug {
+				log.Printf("break me")
 			}
-			got = append(got, chunk)
-		}
 
-		if err := scanner.Err(); err != nil {
-			t.Fatal(err)
-		}
+			scanner := bufio.NewScanner(reader)
+			scanner.Buffer(readbuf, buffersize)
+			scanner.Split(cc.SplitCsvInput)
+			// i := 0
+			for scanner.Scan() {
+				if scanner.Err() == io.EOF {
+					break
+				}
+				chunk := scanner.Bytes()
+				// header has to be set once
+				if cc.DelimiterCount == 0 {
+					// we have to count the delimiters in the header to know for row scanning
+					// how many fields we need
+					cc.DelimiterCount = bytes.Count(chunk, cc.Delimiter)
+				}
+				got = append(got, chunk)
+			}
 
-		// if len(td.multiOut) != len(got) {
-		// 	for c := range td.multiOut {
-		// 		if len(got) <= c {
-		// 			t.Errorf("Test (%s): len(td.multiOut) = %d != len(got) = %d\nwanted = %s\ngot = %s",
-		// 				td.name, len(td.multiOut), len(got), td.multiOut, got)
-		// 		}
-		// 	}
-		// }
+			if err := scanner.Err(); err != nil {
+				t.Fatal(err)
+			}
 
-		if diff := cmp.Diff(td.multiOut, got); diff != "" {
-			// for c := range td.multiOut {
-			// 	if len(got) <= c {
-			// 		t.Fatalf("Test (%s): did not receive all data\nwanted = %s\nGot nothing", td.name, td.multiOut[c])
-			// 	}
-			// 	if d := cmp.Diff(td.multiOut[c], got[c]); d != "" {
-			// 		t.Errorf("ScanWithSplitCSV(): %s\nwant: \t%s\ngot: \t%s\ndiff: \n%s", td.name, td.multiOut[c], got[c], d)
+			// if len(td.multiOut) != len(got) {
+			// 	for c := range td.multiOut {
+			// 		if len(got) <= c {
+			// 			t.Errorf("Test (%s): len(td.multiOut) = %d != len(got) = %d\nwanted = %s\ngot = %s",
+			// 				td.name, len(td.multiOut), len(got), td.multiOut, got)
+			// 		}
 			// 	}
 			// }
-			t.Errorf("ScanWithSplitCSV(): %s mismatch (-want +got):\n%s", td.name, diff)
-		}
+
+			if diff := cmp.Diff(td.multiOut, got); diff != "" {
+				// for c := range td.multiOut {
+				// 	if len(got) <= c {
+				// 		t.Fatalf("Test (%s): did not receive all data\nwanted = %s\nGot nothing", td.name, td.multiOut[c])
+				// 	}
+				// 	if d := cmp.Diff(td.multiOut[c], got[c]); d != "" {
+				// 		t.Errorf("ScanWithSplitCSV(): %s\nwant: \t%s\ngot: \t%s\ndiff: \n%s", td.name, td.multiOut[c], got[c], d)
+				// 	}
+				// }
+				t.Errorf("ScanWithSplitCSV(): %s mismatch (-want +got):\n%s", td.name, diff)
+			}
+		})
 	}
 }
 
@@ -710,6 +743,71 @@ func TestCharacterConfig_Clean(t *testing.T) {
 			got := cc.Clean(tt.args.data, tt.args.prefix, tt.args.suffix)
 			if diff := cmp.Diff(string(tt.want), string(got)); diff != "" {
 				t.Errorf("CharacterConfig.Clean(): %s mismatch (-want +got):\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+func TestCountOutsideEnclosure(t *testing.T) {
+	type args struct {
+		s         []byte
+		sep       characters.Character
+		enclosure characters.Character
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  int
+		debug bool
+	}{
+		{
+			name: "3 cols enclosure without sep inside",
+			args: args{
+				s:         []byte(`ybj1;"ybj2";ybj3`),
+				sep:       characters.Character_SEMICOLON,
+				enclosure: characters.Character_QUOTATION_MARK,
+			},
+			want:  2,
+			debug: false,
+		},
+		{
+			name: "3 cols enclosure with sep inside",
+			args: args{
+				s:         []byte(`ybj1;"ybj2;lala";ybj3`),
+				sep:       characters.Character_SEMICOLON,
+				enclosure: characters.Character_QUOTATION_MARK,
+			},
+			want:  2,
+			debug: false,
+		},
+		{
+			name: "3 cols no enclosure",
+			args: args{
+				s:         []byte(`ybj1;ybj2;ybj3;ybj4`),
+				sep:       characters.Character_SEMICOLON,
+				enclosure: characters.Character_QUOTATION_MARK,
+			},
+			want:  3,
+			debug: false,
+		},
+		{
+			name: "1084854.00215778 8341170105289",
+			args: args{
+				s:         []byte(`"500133";Hjgmsxfqbjz Lobsozgzazvo: Sclaznrröfhrxkw Ysfoy;"Gfaysvsit Jrftrqxzeet hl gogxagw Sclaznrröfhrxkw. Opk Jrftrqxzeet msuävzbg iy roiodwd hl opk Vöyptiev dc Ltößu S/P fjc F/AR. Ueogzsynza Phlituwkubo pmx Ysfoy Dsfyix uck yggzdd, qdqyux Jtrx Rllxt gmwyf zjhemiylz: xbm hl 380 w/p2 Gtltt wwiiw Owgk Yemyuppm mjm Dazpnknszv dc pbuu raxatfddanqev Spößze fjc qisqfqcumd dcisci, lprutc Abcrlöeft jvpäfnzylm rüt Sujvaiffxq wjcrlbtu lmuh rdpnsvqkufoinu Qjzovhstqnu mjm Tdßqbcoshq (Ysfoy Dsfyix) sdl jyc 40 Hbou ehmyxjlu fjc dgsacmfpbafplpyp   Nxjfjf 0 21 yslts yslts yslts OT L-DFTR L-DFTR /* Qptrx Iztxwlfdwua */ jwpdr.RluVvjontDnusa {ron-qptrx-name:""Gfcsdqz Bkpwxhw""; ron-genupy-qopluij-kcsq:0; ron-genupy-rpdixqr-kcsq:0; ron-qptrx-joflfx:roj; ron-qptrx-jbabytaj:99; ron-qptrx-vfdpux:""""; ron-msazdlb-zrb:0he 5.4sq 0he 5.4sq; ron-cihx-ampffd-umr:0he; ron-cihx-ampffd-talue:0he; ron-cihx-ampffd-tbkwcs:8.0sq; ron-cihx-ampffd-xweb:0he; xxto-btyliv:107%; ron-mjssqbdqaj:toihl-ludunw; leip-kcsq:11.0sq; leip-ebuoai:""Owfliwh"",xylc-lfxbl; ron-ziznc-leip-ebuoai:Owfliwh; ron-ziznc-yihrp-leip:bhmdz-lbjgv; ron-rimpu-leip-ebuoai:Owfliwh; ron-rimpu-yihrp-leip:bhmdz-lbjgv; ron-ykeu-leip-ebuoai:""Usfyp Fxm Enklk""; ron-ykeu-yihrp-leip:bhmdz-ykeu; ron-lnrxhgr-tbisnhjt:AG-KC;}";"https://example.com/mfgqxjdlcsfbsbmjmn/yoapnjtyblryi-eylw-ctgtp-ijhdkahfkvl-odhnqqaxdey-jhhdgg/357/hjgmsxfqbjz-lobsozgzazvo-rcuraztqxpwzuonz-ysfoy?szg_goqkhf=ejcktovf&szg_ubnqys=djs";https://example.com/nnpma/qwljy/a9/0a/i7/Upsyc_250821_30399_600x600.knn;"https://example.com/nnpma/qwljy/a8/x7/a5/Upsyc_250821_30398_1280x1280.knn";"https://example.com/nnpma/qwljy/m2/67/96/Upsyc_250821_30420_1280x1280.knn";;;;;;;FZK;29,00;5.99;500133;"8341170105289";zqm;0.00;3-4 Udnk;Gvmih;Gvmih;;"UPSYC";Rvuaivyrbhxbdäilr>Jhpweohxmürg rüt Ctgtp Ijhdkahfkvl, Odhnqqaxdey & Jhhdgg;;he;;he;;he;0.32;90`),
+				sep:       characters.Character_SEMICOLON,
+				enclosure: characters.Character_QUOTATION_MARK,
+			},
+			debug: false,
+			want:  33,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.debug {
+				debug.DebugLog = true
+			}
+			if got := CountOutsideEnclosure(tt.args.s, tt.args.sep, tt.args.enclosure); got != tt.want {
+				t.Errorf("CountOutsideEnclosure() = %v, want %v", got, tt.want)
 			}
 		})
 	}

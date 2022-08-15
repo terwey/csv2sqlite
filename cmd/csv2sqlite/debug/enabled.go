@@ -19,7 +19,7 @@ func State() bool {
 func LogData(name string, data []byte, max int) {
 	if DebugLog {
 		if len(data) < max {
-			Debug("%s (%d) data:\n%s", name, len(data), data)
+			Debug("%s (%d) data:\n\"%s\"", name, len(data), data)
 			return
 		}
 

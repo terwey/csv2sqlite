@@ -43,7 +43,7 @@ func Test_main(t *testing.T) {
 			delimiter: characters.Character_COMMA,
 			enclosure: characters.Character_QUOTATION_MARK,
 			want:      baseDir + "tests/528874.sqlite",
-			debug:     true,
+			debug:     false,
 		},
 		{
 			name:      "emoji",

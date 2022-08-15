@@ -73,6 +73,7 @@ func NoClean(data []byte, prefix, suffix bool) []byte {
 	return data
 }
 
+//export
 type CharacterConfig struct {
 	Delimiter       characters.Character
 	Enclosure       characters.Character
@@ -86,6 +87,13 @@ type CharacterConfig struct {
 
 	clearedEOL bool
 	eolBuf     characters.Character
+
+	// signifies the file was produced by Excel
+	// or behaves like Excel.
+	// meaning the EOL contains an unused delimiter
+	// which must be stripped before the rest of the
+	// logic sees the line
+	Excel bool
 }
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
@@ -124,10 +132,69 @@ func (c *CharacterConfig) Clean(data []byte, prefix, suffix bool) []byte {
 		// we need to clean double quotes
 		data = ReplaceAll(data, c.DoubleEnclosure, c.Enclosure)
 	}
+
 	data = ReplaceAll(data, characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED)
 	data = ReplaceAll(data, characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED)
 
 	return data
+}
+
+func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
+	// Fast path out
+	sn := bytes.Count(s, sep)
+	if sn == -1 {
+		return sn
+	}
+
+	// if the enclosure does not appear inside the slice we can use a normal count
+	if c := Count(s, enclosure); c == -1 {
+		return Count(s, sep)
+	}
+
+	var m int
+	var curPos int
+	var lastPos int
+	var enclCount int
+
+	n := 0
+	i := 0
+	for i < sn {
+		curPos = 0
+		m = bytes.Index(s[lastPos:], sep)
+
+		if m < 0 {
+			break
+		}
+
+		curPos = m + lastPos
+
+		// debug.Debug("checking for %s: \"%s\"", enclosure.Name(), s[:curPos:curPos])
+		enclCount = bytes.Count(s[:curPos:curPos], enclosure)
+		// debug.Debug("enclCount: %d", enclCount)
+		if enclCount%2 == 0 {
+			// debug.Debug("found: \"%s\"", s[:curPos:curPos])
+			// data = append(data, s[:curPos:curPos])
+			lastPos = 0
+			i++
+
+			// this was a column so the sep was valid
+			n++
+		} else {
+			lastPos += m + len(sep)
+			// debug.Debug("continue, lastPos: %d", lastPos)
+			// do not set s
+			continue
+		}
+
+		// debug.Debug("setting s: \"%s\"", s[curPos+len(sep):])
+		s = s[curPos+len(sep):]
+	}
+
+	// debug.Debug("leftover s: %s", s)
+
+	// debug.Debug("CountOutsideEnclosure: %d for sep %s and encl %s", n, sep.Name(), enclosure.Name())
+
+	return n
 }
 
 func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -212,6 +279,12 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// count the enclosures
 		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
 
+		if debug.DebugLog {
+			debug.Debug("eolIndex: %d, c.EOL: \"%v\"", eolIndex, c.EOL)
+			debug.Debug("delimiter count: %d\ndelimiters counted in buf: %d\nenclosures counted in buf: %d", c.DelimiterCount, bytes.Count(in[:eolIndex], c.Delimiter), bytes.Count(in[:eolIndex], c.Enclosure))
+			debug.Debug("CountOutsideEnclosure: %d", CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure))
+		}
+
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
 		if c.enclosureLenth == 0 && bytes.Count(in[:eolIndex], c.Delimiter) == c.DelimiterCount {
 			debug.LogData("encloLen == 0", in[:eolIndex], 40960)
@@ -225,12 +298,20 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 
+		// it is possible that the delimiter appears within the enclosure
+		if c.DelimiterCount > 2 && CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure) == c.DelimiterCount {
+			debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
+			return eolIndex + len(c.EOL), in[:eolIndex], nil
+		}
+
 		// we found none, move the index
 		if len(in) > eolIndex+len(c.EOL) {
+			debug.LogData("searching for new EOL", in[eolIndex+len(c.EOL):], 40960)
 			newIndex := bytes.Index(in[eolIndex+len(c.EOL):], c.EOL)
 			if newIndex == -1 {
 				break
 			}
+
 			// we have to add the length of eolBytes here to account for the offset
 			eolIndex += newIndex + len(c.EOL)
 			continue
@@ -289,7 +370,10 @@ func GenSplit(s, sep []byte, n int, fn CleanFunc, exclude []int) (data []byte, p
 // ColSplitFlat will split a byte slice with the rules for CSV kept in place.
 // If a seperator is inside an enclosure it will not be used to split.
 // Returns a flat byte slice with pos slice
-func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Character, n int) (data []byte, pos []uint32) {
+func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Character, n int, fn CleanFunc) (data []byte, pos []uint32) {
+	if len(enclosure) == 0 {
+		return GenSplit(s, sep, n, fn, nil)
+	}
 	// debug.LogData("s", s, 512)
 	// debug.Debug("sep: \t\t%s\nenclosure: \t%s\nn: \t\t\t%d", sep.Name(), enclosure.Name(), n)
 	if n == 0 {
@@ -310,6 +394,7 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 	var lastPos int
 	var count int
 	var curPos int
+	var buf []byte
 
 	n--
 	i := 0
@@ -320,13 +405,7 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 		// }
 		curPos = 0
 
-		if lastPos > 0 {
-			// debug.Debug("searching in s[lastPos:]: %s", s[lastPos:])
-			m = bytes.Index(s[lastPos:], sep)
-		} else {
-			// debug.Debug("searching in s: %s", s)
-			m = bytes.Index(s, sep)
-		}
+		m = bytes.Index(s[lastPos:], sep)
 
 		if m < 0 {
 			break
@@ -338,8 +417,9 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 		count = bytes.Count(s[:curPos:curPos], enclosure)
 		if count%2 == 0 {
 			// debug.Debug("found: %s", s[:curPos:curPos])
-			data = append(data, s[:curPos:curPos]...)
-			pos = append(pos, uint32(len(s[:curPos:curPos])))
+			buf = fn(s[:curPos:curPos], false, false)
+			data = append(data, buf...)
+			pos = append(pos, uint32(len(buf)))
 			lastPos = 0
 			i++
 		} else {
@@ -353,9 +433,14 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 		s = s[curPos+len(sep):]
 	}
 
+	// if debug.DebugLog {
+	// 	debug.Debug("break me")
+	// }
+
 	if len(s) > 0 {
-		data = append(data, s...)
-		pos = append(pos, uint32(len(s)))
+		buf = fn(s, false, false)
+		data = append(data, buf...)
+		pos = append(pos, uint32(len(buf)))
 	}
 
 	return data, pos
@@ -392,13 +477,8 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 		// }
 		curPos = 0
 
-		if lastPos > 0 {
-			// debug.Debug("searching in s[lastPos:]: %s", s[lastPos:])
-			m = bytes.Index(s[lastPos:], sep)
-		} else {
-			// debug.Debug("searching in s: %s", s)
-			m = bytes.Index(s, sep)
-		}
+		// debug.Debug("i: %d n: %d", i, n)
+		m = bytes.Index(s[lastPos:], sep)
 
 		if m < 0 {
 			break
@@ -406,10 +486,11 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 
 		curPos = m + lastPos
 
-		// debug.Debug("checking: %s", s[:curPos:curPos])
+		// debug.Debug("checking for %s: \"%s\"", enclosure.Name(), s[:curPos:curPos])
 		count = bytes.Count(s[:curPos:curPos], enclosure)
+		// debug.Debug("count: %d", count)
 		if count%2 == 0 {
-			// debug.Debug("found: %s", s[:curPos:curPos])
+			// debug.Debug("found: \"%s\"", s[:curPos:curPos])
 			data = append(data, s[:curPos:curPos])
 			lastPos = 0
 			i++
@@ -420,7 +501,7 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 			continue
 		}
 
-		// debug.Debug("setting s: %s", s[curPos+len(sep):])
+		// debug.Debug("setting s: \"%s\"", s[curPos+len(sep):])
 		s = s[curPos+len(sep):]
 	}
 

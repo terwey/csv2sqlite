@@ -282,6 +282,13 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
 		}
 		header := util.FlatToMulti(cols, pos)
+
+		// we gotta check if the last column in the header is set, if not drop it
+		if len(header[len(header)-1]) == 0 {
+			header = header[:len(header)-1]
+			r.p.Characters.Excel = true
+		}
+
 		if r.p.RowID {
 			header = append(header, []byte("rowid"))
 		}
@@ -362,6 +369,17 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 		return
 	}
 
+	colCountExcl := util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
+
+	// CountOutsideEnclosure returns the amount of delimiters, not columns so add 1
+	if r.colCount == colCountExcl+1 {
+		o, p := util.ColSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1, r.p.Characters.Clean)
+
+		if len(p) == r.colCount {
+			return o, p
+		}
+	}
+
 	// r.colCount is set to non-zero on header creation
 	// TODO: fix that the header gets parsed by our code too
 	if r.colCount != 0 {
@@ -377,7 +395,6 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
 	if count > r.colCount {
-
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
@@ -435,6 +452,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 	for i := range input {
 		// debug.Debug("input[i]: >>>%s<<<", input[i])
 		// debug.Debug("buf: %s", r.sbuf)
+		// debug.DebugColumns(util.FlatToMulti(data, pos))
 
 		// if debug.DebugLog {
 		// 	debug.Debug("break me")
@@ -536,7 +554,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 			r.hasSuffixEnclosure = bytes.HasSuffix(input[i], r.p.Characters.Enclosure)
 		}
 
-		// log.Printf("r.hasPrefixEnclosure: %v, r.hasSuffixEnclosure: %v, count: %d", r.hasPrefixEnclosure, r.hasSuffixEnclosure, count)
+		// debug.Debug("r.hasPrefixEnclosure: %v, r.hasSuffixEnclosure: %v, count: %d", r.hasPrefixEnclosure, r.hasSuffixEnclosure, count)
 
 		if !r.hasPrefixEnclosure || !r.hasSuffixEnclosure {
 			if len(r.sbuf) != 0 {
@@ -613,6 +631,8 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	chunks = make([][]byte, 0, chunkCount)
 	var chunk []byte
 
+	var enclDetectCount int
+
 	// used for p.Start
 	startCounter := 0
 
@@ -652,15 +672,27 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		chunk = make([]byte, size)
 		copy(chunk, scanner.Bytes())
 		chunksSize += size
+		if r.p.Characters.Excel {
+			chunk = bytes.TrimSuffix(chunk, r.p.Characters.Delimiter)
+		}
 		// if no delimiter was set we detect it once
 		if !delimSet {
 			r.p.Characters.SetDelimiter(characters.DetectDelimiter(chunk))
-			delimSet = true
+			if r.p.Characters.DelimiterCount != 0 {
+				delimSet = true
+			}
 		}
 
 		if !enclosureSet {
-			r.p.Characters.SetEnclosure(characters.DetectEnclosure(chunk))
-			enclosureSet = true
+			prevCount := enclDetectCount
+			var encl characters.Character
+			encl, enclDetectCount = characters.DetectEnclosure(chunk)
+			if prevCount < enclDetectCount {
+				r.p.Characters.SetEnclosure(encl)
+			}
+			if r.p.Characters.DelimiterCount != 0 {
+				enclosureSet = true
+			}
 		}
 
 		// header has to be set once

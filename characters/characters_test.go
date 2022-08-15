@@ -73,34 +73,40 @@ func Test_detectDelimiter(t *testing.T) {
 
 func Test_detectEnclosure(t *testing.T) {
 	tests := []struct {
-		name string
-		data []byte
-		want Character
+		name  string
+		data  []byte
+		want  Character
+		count int
 	}{
 		{
-			name: "Detect triple quotation",
-			data: []byte(`"""fielda""","""fieldb""","""fieldc"""`),
-			want: Character_QUOTATION_MARK_TRIPLE,
+			name:  "Detect triple quotation",
+			data:  []byte(`"""fielda""","""fieldb""","""fieldc"""`),
+			want:  Character_QUOTATION_MARK_TRIPLE,
+			count: 6,
 		},
 		{
-			name: "Detect double quotation",
-			data: []byte(`""fielda"",""fieldb"",""fieldc""`),
-			want: Character_QUOTATION_MARK_DOUBLE,
+			name:  "Detect double quotation",
+			data:  []byte(`""fielda"",""fieldb"",""fieldc""`),
+			want:  Character_QUOTATION_MARK_DOUBLE,
+			count: 6,
 		},
 		{
-			name: "Detect quote",
-			data: []byte(`"fielda","fieldb","fieldc"`),
-			want: Character_QUOTATION_MARK,
+			name:  "Detect quote",
+			data:  []byte(`"fielda","fieldb","fieldc"`),
+			want:  Character_QUOTATION_MARK,
+			count: 6,
 		},
 		{
-			name: "Detect apostrophe",
-			data: []byte(`'fielda','fieldb','fieldc'`),
-			want: Character_APOSTROPHE,
+			name:  "Detect apostrophe",
+			data:  []byte(`'fielda','fieldb','fieldc'`),
+			want:  Character_APOSTROPHE,
+			count: 6,
 		},
 		{
-			name: "Detect asterisk",
-			data: []byte(`*fielda*,*fieldb*,*fieldc*`),
-			want: Character_ASTERISK,
+			name:  "Detect asterisk",
+			data:  []byte(`*fielda*,*fieldb*,*fieldc*`),
+			want:  Character_ASTERISK,
+			count: 6,
 		},
 		{
 			name: "Detect empty",
@@ -110,8 +116,12 @@ func Test_detectEnclosure(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := DetectEnclosure(tt.data); !reflect.DeepEqual(got, tt.want) {
+			got, count := DetectEnclosure(tt.data)
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DetectEnclosure() = %v (%s), want %v (%s)", got, got, tt.want, tt.want)
+			}
+			if count != tt.count {
+				t.Errorf("DetectEnclosure() = %d, want %d", count, tt.count)
 			}
 		})
 	}
