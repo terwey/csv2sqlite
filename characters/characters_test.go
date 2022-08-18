@@ -1,8 +1,11 @@
 package characters
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
+
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 )
 
 func Test_detectDelimiter(t *testing.T) {
@@ -73,55 +76,74 @@ func Test_detectDelimiter(t *testing.T) {
 
 func Test_detectEnclosure(t *testing.T) {
 	tests := []struct {
-		name  string
-		data  []byte
-		want  Character
-		count int
+		name      string
+		data      []byte
+		delimiter Character
+		want      Character
+		count     int
+		debug     bool
 	}{
 		{
-			name:  "Detect triple quotation",
-			data:  []byte(`"""fielda""","""fieldb""","""fieldc"""`),
-			want:  Character_QUOTATION_MARK_TRIPLE,
-			count: 6,
+			name:      "Detect triple quotation",
+			data:      []byte(`"""fielda""","""fieldb""","""fieldc"""`),
+			want:      Character_QUOTATION_MARK_TRIPLE,
+			delimiter: Character_COMMA,
+			count:     6,
 		},
 		{
-			name:  "Detect double quotation",
-			data:  []byte(`""fielda"",""fieldb"",""fieldc""`),
-			want:  Character_QUOTATION_MARK_DOUBLE,
-			count: 6,
+			name:      "Detect double quotation",
+			data:      []byte(`""fielda"",""fieldb"",""fieldc""`),
+			want:      Character_QUOTATION_MARK_DOUBLE,
+			delimiter: Character_COMMA,
+			count:     6,
 		},
 		{
-			name:  "Detect quote",
-			data:  []byte(`"fielda","fieldb","fieldc"`),
-			want:  Character_QUOTATION_MARK,
-			count: 6,
+			name:      "Detect quote",
+			data:      []byte(`"fielda","fieldb","fieldc"`),
+			want:      Character_QUOTATION_MARK,
+			delimiter: Character_COMMA,
+			count:     6,
 		},
 		{
-			name:  "Detect apostrophe",
-			data:  []byte(`'fielda','fieldb','fieldc'`),
-			want:  Character_APOSTROPHE,
-			count: 6,
+			name:      "Detect apostrophe",
+			data:      []byte(`'fielda','fieldb','fieldc'`),
+			want:      Character_APOSTROPHE,
+			delimiter: Character_COMMA,
+			count:     6,
+			debug:     true,
 		},
 		{
-			name:  "Detect asterisk",
-			data:  []byte(`*fielda*,*fieldb*,*fieldc*`),
-			want:  Character_ASTERISK,
-			count: 6,
+			name:      "Detect asterisk",
+			data:      []byte(`*fielda*,*fieldb*,*fieldc*`),
+			want:      Character_ASTERISK,
+			delimiter: Character_COMMA,
+			count:     6,
 		},
 		{
-			name: "Detect empty",
-			data: []byte(`fielda,fieldb,fieldc`),
-			want: Character_EMPTY,
+			name:      "Detect empty",
+			data:      []byte(`fielda,fieldb,fieldc`),
+			delimiter: Character_COMMA,
+			want:      Character_EMPTY,
+			debug:     false,
+		},
+		{
+			name: "1085113.82355726",
+			data: []byte(`7665	5173555025610	7	"Zctc Srgzwe Momf ""Fip Rwhct Tgjulmazoh"" Rypzpnj Wjp Saitesk"	"Mjm ncolejadx ajjtoz Coohp fjc czf ywms Jrijta diznos czf Momf Fip Rwhct Tgjulmazoh yep Zctc hl qooam bmonojbdgy fjc nmypgaixe Nrjddt.- pfuxafroibe Utvffgybctt uck Ulvegipzkgfius gkclz- hanrksb Jcxbwis- wuye bemzjeqxipe- parjojxbam Rgne- vrsqnvi Idzcc dh vüpnpäyzrwva Rnlygx- Zdqgfdayljlhv: Zhfouwoigdäabgm 60 Hbou"	"Zctc"	"Bhkxcsu & Vrhxab > Vrhxab"	"P"	"xrbjea feob (81)"	"F"	"https://example.com/nnpma/2542/2097922-61e9203f917we.knn"	"https://example.com/nnpma/2542/2097926-61e2425463893.knn,https://example.com/nnpma/2542/2097934-61e920438e925.knn,https://example.com/nnpma/2542/2097942-61e5996941820.knn"	"MFNR"	0	"{""ag_AG.bjl8"":""100% Avevdixgb""}"	"{""ag_AG.bjl8"":""Wwiiw cqfgymsfvhjo; Uwiysyvktdnpdhk jyc sthdxqzaz Xbkmpkxjgn; Cmwkprrazkxlvam 60 Hbou; Wwiiw ezhkqlos; Fülkix uck lgawuhewx Xbkmpkxjgn""}"	999900	8999	8999`),
+			want:      Character_QUOTATION_MARK,
+			delimiter: Character_TAB,
+			count:     24,
+			debug:     true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, count := DetectEnclosure(tt.data)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DetectEnclosure() = %v (%s), want %v (%s)", got, got, tt.want, tt.want)
+			debug.DebugLog = tt.debug
+			got, count := DetectEnclosureWithDelimiter(tt.data, tt.delimiter)
+			if !bytes.Equal(got, tt.want) {
+				t.Errorf("DetectEnclosureWithDelimiter() = %v (%s), want %v (%s)", got, got, tt.want, tt.want)
 			}
 			if count != tt.count {
-				t.Errorf("DetectEnclosure() = %d, want %d", count, tt.count)
+				t.Errorf("DetectEnclosureWithDelimiter() = %d, want %d", count, tt.count)
 			}
 		})
 	}
