@@ -175,10 +175,10 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 				if ierr := RemoveIndex(indexNameB, b); ierr != nil {
 					return fmt.Errorf("RemoveIndex(B): %w, previous error: %s", ierr, err)
 				}
-				return fmt.Errorf("WARN: %w", err)
+				return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %s", errors, MaxErrors, err)
 			} else {
 				errors++
-				log.Printf("WARN: %s", err)
+				log.Printf("WARN (Error count: %d, MaxErrors: %d): %s", errors, MaxErrors, err)
 			}
 		}
 
