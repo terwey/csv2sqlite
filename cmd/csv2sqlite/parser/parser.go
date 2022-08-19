@@ -686,12 +686,15 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		if !enclosureSet {
 			prevCount := enclDetectCount
 			var encl characters.Character
-			encl, enclDetectCount = characters.DetectEnclosure(chunk)
+			encl, enclDetectCount = characters.DetectEnclosureWithDelimiter(chunk, r.p.Characters.Delimiter)
 			if prevCount < enclDetectCount {
 				r.p.Characters.SetEnclosure(encl)
 			}
 			if r.p.Characters.DelimiterCount != 0 {
 				enclosureSet = true
+			}
+			if prevCount == 0 && enclDetectCount == 0 {
+				log.Fatal("Enclosure cannot be detected")
 			}
 		}
 
