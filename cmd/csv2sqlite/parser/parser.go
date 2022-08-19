@@ -693,6 +693,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			if r.p.Characters.DelimiterCount != 0 {
 				enclosureSet = true
 			}
+			if prevCount == 0 && enclDetectCount == 0 {
+				log.Fatal("Enclosure cannot be detected")
+			}
 		}
 
 		// header has to be set once

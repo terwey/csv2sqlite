@@ -30,6 +30,10 @@ func DetectEnclosure(data []byte) (Character, int) {
 }
 
 func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, int) {
+	if len(delimiter) == 0 {
+		return nil, 0
+	}
+
 	orig := data
 	var prevPos int = 0
 	// enclosures are optional, we must compare to a previously found right
