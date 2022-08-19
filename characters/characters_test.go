@@ -84,11 +84,29 @@ func Test_detectEnclosure(t *testing.T) {
 		debug     bool
 	}{
 		{
+			name:      "Detect emoji",
+			data:      []byte(`🍆fielda🍆,🍆fieldb🍆,🍆fieldc🍆`),
+			delimiter: Character_COMMA,
+			want:      Character([]byte("🍆")),
+			count:     6,
+			debug:     false,
+		},
+
+		{
+			name:      "Detect double emoji",
+			data:      []byte(`🍆🍆fielda🍆🍆,🍆🍆fieldb🍆🍆,🍆🍆fieldc🍆🍆`),
+			delimiter: Character_COMMA,
+			want:      Character([]byte("🍆🍆")),
+			debug:     false,
+			count:     6,
+		},
+		{
 			name:      "Detect triple quotation",
 			data:      []byte(`"""fielda""","""fieldb""","""fieldc"""`),
 			want:      Character_QUOTATION_MARK_TRIPLE,
 			delimiter: Character_COMMA,
 			count:     6,
+			debug:     true,
 		},
 		{
 			name:      "Detect double quotation",
@@ -105,12 +123,20 @@ func Test_detectEnclosure(t *testing.T) {
 			count:     6,
 		},
 		{
+			name:      "Detect apostrophe when delimiter is emoji",
+			data:      []byte(`'fielda'🍆'fieldb'🍆'fieldc'`),
+			want:      Character_APOSTROPHE,
+			delimiter: Character([]byte("🍆")),
+			count:     6,
+			debug:     false,
+		},
+		{
 			name:      "Detect apostrophe",
 			data:      []byte(`'fielda','fieldb','fieldc'`),
 			want:      Character_APOSTROPHE,
 			delimiter: Character_COMMA,
 			count:     6,
-			debug:     true,
+			debug:     false,
 		},
 		{
 			name:      "Detect asterisk",
@@ -126,13 +152,14 @@ func Test_detectEnclosure(t *testing.T) {
 			want:      Character_EMPTY,
 			debug:     false,
 		},
+
 		{
 			name: "1085113.82355726",
 			data: []byte(`7665	5173555025610	7	"Zctc Srgzwe Momf ""Fip Rwhct Tgjulmazoh"" Rypzpnj Wjp Saitesk"	"Mjm ncolejadx ajjtoz Coohp fjc czf ywms Jrijta diznos czf Momf Fip Rwhct Tgjulmazoh yep Zctc hl qooam bmonojbdgy fjc nmypgaixe Nrjddt.- pfuxafroibe Utvffgybctt uck Ulvegipzkgfius gkclz- hanrksb Jcxbwis- wuye bemzjeqxipe- parjojxbam Rgne- vrsqnvi Idzcc dh vüpnpäyzrwva Rnlygx- Zdqgfdayljlhv: Zhfouwoigdäabgm 60 Hbou"	"Zctc"	"Bhkxcsu & Vrhxab > Vrhxab"	"P"	"xrbjea feob (81)"	"F"	"https://example.com/nnpma/2542/2097922-61e9203f917we.knn"	"https://example.com/nnpma/2542/2097926-61e2425463893.knn,https://example.com/nnpma/2542/2097934-61e920438e925.knn,https://example.com/nnpma/2542/2097942-61e5996941820.knn"	"MFNR"	0	"{""ag_AG.bjl8"":""100% Avevdixgb""}"	"{""ag_AG.bjl8"":""Wwiiw cqfgymsfvhjo; Uwiysyvktdnpdhk jyc sthdxqzaz Xbkmpkxjgn; Cmwkprrazkxlvam 60 Hbou; Wwiiw ezhkqlos; Fülkix uck lgawuhewx Xbkmpkxjgn""}"	999900	8999	8999`),
 			want:      Character_QUOTATION_MARK,
 			delimiter: Character_TAB,
 			count:     24,
-			debug:     true,
+			debug:     false,
 		},
 	}
 	for _, tt := range tests {

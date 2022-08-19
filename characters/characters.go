@@ -5,7 +5,6 @@ package characters
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -86,8 +85,6 @@ func CharacterFromString(name string) (Character, error) {
 	}
 
 	return Character(name), nil
-
-	return Character{}, fmt.Errorf("Character with name \"%s\" is not recognised", name)
 }
 
 func (c Character) Name() string {

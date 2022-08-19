@@ -5,6 +5,7 @@ package characters
 
 import (
 	"bytes"
+	"unicode/utf8"
 )
 
 func knownEnclosures() []Character {
@@ -33,6 +34,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	var prevPos int = 0
 	// enclosures are optional, we must compare to a previously found right
 	var prevRight []byte
+	charSize := 1
 	for {
 		if len(data) < prevPos {
 			break
@@ -43,14 +45,27 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 			break
 		}
 
-		left := data[pos-1 : pos]
+		var left []byte
+
+		for {
+			left = data[pos-charSize : pos]
+			if !utf8.Valid(left) {
+				// not valid UTF
+				charSize++
+				continue
+			}
+			break
+		}
 
 		// first find the left
 		var leftCount int
-		if leftCount = bytes.Count(data[:pos-1], left); leftCount >= 1 {
+		// we want to look inside the data minus the already found charSize
+		if leftCount = bytes.Count(data[:pos-charSize], left); leftCount > 1 {
+			subpos := pos - charSize
 			realCount := 1
-			for i := 1; i < leftCount; i++ {
-				subdata := data[pos-i-1 : pos-i]
+			// iter := 0
+			for i := charSize; i < leftCount*charSize; i = i + charSize {
+				subdata := data[subpos-i : subpos-i+charSize]
 				if bytes.Equal(subdata, left) {
 					realCount++
 				} else {
@@ -58,15 +73,15 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 				}
 			}
 
-			left = data[pos-realCount : pos]
+			left = data[pos-(charSize*realCount) : pos]
 			leftCount = realCount
 		}
 
 		// the right side should be the same length
 
 		var right []byte
-		if len(data) >= pos+leftCount+1 {
-			right = data[pos+1 : pos+1+leftCount]
+		if len(data) >= pos+len(delimiter)+(leftCount*charSize) {
+			right = data[pos+len(delimiter) : pos+len(delimiter)+(charSize*leftCount)]
 		}
 
 		if bytes.Equal(left, right) || bytes.Equal(left, prevRight) {
@@ -86,7 +101,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 			return Character(left), c - escaped*2
 		}
 
-		prevPos = pos + 1
+		prevPos = pos + len(delimiter)
 		prevRight = right
 	}
 
