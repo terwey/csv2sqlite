@@ -106,7 +106,7 @@ func Test_detectEnclosure(t *testing.T) {
 			want:      Character_QUOTATION_MARK_TRIPLE,
 			delimiter: Character_COMMA,
 			count:     6,
-			debug:     true,
+			debug:     false,
 		},
 		{
 			name:      "Detect double quotation",
@@ -121,6 +121,22 @@ func Test_detectEnclosure(t *testing.T) {
 			want:      Character_QUOTATION_MARK,
 			delimiter: Character_COMMA,
 			count:     6,
+		},
+		{
+			name:      "Detect quote optional",
+			data:      []byte(`fielda,"fieldb",fieldc`),
+			want:      Character_QUOTATION_MARK,
+			delimiter: Character_COMMA,
+			count:     2,
+			debug:     false,
+		},
+		{
+			name:      "Detect quote, fieldnames can be seen as enclosure",
+			data:      []byte(`fielda,afieldb,"fieldc"`),
+			want:      Character_QUOTATION_MARK,
+			delimiter: Character_COMMA,
+			count:     2,
+			debug:     false,
 		},
 		{
 			name:      "Detect apostrophe when delimiter is emoji",

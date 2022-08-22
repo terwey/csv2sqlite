@@ -5,6 +5,7 @@ package characters
 
 import (
 	"bytes"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -34,6 +35,12 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		return nil, 0
 	}
 
+	type Found struct {
+		char  Character
+		count int
+	}
+
+	detected := make(map[string]Found)
 	orig := data
 	var prevPos int = 0
 	// enclosures are optional, we must compare to a previously found right
@@ -46,7 +53,11 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		data = data[prevPos:]
 		pos := bytes.Index(data, delimiter)
 		if pos == -1 {
-			break
+			// it is possible that the enclosure appears before the end of the array and no more delimiters are found
+			if len(data) == 1 {
+				break
+			}
+			pos = len(data)
 		}
 
 		var left []byte
@@ -62,9 +73,9 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		}
 
 		// first find the left
-		var leftCount int
+		leftCount := bytes.Count(data[:pos-charSize], left)
 		// we want to look inside the data minus the already found charSize
-		if leftCount = bytes.Count(data[:pos-charSize], left); leftCount > 1 {
+		if leftCount > 1 {
 			subpos := pos - charSize
 			realCount := 1
 			// iter := 0
@@ -81,6 +92,10 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 			leftCount = realCount
 		}
 
+		// if leftCount is zero increase to 1
+		if leftCount == 0 {
+			leftCount = 1
+		}
 		// the right side should be the same length
 
 		var right []byte
@@ -102,12 +117,27 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 				c = 0
 			}
 
-			return Character(left), c - escaped*2
+			detected[string(left)] = Found{
+				char:  Character(left),
+				count: c - escaped*2,
+			}
+			// return Character(left), c - escaped*2
 		}
 
 		prevPos = pos + len(delimiter)
 		prevRight = right
 	}
 
-	return nil, 0
+	if len(detected) == 0 {
+		return Character_EMPTY, 0
+	}
+
+	var highest Found
+	for _, found := range detected {
+		if highest.count < found.count && !unicode.IsLetter(highest.char.Rune()) {
+			highest = found
+		}
+	}
+
+	return highest.char, highest.count
 }
