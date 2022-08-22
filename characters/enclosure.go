@@ -134,7 +134,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 
 	var highest Found
 	for _, found := range detected {
-		if highest.count < found.count && !unicode.IsLetter(highest.char.Rune()) {
+		if highest.count < found.count && !unicode.IsLetter(found.char.Rune()) {
 			highest = found
 		}
 	}
