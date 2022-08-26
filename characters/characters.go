@@ -30,9 +30,9 @@ var (
 	Character_UNIT_SEPARATOR Character = []byte("\x241F")
 
 	// Enclosures
-	Character_QUOTATION_MARK        Character = []byte("\"")
-	Character_QUOTATION_MARK_DOUBLE Character = []byte("\"\"")
-	Character_QUOTATION_MARK_TRIPLE Character = []byte("\"\"\"")
+	Character_QUOTATION_MARK        Character = []byte(`"`)
+	Character_QUOTATION_MARK_DOUBLE Character = []byte(`""`)
+	Character_QUOTATION_MARK_TRIPLE Character = []byte(`"""`)
 	Character_APOSTROPHE            Character = []byte("'")
 	Character_ASTERISK              Character = []byte("*")
 
@@ -130,8 +130,6 @@ func detect(data []byte, known []Character) (Character, int) {
 	var highestCount int
 	highestChar := Character_EMPTY
 	var longestLen int
-	var longestChar Character
-	var longestCharCount int
 	for _, char := range known {
 		if bytes.Compare(char, Character_EMPTY) == 0 {
 			continue
@@ -144,15 +142,8 @@ func detect(data []byte, known []Character) (Character, int) {
 		if count != 0 {
 			if length := len(char); length > longestLen {
 				longestLen = length
-				longestChar = char
-				longestCharCount = count
 			}
 		}
-	}
-
-	// in the case a character is multiple its always that one
-	if longestLen > 1 {
-		return longestChar, longestCharCount
 	}
 
 	return highestChar, highestCount
