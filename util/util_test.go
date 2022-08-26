@@ -812,3 +812,15 @@ func TestCountOutsideEnclosure(t *testing.T) {
 		})
 	}
 }
+
+var CountOutsideEnclosureResult int
+
+func Benchmark_CountOutsideEnclosure(b *testing.B) {
+	var m int
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		m = CountOutsideEnclosure(CleanerIn, []byte(`,`), []byte(`"`))
+	}
+
+	CountOutsideEnclosureResult = m
+}
