@@ -175,7 +175,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	}
 
 	if len(detected) == 0 {
-		return Character_EMPTY, 0
+		return Character_EMPTY, -1
 	}
 
 	for key := range detectedRight {
@@ -209,8 +209,8 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 
 	highest := Found{
 		char:      Character_EMPTY,
-		count:     0,
-		occurence: 0,
+		count:     -1,
+		occurence: -1,
 	}
 	for _, found := range detected {
 		if bytes.Equal(found.char, []byte(" ")) {
@@ -226,7 +226,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	}
 
 	if highest.occurence == 1 {
-		return Character_EMPTY, 0
+		return Character_EMPTY, -1
 	}
 
 	if debug.DebugLog {
@@ -234,7 +234,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	}
 
 	if highest.count%2 != 0 {
-		return Character_EMPTY, 0
+		return Character_EMPTY, -1
 	}
 
 	return highest.char, highest.count

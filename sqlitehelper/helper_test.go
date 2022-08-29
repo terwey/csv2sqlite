@@ -69,4 +69,121 @@ func TestColumnsForDB(t *testing.T) {
 	if diff := cmp.Diff(got.Names(), []string{`"baz"`, `"foo"`, `"id"`}); diff != "" {
 		t.Errorf("ColumnsForDB() mismatch (-want +got):\n%s", diff)
 	}
+
+	c := got.Count()
+	if c != 3 {
+		t.Errorf("Count incorrect: %d", c)
+	}
+
+	query := got.Query("data", 10, 10)
+	if query != `SELECT "baz", "foo", "id" FROM data ORDER BY "baz", "foo", "id" LIMIT 10 OFFSET 10` {
+		t.Errorf("Query incorrect: %s", query)
+	}
+
+	raw := got.RawNames()
+	if diff := cmp.Diff(raw, []string{"id", "foo", "baz"}); diff != "" {
+		t.Errorf("RawNames() mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestAddIndex(t *testing.T) {
+	conn, err := MemoryTable(table, 1)
+	if err != nil {
+		t.Errorf("MemoryTable() returned err: %s", err)
+	}
+
+	defer conn.Close()
+
+	_, hash, err := AddIndex("data", []string{"id", "foo", "baz"}, conn)
+	if err != nil {
+		t.Errorf("AddIndex error: %s", err)
+	}
+
+	err = RemoveIndex(hash, conn)
+	if err != nil {
+		t.Errorf("RemoveIndex error: %s", err)
+	}
+}
+
+func TestQueryForIndexed(t *testing.T) {
+	type args struct {
+		columns []string
+		order   []string
+		table   string
+		limit   int
+		offset  int
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			args: args{
+				columns: []string{"*"},
+				order:   nil,
+				table:   "data",
+				limit:   0,
+				offset:  0,
+			},
+			want: "SELECT * FROM data",
+		},
+		{
+			args: args{
+				columns: []string{"*"},
+				order:   nil,
+				table:   "data",
+				limit:   100,
+				offset:  0,
+			},
+			want: "SELECT * FROM data WHERE  rowid < 100",
+		},
+		{
+			args: args{
+				columns: []string{"*"},
+				order:   nil,
+				table:   "data",
+				limit:   100,
+				offset:  100,
+			},
+			want: "SELECT * FROM data WHERE rowid >= 100 AND  rowid < 200",
+		},
+		{
+			args: args{
+				columns: []string{"*"},
+				order:   []string{"foo", "bar"},
+				table:   "data",
+				limit:   0,
+				offset:  0,
+			},
+			want: "SELECT * FROM data ORDER BY foo, bar",
+		},
+		{
+			args: args{
+				columns: []string{"*"},
+				order:   []string{"foo", "bar"},
+				table:   "data",
+				limit:   100,
+				offset:  0,
+			},
+			want: "SELECT * FROM data ORDER BY foo, bar LIMIT 100",
+		},
+		{
+			args: args{
+				columns: []string{"*"},
+				order:   []string{"foo", "bar"},
+				table:   "data",
+				limit:   100,
+				offset:  100,
+			},
+			want: "SELECT * FROM data ORDER BY foo, bar LIMIT 100 OFFSET 100",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := QueryForIndexed(tt.args.columns, tt.args.order, tt.args.table, tt.args.limit, tt.args.offset); got != tt.want {
+				t.Errorf("QueryForIndexed() = \"%s\", want \"%s\"", got, tt.want)
+			}
+		})
+	}
 }
