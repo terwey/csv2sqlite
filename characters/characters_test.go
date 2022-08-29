@@ -3336,6 +3336,12 @@ func Test_detectEnclosure(t *testing.T) {
 			delimiter: Character_COMMA,
 			want:      Character_QUOTATION_MARK,
 		},
+		{
+			data:      []byte(`yg|057523|1|dc fzxmi|CZP|https://example.com/nnpma/qwljy/30/65/76/sbbv_CZP_150x35.psj|Fydqcl Peay|fxm|w|XSR|3-5 xsmzn fuvtgnazojfu|39,47|qeuowu|457289511545|https://example.com/nnpma/qwljy/1i/25/48/247957_200x200.knn|https://example.com/nnpma/qwljy/57/51/1a/247957_600x600.knn|https://example.com/nnpma/qwljy/ns/2m/90/247957_900x900.knn|yiit|6|213,04|173,57|Wvrofh Kmiof|Krqpjl|Uzqid|Qsuy, Jwin Eqwdaqao, Fapnkcq Dnezafax Eitodhfjfkzg, Trsemjxjtyna Wiwguxyb Eqwdaqao, Dnezafax Fapnkcq Qregsn Diqxskqs, Nypnlgssz Mtkebgijleshkmd, Wyeelafybq Goocydugprqqs, Fapnkcq Qregsn Eitodhfjfkzg, Dtiblp, Bkubbvafha Hzcfxay, Lxnpzfvybbmwlqbgauvdmpu, Dxo Ulmba, Ygxmpvvv/Ygxmpvvv Zbdmksb, Wubozpyl Emnwog, Egbeoygr Emnwog, Nwlhktkvldfekl,  [+/- Seof, Ygxmpvvv Zbdmksb (Vm 77891), Wido Gwcypw (Vm 77491), Wido Gwcypw (Vm 77492), Wido Gwcypw (Vm 77499), Ezdcaep Vsnsmjvrzdh (Vm 77163), Feob 1 Kvvs (Vm 42090), Eebhou Wvrofh (Vm 77400), Bxmwggc (Vm 75470), Imtivukw Licmodnmr Rqgjh (Vm 77289), Imtivukw Ulmba Uffuyx (Vm 77288), Kslnzi Wvrofh (Vm 77400), Jmqzis Xtzrecyr Pvkqonetswdg (Vm 77510), Jmqzis Pvkqonetswdg (Vm 77510), Wwprjpvmb Pnintt (Vm 77742), Yiv 6 (Vm 15850), Yiv 28 (Vm 45410), Yiv 6 Kvvs (Vm 15850), Yiv 7 Kvvs (Vm 15850), Yiv 28 Kvvs (Vm 45410), Yiv 30 Kvvs (Vm 73360), Yiv 40 Kvvs (Vm 16035), Jiuzhmlaaffm (Vm 77007), Uxvyyv 5 Kvvs (Vm 19140), Uxvyyv 6 Kvvs (Vm 15985)] ||https://example.com/k/czp-wvrofh-kmiof-057523?ygdubn=057523|Wvrofh Kmiof jrb CZP lh mjdldfbc, robslpig, jtcf rxpvraeng zv snsan cfbhusgc ag azzfv osøz. |Wvrofh Kmiof|Ybevv|Kmiof|100 w|6 w|XSR 2893,00 / 100 w|https://example.com/u/czp/||czp`),
+			delimiter: Character_PIPE,
+			want:      Character_EMPTY,
+			count:     -1,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

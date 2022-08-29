@@ -678,16 +678,13 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		// if no delimiter was set we detect it once
 		if !delimSet {
 			r.p.Characters.SetDelimiter(characters.DetectDelimiter(chunk))
-			if r.p.Characters.DelimiterCount != 0 {
-				delimSet = true
-			}
 		}
 
 		if !enclosureSet {
 			prevCount := enclDetectCount
 			var encl characters.Character
 			encl, enclDetectCount = characters.DetectEnclosureWithDelimiter(chunk, r.p.Characters.Delimiter)
-			if prevCount < enclDetectCount {
+			if prevCount < enclDetectCount || enclDetectCount == -1 {
 				r.p.Characters.SetEnclosure(encl)
 			}
 			if r.p.Characters.DelimiterCount != 0 {
@@ -703,6 +700,10 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			// we have to count the delimiters in the header to know for row scanning
 			// how many fields we need
 			r.p.Characters.DelimiterCount = bytes.Count(chunk, r.p.Characters.Delimiter)
+
+			if r.p.Characters.DelimiterCount != 0 {
+				delimSet = true
+			}
 		}
 
 		// log.Printf("chunk: ---\n%s\n---\n", chunk)
