@@ -24,10 +24,13 @@ var (
 	Character_POUND     Character = []byte("#")
 
 	// Character_RECORD_SEPARATOR http://www.fileformat.info/info/unicode/char/241e/index.htm
-	Character_RECORD_SEPARATOR Character = []byte("\x241E")
+	Character_RECORD_SEPARATOR Character = []byte("\u241E")
 
 	// Character_UNIT_SEPARATOR http://www.fileformat.info/info/unicode/char/241f/index.htm
-	Character_UNIT_SEPARATOR Character = []byte("\x241F")
+	Character_UNIT_SEPARATOR Character = []byte("\u241F")
+
+	// // Character_INVISIBLE_SEPARATOR https://www.fileformat.info/info/unicode/char/2063/index.htm
+	Character_INVISIBLE_SEPARATOR Character = []byte("\u2063")
 
 	// Enclosures
 	Character_QUOTATION_MARK        Character = []byte(`"`)
@@ -58,6 +61,7 @@ func getAllCharacters() map[string]Character {
 	allChars["POUND"] = Character_POUND
 	allChars["RECORD_SEPARATOR"] = Character_RECORD_SEPARATOR
 	allChars["UNIT_SEPARATOR"] = Character_UNIT_SEPARATOR
+	allChars["INVISIBLE_SEPARATOR"] = Character_INVISIBLE_SEPARATOR
 	allChars["QUOTATION_MARK"] = Character_QUOTATION_MARK
 	allChars["QUOTATION_MARK_DOUBLE"] = Character_QUOTATION_MARK_DOUBLE
 	allChars["QUOTATION_MARK_TRIPLE"] = Character_QUOTATION_MARK_TRIPLE
