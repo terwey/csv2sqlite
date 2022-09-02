@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/sqlitehelper/compare"
 	"github.com/terwey/csv2sqlite/util"
 )
@@ -26,6 +27,7 @@ func Test_main(t *testing.T) {
 		want      string
 		null      bool
 		debug     bool
+		newline   bool
 	}{
 		{
 			name:      "head.csv",
@@ -53,9 +55,21 @@ func Test_main(t *testing.T) {
 			enclosure: []byte("🍆"),
 			delimiter: []byte("💦"),
 		},
+		{
+			name:      "csvSample.512034.15616004",
+			input:     baseDir + "tests/csvSample.512034.11822895.csv",
+			output:    tmpDir + "csvSample.512034.11822895.sqlite",
+			want:      baseDir + "tests/csvSample.512034.11822895.sqlite",
+			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     false,
+			delimiter: characters.Character_INVISIBLE_SEPARATOR,
+			newline:   false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
+			p.Characters.DelimiterCount = 0
 
 			os.Args = []string{
 				"rddb",
@@ -81,9 +95,16 @@ func Test_main(t *testing.T) {
 				)
 			}
 
-			// if tt.debug {
-			// 	os.Args = append(os.Args, "--debug")
-			// }
+			if tt.newline {
+				os.Args = append(os.Args,
+					"--nd",
+				)
+			}
+
+			if tt.debug {
+				debug.DebugLog = tt.debug
+				os.Args = append(os.Args, "--debug")
+			}
 
 			main()
 

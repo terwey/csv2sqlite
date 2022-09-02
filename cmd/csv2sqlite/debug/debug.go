@@ -5,3 +5,5 @@ package debug
 
 var DebugLog bool = false
 var LogCSVReader bool = false
+
+func BreakMe() {}

@@ -433,9 +433,9 @@ func getTestData() []TestData {
 			},
 			advance:   5,
 			out:       []byte("h,u"),
-			delimiter: []byte(","),
+			delimiter: characters.Character_COMMA,
 			enclosure: characters.Character_QUOTATION_MARK,
-			debug:     true,
+			debug:     false,
 		},
 		{
 			name: "utf8.csv",
@@ -497,6 +497,20 @@ func getTestData() []TestData {
 			delimiter: characters.Character_SEMICOLON,
 			enclosure: characters.Character_QUOTATION_MARK,
 			debug:     false,
+		},
+		{
+			name: "512034",
+			in: []byte(`ulxeoteu_id⁣renjy⁣jtbzwwfr_id⁣jtbzwwfr_name⁣hacbmomv_fdcp⁣gcebs_hacbmomv_mswb⁣hacbmomv_tyid⁣arck_qmlmsrps⁣irnagf⁣gegj⁣rddb_qwljy⁣xbv⁣wrjhr⁣rskxl_sdyyi⁣otpvgxum_nawum_name⁣yjuy_ewuwttdk⁣yjuy_ulxeoteu_ewuwttdk⁣ihibmrx_id⁣rlqdyjg_id⁣otpvgxum_id⁣rlqdyjg_id_ulxeoteu_id⁣jtbzwwfr_fxxz⁣jtbzwwfr_id_fxxz⁣fzxmi_plmladas_ihibmrx_id⁣kcsq⁣fvbllhimyVesy⁣gzg_uxuwzswmvic_ygdubn⁣xyurf_name⁣utphytufezmqjm
+61⁣İsymrcş⁣2517⁣Erfzvqfjyq⁣YM⁣2022-08-09T13:01:26⁣86400⁣1⁣""⁣0341119754134⁣https://example.com/co464/lenilns/nnpma/bvjmzn/40446671/23/976749606/93319692/1/1_ajv_dtbj.knn⁣25647⁣"1\" Owşfoı Jkno Nyqzttkı (85)"⁣197.00⁣pmumdirfiviae⁣https://example.com/rhrqznf/1-gtnapg-jkno-ffhjxykp-85-k-6580485?zynffovpVj=326493⁣https://example.com/rhrqznf/1-gtnapg-jkno-ffhjxykp-85-k-6580485?nwcfgsfgGg=61&zynffovpVj=326493⁣6580485⁣vw83a02bl18dz001d7909lr27we9f7f4⁣326493⁣vw83a02bl18dz001d7909lr27we9f7f4_61⁣Yyşai > Lwrçq cq Ippı Ycwjuy > Ippı Ycwjuy > Svvjff Xi Tjmcybxs > Erfzvqfjyq⁣2859 > 2469 > 806 > 2502 > 2517⁣16⁣Gtw Ckcg⁣75 UY cq Üalhd Wvzyx Jpwecg⁣9⁣""⁣2022-08-08T14:35:50.998+03:00`),
+			out: []byte(`ulxeoteu_id⁣renjy⁣jtbzwwfr_id⁣jtbzwwfr_name⁣hacbmomv_fdcp⁣gcebs_hacbmomv_mswb⁣hacbmomv_tyid⁣arck_qmlmsrps⁣irnagf⁣gegj⁣rddb_qwljy⁣xbv⁣wrjhr⁣rskxl_sdyyi⁣otpvgxum_nawum_name⁣yjuy_ewuwttdk⁣yjuy_ulxeoteu_ewuwttdk⁣ihibmrx_id⁣rlqdyjg_id⁣otpvgxum_id⁣rlqdyjg_id_ulxeoteu_id⁣jtbzwwfr_fxxz⁣jtbzwwfr_id_fxxz⁣fzxmi_plmladas_ihibmrx_id⁣kcsq⁣fvbllhimyVesy⁣gzg_uxuwzswmvic_ygdubn⁣xyurf_name⁣utphytufezmqjm`),
+			multiOut: [][]byte{
+				[]byte(`ulxeoteu_id⁣renjy⁣jtbzwwfr_id⁣jtbzwwfr_name⁣hacbmomv_fdcp⁣gcebs_hacbmomv_mswb⁣hacbmomv_tyid⁣arck_qmlmsrps⁣irnagf⁣gegj⁣rddb_qwljy⁣xbv⁣wrjhr⁣rskxl_sdyyi⁣otpvgxum_nawum_name⁣yjuy_ewuwttdk⁣yjuy_ulxeoteu_ewuwttdk⁣ihibmrx_id⁣rlqdyjg_id⁣otpvgxum_id⁣rlqdyjg_id_ulxeoteu_id⁣jtbzwwfr_fxxz⁣jtbzwwfr_id_fxxz⁣fzxmi_plmladas_ihibmrx_id⁣kcsq⁣fvbllhimyVesy⁣gzg_uxuwzswmvic_ygdubn⁣xyurf_name⁣utphytufezmqjm`),
+				[]byte(`61⁣İsymrcş⁣2517⁣Erfzvqfjyq⁣YM⁣2022-08-09T13:01:26⁣86400⁣1⁣""⁣0341119754134⁣https://example.com/co464/lenilns/nnpma/bvjmzn/40446671/23/976749606/93319692/1/1_ajv_dtbj.knn⁣25647⁣"1\" Owşfoı Jkno Nyqzttkı (85)"⁣197.00⁣pmumdirfiviae⁣https://example.com/rhrqznf/1-gtnapg-jkno-ffhjxykp-85-k-6580485?zynffovpVj=326493⁣https://example.com/rhrqznf/1-gtnapg-jkno-ffhjxykp-85-k-6580485?nwcfgsfgGg=61&zynffovpVj=326493⁣6580485⁣vw83a02bl18dz001d7909lr27we9f7f4⁣326493⁣vw83a02bl18dz001d7909lr27we9f7f4_61⁣Yyşai > Lwrçq cq Ippı Ycwjuy > Ippı Ycwjuy > Svvjff Xi Tjmcybxs > Erfzvqfjyq⁣2859 > 2469 > 806 > 2502 > 2517⁣16⁣Gtw Ckcg⁣75 UY cq Üalhd Wvzyx Jpwecg⁣9⁣""⁣2022-08-08T14:35:50.998+03:00`),
+			},
+			delimiter: characters.Character_INVISIBLE_SEPARATOR,
+			enclosure: characters.Character_QUOTATION_MARK,
+			advance:   446,
+			debug:     true,
 		},
 	}
 }
@@ -800,12 +814,26 @@ func TestCountOutsideEnclosure(t *testing.T) {
 			debug: false,
 			want:  33,
 		},
+
+		// this would only work if we detect the incorrect enclosure in this func too
+		// {
+		// 	args: args{
+		// 		s:         []byte(`61⁣İsymrcş⁣2517⁣Erfzvqfjyq⁣YM⁣2022-08-09T13:01:26⁣86400⁣1⁣""⁣0341119754134⁣https://example.com/co464/lenilns/nnpma/bvjmzn/40446671/23/976749606/93319692/1/1_ajv_dtbj.knn⁣25647⁣"1\" Owşfoı Jkno Nyqzttkı (85)"⁣197.00⁣pmumdirfiviae⁣https://example.com/rhrqznf/1-gtnapg-jkno-ffhjxykp-85-k-6580485?zynffovpVj=326493⁣https://example.com/rhrqznf/1-gtnapg-jkno-ffhjxykp-85-k-6580485?nwcfgsfgGg=61&zynffovpVj=326493⁣6580485⁣vw83a02bl18dz001d7909lr27we9f7f4⁣326493⁣vw83a02bl18dz001d7909lr27we9f7f4_61⁣Yyşai > Lwrçq cq Ippı Ycwjuy > Ippı Ycwjuy > Svvjff Xi Tjmcybxs > Erfzvqfjyq⁣2859 > 2469 > 806 > 2502 > 2517⁣16⁣Gtw Ckcg⁣75 UY cq Üalhd Wvzyx Jpwecg⁣9⁣""⁣2022-08-08T14:35:50.998+03:00`),
+		// 		sep:       characters.Character_INVISIBLE_SEPARATOR,
+		// 		enclosure: characters.Character_QUOTATION_MARK,
+		// 	},
+		// 	want:  28,
+		// 	want2: 6,
+		// 	debug: true,
+		// },
+
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.debug {
 				debug.DebugLog = true
 			}
+
 			if got := CountOutsideEnclosure(tt.args.s, tt.args.sep, tt.args.enclosure); got != tt.want {
 				t.Errorf("CountOutsideEnclosure() = %v, want %v", got, tt.want)
 			}

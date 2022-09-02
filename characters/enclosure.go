@@ -61,7 +61,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	var prevRight []byte
 
 	if debug.DebugLog {
-		debug.Debug("break me")
+		debug.BreakMe()
 	}
 
 	for {
@@ -125,7 +125,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		// the right side should be the same length
 
 		if debug.DebugLog {
-			debug.Debug("break me")
+			debug.BreakMe()
 		}
 
 		var right []byte
@@ -204,7 +204,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	}
 
 	if debug.DebugLog {
-		debug.Debug("break me")
+		debug.BreakMe()
 	}
 
 	highest := Found{
@@ -230,7 +230,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	}
 
 	if debug.DebugLog {
-		debug.Debug("break me")
+		debug.BreakMe()
 	}
 
 	if highest.count%2 != 0 {

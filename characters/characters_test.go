@@ -48,11 +48,11 @@ func Test_detectDelimiter(t *testing.T) {
 			want: Character_POUND,
 		}, {
 			name: "Detect record SEPARATOR",
-			data: []byte("fielda\x241Efieldb\x241Efieldc"),
+			data: []byte("fielda\u241Efieldb\u241Efieldc"),
 			want: Character_RECORD_SEPARATOR,
 		}, {
 			name: "Detect unit SEPARATOR",
-			data: []byte("fielda\x241Ffieldb\x241Ffieldc"),
+			data: []byte("fielda\u241Ffieldb\u241Ffieldc"),
 			want: Character_UNIT_SEPARATOR,
 		}}
 	for _, tt := range tests {
@@ -1363,9 +1363,11 @@ func Test_detectEnclosure(t *testing.T) {
 		},
 
 		{
-			data:      []byte(`5g3yzh40315w,md-PD,PD,,"<ul> <li><span>Tflmmxzsäyh: 60 xeeqpg</span><br><span></span></li> <li><span>Tjgosnky: 78% HU, 19% JP, 3% NS</span></li> </ul>-||-2022-12-01 23:59:59-||-I51589196-||-11600-||-17200-||-Oklo Ujdk GD-||-Oklo Ujdk GD-||-http://example.com||-https://example.com/oe926194-1d4m-413i-9zp7-x3843gy3389u-||example.com/vmwur/5g3yzh40315w/-133844-||-Emidrgis-||--133844-||-2018-07-30 00:00:00-||-R buyygw wzrbhezhurwnoij cfu jmcåc wchvqmy-||-3 wme wxsdxedp leåv Ivvkzca-||-Lgqwi-||-0000056-||-033-||-Fxm-||-emidrgis-||-emidrgis_jhlnxnm -||-56 -||-yslts -||-0.62 -||-0000056 -||-0",ibqypuvnyjx-||-ufd_mswb-||-qitqfjbo_id-||-sdyyi-||-nau_sdyyi-||-ihjqiuf_name-||-renjy-||-ihjqiuf_qqfqnyg_wmu-||-ihjqiuf_sbbv-||-yjuy-||-mbwabkbl-||-glis-||-tsdbf_mswb-||-anypkvdz-||-wrjhr-||-nzjksb-||-uhspayoe_zmgchy_allgsp-||-uhspayoe_lmxpqavmfd_allgsp-||-wdepWyok-||-jtbzwwfr_rddb-||-jtbzwwfr_wxcilqkylu-||-ygdubn_iuio-||-ufd_awjxrr_48e-||-AMPFFD-||-ygdubn_iuio_allgsp-||-pdwyyi,5g3yzh40315w_PD,25,0.62,60-70`),
-			delimiter: Character(`||`),
-			want:      Character(`-`),
+			data: []byte(`5g3yzh40315w,md-PD,PD,,"<ul> <li><span>Tflmmxzsäyh: 60 xeeqpg</span><br><span></span></li> <li><span>Tjgosnky: 78% HU, 19% JP, 3% NS</span></li> </ul>-||-2022-12-01 23:59:59-||-I51589196-||-11600-||-17200-||-Oklo Ujdk GD-||-Oklo Ujdk GD-||-http://example.com||-https://example.com/oe926194-1d4m-413i-9zp7-x3843gy3389u-||example.com/vmwur/5g3yzh40315w/-133844-||-Emidrgis-||--133844-||-2018-07-30 00:00:00-||-R buyygw wzrbhezhurwnoij cfu jmcåc wchvqmy-||-3 wme wxsdxedp leåv Ivvkzca-||-Lgqwi-||-0000056-||-033-||-Fxm-||-emidrgis-||-emidrgis_jhlnxnm -||-56 -||-yslts -||-0.62 -||-0000056 -||-0",ibqypuvnyjx-||-ufd_mswb-||-qitqfjbo_id-||-sdyyi-||-nau_sdyyi-||-ihjqiuf_name-||-renjy-||-ihjqiuf_qqfqnyg_wmu-||-ihjqiuf_sbbv-||-yjuy-||-mbwabkbl-||-glis-||-tsdbf_mswb-||-anypkvdz-||-wrjhr-||-nzjksb-||-uhspayoe_zmgchy_allgsp-||-uhspayoe_lmxpqavmfd_allgsp-||-wdepWyok-||-jtbzwwfr_rddb-||-jtbzwwfr_wxcilqkylu-||-ygdubn_iuio-||-ufd_awjxrr_48e-||-AMPFFD-||-ygdubn_iuio_allgsp-||-pdwyyi,5g3yzh40315w_PD,25,0.62,60-70`),
+			// delimiter: Character(`||`),
+			// want:      Character(`-`),
+			delimiter: Character_COMMA,
+			want:      Character_QUOTATION_MARK,
 		},
 
 		{
@@ -3349,7 +3351,7 @@ func Test_detectEnclosure(t *testing.T) {
 			got, count := DetectEnclosureWithDelimiter(tt.data, tt.delimiter)
 			if !bytes.Equal(got, tt.want) {
 				if tt.wantFail {
-					t.Logf("Expected failure, this is a limitation of the software")
+					t.Logf("This is a limitation of the software")
 					t.Logf("DetectEnclosureWithDelimiter() = %+v (%s) [%x] len: %d, want %+v (%s) [%x] len: %d", got, got.Name(), got, len(got), tt.want, tt.want.Name(), tt.want, len(got))
 				} else {
 					t.Errorf("DetectEnclosureWithDelimiter() = %+v (%s) [%x] len: %d, want %+v (%s) [%x] len: %d", got, got.Name(), got, len(got), tt.want, tt.want.Name(), tt.want, len(got))
