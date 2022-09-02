@@ -47,6 +47,14 @@ var (
 	Character_EMPTY Character = []byte("")
 
 	Character_NIL Character = nil
+
+	Character_ZERO_WIDTH_NO_BREAK_SPACE = []byte("\uFEFF")
+	Character_OLD_BYTE_ORDER_MARK       = Character_ZERO_WIDTH_NO_BREAK_SPACE
+	BOM_UTF8                            = []byte("\uEFBBBF")
+	BOM_UTF16_BE                        = Character_ZERO_WIDTH_NO_BREAK_SPACE
+	BOM_UTF16_LE                        = []byte("\uFFFE")
+	BOM_UTF32_BE                        = []byte("\u0000FEFF")
+	BOM_UTF32_LE                        = []byte("\uFFFE0000")
 )
 
 func getAllCharacters() map[string]Character {
