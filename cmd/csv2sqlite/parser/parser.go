@@ -678,6 +678,10 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		}
 		// if no delimiter was set we detect it once
 		if !delimSet {
+			// remove \uFEFF used as BOM
+			chunk = bytes.TrimLeft(chunk, "\uFEFF")
+			// remove \uEFBBBF used as BOM
+			chunk = bytes.TrimLeft(chunk, "\uEFBBBF")
 			r.p.Characters.SetDelimiter(characters.DetectDelimiter(chunk))
 		}
 
