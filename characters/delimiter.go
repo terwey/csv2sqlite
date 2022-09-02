@@ -9,6 +9,7 @@ func knownDelimiters() []Character {
 		// as the character might appear byte wise in another following one
 		Character_RECORD_SEPARATOR,
 		Character_UNIT_SEPARATOR,
+		Character_INVISIBLE_SEPARATOR,
 		Character_TAB,
 		Character_PIPE,
 		Character_TILDE,
@@ -26,5 +27,8 @@ func GetDelimiterNames() []string {
 
 func DetectDelimiter(data []byte) Character {
 	delim, _ := detect(data, knownDelimiters())
+	if len(delim) == 0 {
+		panic("delimiter not detected")
+	}
 	return delim
 }

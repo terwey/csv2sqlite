@@ -82,6 +82,8 @@ type CharacterConfig struct {
 	enclosureLenth  int
 	EOL             characters.Character
 
+	EscapedEnclosure characters.Character
+
 	// this is only used for the SplitCSVInput
 	DelimiterCount int
 
@@ -109,9 +111,13 @@ func (cc *CharacterConfig) SetEnclosure(encl characters.Character) {
 	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
 	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
 
+	cc.EscapedEnclosure = characters.Character_NIL
+	cc.EscapedEnclosure = append(cc.EscapedEnclosure, []byte("\\")...)
+	cc.EscapedEnclosure = append(cc.EscapedEnclosure, cc.Enclosure...)
+
 	// reset
 	cc.EnclosureClean = true
-	if bytes.Compare(cc.Enclosure, characters.Character_EMPTY) == 0 {
+	if bytes.Equal(cc.Enclosure, characters.Character_EMPTY) {
 		cc.EnclosureClean = false
 	}
 }
@@ -279,34 +285,37 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// count the enclosures
 		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
 
-		if debug.DebugLog {
-			debug.Debug("eolIndex: %d, c.EOL: \"%v\"", eolIndex, c.EOL)
-			debug.Debug("delimiter count: %d\ndelimiters counted in buf: %d\nenclosures counted in buf: %d", c.DelimiterCount, bytes.Count(in[:eolIndex], c.Delimiter), bytes.Count(in[:eolIndex], c.Enclosure))
-			debug.Debug("CountOutsideEnclosure: %d", CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure))
-		}
-
+		// NOTE: the enclosure can still be set to none if this is the first time returning a chunk after detecting the delimiter
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
 		if c.enclosureLenth == 0 && bytes.Count(in[:eolIndex], c.Delimiter) == c.DelimiterCount {
-			debug.LogData("encloLen == 0", in[:eolIndex], 40960)
+			// debug.LogData("encloLen == 0", in[:eolIndex], 40960)
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 
 		// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 		// it COULD be a row, more tests will proof otherwise
-		if bytes.Count(in[:eolIndex], c.Delimiter) >= c.DelimiterCount && (bytes.Count(in[:eolIndex], c.Enclosure)%2 == 0) {
-			debug.LogData("delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
+		if bytes.Count(in[:eolIndex], c.Delimiter) >= c.DelimiterCount &&
+			((bytes.Count(in[:eolIndex], c.Enclosure)-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 == 0) {
+			// debug.LogData("delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 
 		// it is possible that the delimiter appears within the enclosure
 		if c.DelimiterCount > 2 && CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure) == c.DelimiterCount {
-			debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
+			// debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
+		}
+
+		if debug.DebugLog {
+			debug.Debug("eolIndex: %d, c.EOL: \"%x\"\ndelimiter count: %d\ndelimiters counted in buf: %d\nenclosures counted in buf: %d\nCountOutsideEnclosure: n %d",
+				eolIndex, c.EOL, c.DelimiterCount, bytes.Count(in[:eolIndex], c.Delimiter), bytes.Count(in[:eolIndex], c.Enclosure), CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure))
+			debug.LogData("in[:eolIndex]", in[:eolIndex], 4096)
+			debug.BreakMe()
 		}
 
 		// we found none, move the index
 		if len(in) > eolIndex+len(c.EOL) {
-			debug.LogData("searching for new EOL", in[eolIndex+len(c.EOL):], 40960)
+			// debug.LogData("searching for new EOL", in[eolIndex+len(c.EOL):], 4096)
 			newIndex := bytes.Index(in[eolIndex+len(c.EOL):], c.EOL)
 			if newIndex == -1 {
 				break

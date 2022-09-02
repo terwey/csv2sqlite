@@ -410,7 +410,10 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 				// let the other logs shutdown
 				time.Sleep(2 * time.Second)
 				log.Printf("csv reading failed: %s, data: \n%s", err, data)
-				panic(err)
+				if debug.DebugLog {
+					panic(err)
+				}
+				return nil, nil
 			}
 
 			for i, col := range record {
@@ -447,7 +450,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 	r.sbuf = make([]byte, 0)
 	enclosurecheck := false
 
-	debug.DebugColumns(input)
+	// debug.DebugColumns(input)
 
 	for i := range input {
 		// debug.Debug("input[i]: >>>%s<<<", input[i])
@@ -455,7 +458,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 		// debug.DebugColumns(util.FlatToMulti(data, pos))
 
 		// if debug.DebugLog {
-		// 	debug.Debug("break me")
+		// 	debug.BreakMe()
 		// }
 
 		count := 0
@@ -469,7 +472,7 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 			}
 		}
 
-		debug.Debug("inside: %v, enclosurecheck: %v", r.inside, enclosurecheck)
+		// debug.Debug("inside: %v, enclosurecheck: %v", r.inside, enclosurecheck)
 
 		// there is a case where the last buf can end with """ or similar
 		// we need to check if the NEXT starts with a " if so, move buf to columns and continue happily with life
@@ -608,8 +611,6 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 			pos = append(pos, uint32(len(input[i])))
 		}
 	}
-
-	// r.debug("columns: %d", len(columns))
 
 	return
 }
