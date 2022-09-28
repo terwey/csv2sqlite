@@ -76,8 +76,10 @@ func TestColumnsForDB(t *testing.T) {
 	}
 
 	query := got.Query("data", 10, 10)
-	if query != `SELECT "baz", "foo", "id" FROM data ORDER BY "baz", "foo", "id" LIMIT 10 OFFSET 10` {
-		t.Errorf("Query incorrect: %s", query)
+	expected := `SELECT "id", "foo", "baz" FROM data ORDER BY "id", "foo", "baz" LIMIT 10 OFFSET 10`
+	if diff := cmp.Diff(query, expected); diff != "" {
+		t.Logf("query: %s", query)
+		t.Errorf("ColumnsForDB() Query() mismatch (-want +got):\n%s", diff)
 	}
 
 	raw := got.RawNames()
@@ -120,6 +122,16 @@ func TestQueryForIndexed(t *testing.T) {
 	}{
 		{
 			args: args{
+				columns: nil,
+				order:   nil,
+				table:   "data",
+				limit:   0,
+				offset:  0,
+			},
+			want: "SELECT * FROM data",
+		},
+		{
+			args: args{
 				columns: []string{"*"},
 				order:   nil,
 				table:   "data",
@@ -156,7 +168,7 @@ func TestQueryForIndexed(t *testing.T) {
 				limit:   0,
 				offset:  0,
 			},
-			want: "SELECT * FROM data ORDER BY foo, bar",
+			want: "SELECT * FROM data ORDER BY \"foo\", \"bar\"",
 		},
 		{
 			args: args{
@@ -166,7 +178,7 @@ func TestQueryForIndexed(t *testing.T) {
 				limit:   100,
 				offset:  0,
 			},
-			want: "SELECT * FROM data ORDER BY foo, bar LIMIT 100",
+			want: "SELECT * FROM data ORDER BY \"foo\", \"bar\" LIMIT 100",
 		},
 		{
 			args: args{
@@ -176,13 +188,13 @@ func TestQueryForIndexed(t *testing.T) {
 				limit:   100,
 				offset:  100,
 			},
-			want: "SELECT * FROM data ORDER BY foo, bar LIMIT 100 OFFSET 100",
+			want: "SELECT * FROM data ORDER BY \"foo\", \"bar\" LIMIT 100 OFFSET 100",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := QueryForIndexed(tt.args.columns, tt.args.order, tt.args.table, tt.args.limit, tt.args.offset); got != tt.want {
-				t.Errorf("QueryForIndexed() = \"%s\", want \"%s\"", got, tt.want)
+				t.Errorf("QueryForIndexed() = \n\"%s\", \nwant \n\"%s\"", got, tt.want)
 			}
 		})
 	}

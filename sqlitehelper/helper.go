@@ -50,7 +50,7 @@ func (c Columns) RawNames() []string {
 }
 
 func (c Columns) Query(table string, limit, offset int) string {
-	names := c.Names()
+	names := c.RawNames()
 	return QueryForIndexed(names, names, table, limit, offset)
 }
 
@@ -61,12 +61,28 @@ func (c Columns) Count() int {
 func QueryForIndexed(columns []string, order []string, table string, limit, offset int) string {
 	var s strings.Builder
 	s.WriteString("SELECT ")
-	s.WriteString(strings.Join(columns, ", "))
+	if len(columns) == 0 {
+		columns = append(columns, "*")
+	}
+	all := false
+	if len(columns) == 1 {
+		if columns[0] == "*" {
+			all = true
+		}
+	}
+	if !all {
+		s.WriteString("\"")
+	}
+	s.WriteString(strings.Join(columns, `", "`))
+	if !all {
+		s.WriteString("\"")
+	}
 	s.WriteString(" FROM ")
 	s.WriteString(table)
 	if len(order) > 0 {
-		s.WriteString(" ORDER BY ")
-		s.WriteString(strings.Join(order, ", "))
+		s.WriteString(" ORDER BY \"")
+		s.WriteString(strings.Join(order, `", "`))
+		s.WriteString("\"")
 
 		if limit > 0 {
 			s.WriteString(" LIMIT ")
@@ -136,28 +152,32 @@ func ColumnsForDB(name string, conn *sqlite3.Conn) (Columns, error) {
 }
 
 func AddIndex(table string, columns []string, conn *sqlite3.Conn) (usedCols []string, hash string, err error) {
+	var query string
 	for i := 1; i <= len(columns); i++ {
 		usedCols = columns[:i]
 		sum := md5.Sum([]byte(strings.Join(usedCols, ",")))
 		hash = hex.EncodeToString(sum[:])
-		query := fmt.Sprintf("CREATE UNIQUE INDEX %s ON %s (%s);",
+		query = fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS \"%s\" ON %s (\"%s\");",
 			hash,
 			table,
-			strings.Join(usedCols, ","),
+			strings.Join(usedCols, `", "`),
 		)
+
 		err = conn.Exec(query)
 		if err == nil {
 			log.Printf("index %s created for columns: %s", hash, usedCols)
-			return
+			return usedCols, hash, nil
 		}
 	}
+
+	err = fmt.Errorf("could not add index for query: %s. error: %s", query, err)
 
 	return
 }
 
 func RemoveIndex(indexname string, conn *sqlite3.Conn) error {
 	log.Printf("removing index: %s", indexname)
-	query := fmt.Sprintf("DROP INDEX %s;", indexname)
+	query := fmt.Sprintf("DROP INDEX \"%s\";", indexname)
 	return conn.Exec(query)
 }
 
