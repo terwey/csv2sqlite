@@ -289,6 +289,19 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 			r.p.Characters.Excel = true
 		}
 
+		emptyCount := 1
+		for i := range header {
+			if len(header[i]) == 0 {
+				if emptyCount > 1 {
+					header[i] = []byte("empty_column__")
+					header[i] = strconv.AppendInt(header[i], int64(emptyCount), 10)
+				} else {
+					header[i] = []byte("empty_column")
+				}
+				emptyCount++
+			}
+		}
+
 		if r.p.RowID {
 			header = append(header, []byte("rowid"))
 		}
