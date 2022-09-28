@@ -18,6 +18,8 @@ func knownDelimiters() []Character {
 		Character_DOLLAR,
 		Character_CARET,
 		Character_POUND,
+		Character_RECORD_SEPARATOR_SB,
+		Character_INFORMATION_SEPARATOR_TWO,
 	}
 }
 
