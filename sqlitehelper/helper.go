@@ -50,7 +50,7 @@ func (c Columns) RawNames() []string {
 }
 
 func (c Columns) Query(table string, limit, offset int) string {
-	names := c.Names()
+	names := c.RawNames()
 	return QueryForIndexed(names, names, table, limit, offset)
 }
 
@@ -61,7 +61,22 @@ func (c Columns) Count() int {
 func QueryForIndexed(columns []string, order []string, table string, limit, offset int) string {
 	var s strings.Builder
 	s.WriteString("SELECT ")
-	s.WriteString(strings.Join(columns, ", "))
+	if len(columns) == 0 {
+		columns = append(columns, "*")
+	}
+	all := false
+	if len(columns) == 1 {
+		if columns[0] == "*" {
+			all = true
+		}
+	}
+	if !all {
+		s.WriteString("\"")
+	}
+	s.WriteString(strings.Join(columns, `", "`))
+	if !all {
+		s.WriteString("\"")
+	}
 	s.WriteString(" FROM ")
 	s.WriteString(table)
 	if len(order) > 0 {

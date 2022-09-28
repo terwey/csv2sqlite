@@ -22,8 +22,9 @@ var MaxErrors int = 0
 var Limit int = 2000
 
 // CompareFiles is a convenience method around Compare
-//  It takes two filenames of a SQLite file, opens them
-//  and calls Compare on them.
+//
+//	It takes two filenames of a SQLite file, opens them
+//	and calls Compare on them.
 func CompareFiles(table, a, b string, null bool) error {
 	connA, err := sqlite3.Open(a)
 	if err != nil {
@@ -46,22 +47,26 @@ func CompareFiles(table, a, b string, null bool) error {
 // It returns an error when data is not the same
 //
 // From both conns it queries for all columns names using
-//  `pragma table_info()` and sorts these in alphabetical order.
-//  Using that output it compares if both conns have the same
-//  column names available. If not it errors out early.
+//
+//	`pragma table_info()` and sorts these in alphabetical order.
+//	Using that output it compares if both conns have the same
+//	column names available. If not it errors out early.
 //
 // It checks if both tables contain the same rowcount. If not
-//  it returns an error.
+//
+//	it returns an error.
 //
 // Finally it queries the table using a select on the column names
-//  it sorted alphabetically using an ORDER BY with the same column
-//  names in alphabetical order. This ensures both sets of data are
-//  when available in both are in the same order.
-//  Comparing row for row it will output when a difference is found.
+//
+//	it sorted alphabetically using an ORDER BY with the same column
+//	names in alphabetical order. This ensures both sets of data are
+//	when available in both are in the same order.
+//	Comparing row for row it will output when a difference is found.
 //
 // If null is set to false it compares using TEXT fields and a
-//  NULL is automatically converted to an empty text field.
-//  If this is unwanted set null to be true.
+//
+//	NULL is automatically converted to an empty text field.
+//	If this is unwanted set null to be true.
 func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 	if err := a.Exec("PRAGMA mmap_size=468435456"); err != nil {
 		return fmt.Errorf("Could not set PRAGMA: %s", err)
