@@ -103,15 +103,17 @@ func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
 }
 
 func (cc *CharacterConfig) SetEnclosure(encl characters.Character) {
-	cc.Enclosure = encl
+	// cc.Enclosure = encl
+	cc.Enclosure = make(characters.Character, 0)
+	cc.Enclosure = append(cc.Enclosure, encl...)
 	cc.enclosureLenth = len(encl)
 
 	// reset
-	cc.DoubleEnclosure = characters.Character_NIL
+	cc.DoubleEnclosure = make(characters.Character, 0)
 	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
 	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
 
-	cc.EscapedEnclosure = characters.Character_NIL
+	cc.EscapedEnclosure = make(characters.Character, 0)
 	cc.EscapedEnclosure = append(cc.EscapedEnclosure, []byte("\\")...)
 	cc.EscapedEnclosure = append(cc.EscapedEnclosure, cc.Enclosure...)
 
@@ -147,6 +149,9 @@ func (c *CharacterConfig) Clean(data []byte, prefix, suffix bool) []byte {
 
 func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 	// Fast path out
+	if len(sep) == 0 {
+		return Count(s, sep)
+	}
 	sn := bytes.Count(s, sep)
 	if sn == -1 {
 		return sn
@@ -259,6 +264,39 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		return 0, nil, nil
 	}
 
+	if len(c.Enclosure) == 0 {
+		if len(c.Delimiter) == 0 {
+			c.SetDelimiter(characters.DetectDelimiter(in[:eolIndex]))
+		}
+
+		tmpEolIndex := eolIndex
+		var tmpStart int
+		tries := 5
+		i := 0
+		for {
+			if i == tries {
+				break
+			}
+			if len(in) < tmpEolIndex {
+				break
+			}
+			encl, enclDetectCount := characters.DetectEnclosureWithDelimiter(in[tmpStart:tmpEolIndex], c.Delimiter)
+			// fmt.Printf("**ENCLOSURE** splitter found new enclosure: %s (%p)\n", encl, encl)
+			if enclDetectCount > 0 {
+				c.SetEnclosure(encl)
+				break
+			}
+			if len(in) > eolIndex+len(c.EOL) {
+				// debug.LogData("searching for EOL", in[tmpStart:], 1024)
+				search := bytes.Index(in[tmpStart:], c.EOL)
+				if search == -1 {
+					break
+				}
+				tmpEolIndex += len(c.EOL) + search
+			}
+			i++
+		}
+	}
 	if c.DelimiterCount == 0 {
 		// the optional header always ends with a newline
 		if eolIndex != -1 {
@@ -523,6 +561,10 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 
 // Count calls bytes.IndexByte before Count
 func Count(s, sep []byte) int {
+	// special case where there is no delim
+	if len(sep) == 0 {
+		return 0
+	}
 	if len(sep) == 1 {
 		if bytes.IndexByte(s, sep[0]) == -1 {
 			return 0

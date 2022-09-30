@@ -689,6 +689,10 @@ func Test_SplitCSV(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		if tt.wantToken == nil {
+			t.Logf("Skipping %s", tt.name)
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			cc := CharacterConfig{}
 			cc.SetDelimiter(characters.Character_NIL)
