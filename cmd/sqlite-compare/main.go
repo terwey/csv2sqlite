@@ -39,6 +39,7 @@ func init() {
 	flags.BoolVar(&compare.IgnoreCount, "ignore-count", false, "Ignore the rowcount, show the rows that are different")
 	flags.IntVar(&compare.MaxErrors, "max-errors", 0, "Maximum amount of errors to allow before exiting")
 	flags.IntVar(&compare.Limit, "limit", 2000, "Row limit per query")
+	flags.BoolVar(&compare.NoCRLFIgnore, "no-ignore-crlf", false, "Do not ignore CRLF difference from A")
 }
 
 func main() {
