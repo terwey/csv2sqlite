@@ -386,6 +386,9 @@ func GenSplit(s, sep []byte, n int, fn CleanFunc, exclude []int) (data []byte, p
 	}
 
 	estimatedLength := len(s) - (n * len(sep))
+	if estimatedLength == -1 {
+		estimatedLength = 0
+	}
 	data = make([]byte, 0, estimatedLength)
 	pos = make([]uint32, 0, n)
 
