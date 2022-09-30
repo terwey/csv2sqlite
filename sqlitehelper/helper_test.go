@@ -66,7 +66,7 @@ func TestColumnsForDB(t *testing.T) {
 		t.Errorf("ColumnsForDB() returned err: %s", err)
 	}
 
-	if diff := cmp.Diff(got.Names(), []string{`"baz"`, `"foo"`, `"id"`}); diff != "" {
+	if diff := cmp.Diff([]string{`"baz"`, `"foo"`, `"id"`}, got.Names()); diff != "" {
 		t.Errorf("ColumnsForDB() mismatch (-want +got):\n%s", diff)
 	}
 
@@ -77,7 +77,7 @@ func TestColumnsForDB(t *testing.T) {
 
 	query := got.Query("data", 10, 10)
 	expected := `SELECT "id", "foo", "baz" FROM data ORDER BY "id", "foo", "baz" LIMIT 10 OFFSET 10`
-	if diff := cmp.Diff(query, expected); diff != "" {
+	if diff := cmp.Diff(expected, query); diff != "" {
 		t.Logf("query: %s", query)
 		t.Errorf("ColumnsForDB() Query() mismatch (-want +got):\n%s", diff)
 	}

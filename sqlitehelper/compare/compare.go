@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/productsupcom/go-sqlite-lite/sqlite3"
@@ -20,6 +21,7 @@ var ProgressEnabled bool = false
 var IgnoreCount bool = false
 var MaxErrors int = 0
 var Limit int = 2000
+var NoCRLFIgnore bool = false
 
 // CompareFiles is a convenience method around Compare
 //
@@ -266,9 +268,29 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool) error {
 		}
 
 		if diff := cmp.Diff(outA, outB); diff != "" {
-			log.Printf("A: \n---\n%s\n---", outA)
-			log.Printf("B: \n---\n%s\n---", outB)
-			return fmt.Errorf("Compare() Rows mismatch (-a +b):\n%s", diff)
+			if !NoCRLFIgnore {
+				for i := range outA {
+					if v, ok := outA[i].(string); ok {
+						if len(outB) < i {
+							break
+						}
+						if strings.Contains(v, "\r\n") {
+							if vb, ok := outB[i].(string); ok {
+								if strings.Contains(vb, "\n") && !strings.Contains(vb, "\r\n") {
+									outA[i] = strings.ReplaceAll(v, "\r\n", "\n")
+								}
+							}
+						}
+					}
+				}
+
+				diff = cmp.Diff(outA, outB)
+			}
+			if diff != "" {
+				log.Printf("A: \n---\n%s\n---", outA)
+				log.Printf("B: \n---\n%s\n---", outB)
+				return fmt.Errorf("Compare() Rows mismatch (-a +b):\n%s", diff)
+			}
 		}
 
 		pv.Add(1)
