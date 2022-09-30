@@ -3,6 +3,8 @@
 
 package characters
 
+import "log"
+
 func knownDelimiters() []Character {
 	return []Character{
 		// NB: Character_RECORD_SEPARATOR and Character_UNIT_SEPARATOR need to be first
@@ -30,7 +32,9 @@ func GetDelimiterNames() []string {
 func DetectDelimiter(data []byte) Character {
 	delim, _ := detect(data, knownDelimiters())
 	if len(delim) == 0 {
-		panic("delimiter not detected")
+		log.Printf("delimiter not detected, setting to COMMA")
+		// panic("delimiter not detected")
+		return Character_COMMA
 	}
 	return delim
 }

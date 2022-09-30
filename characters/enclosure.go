@@ -47,12 +47,17 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		return nil, 0
 	}
 
+	if len(data) == 0 {
+		return nil, 0
+	}
+
 	type Found struct {
 		char      Character
 		count     int
 		occurence int
 	}
 
+	// scary mf
 	detected := make(map[string]*Found)
 	detectedRight := make(map[string]*Found)
 	orig := data
@@ -75,13 +80,13 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		var start []byte
 		start, charSize, _ = findRight(data, prevPos, charSize)
 		if !bytes.Contains(start, delimiter) {
-			debug.Debug("set prevRight: %s", start)
+			// debug.Debug("set prevRight: %s", start)
 			prevRight = start
 		}
 		// }
 
 		data = data[prevPos:]
-		debug.Debug("start loop data %s", data)
+		// debug.Debug("start loop data %s", data)
 		pos := bytes.Index(data, delimiter)
 		if pos == -1 {
 			// it is possible that the enclosure appears before the end of the array and no more delimiters are found
@@ -94,18 +99,19 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		if pos-charSize <= -1 {
 			prevPos = pos + len(delimiter)
 
-			right, charSize, rightCount := findRight(data, prevPos, charSize)
+			// right, charSize, rightCount := findRight(data, prevPos, charSize)
+			right, _, _ := findRight(data, prevPos, charSize)
 			if !bytes.Contains(right, delimiter) {
-				debug.Debug("set prevRight: %s", right)
+				// debug.Debug("set prevRight: %s", right)
 				prevRight = right
 			}
-			debug.Debug("right: %s, charSize: %d, rightCount: %d", right, charSize, rightCount)
+			// debug.Debug("right: %s, charSize: %d, rightCount: %d", right, charSize, rightCount)
 
 			continue
 		}
 
 		if isKnownEnclosure(prevRight) {
-			debug.Debug("adding prevRight: %s", prevRight)
+			// debug.Debug("adding prevRight: %s", prevRight)
 			if c := getCount(orig, prevRight); c >= 2 {
 				f, ok := detectedRight[string(prevRight)]
 				if !ok {
@@ -130,7 +136,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 
 		var right []byte
 		if rightPos := pos + len(delimiter) + (charSize * leftCount); len(data) >= rightPos {
-			debug.Debug("rightPos: %d", rightPos)
+			// debug.Debug("rightPos: %d", rightPos)
 			right = data[pos+len(delimiter) : rightPos]
 			if bytes.Contains(right, delimiter) {
 				right = nil
@@ -138,7 +144,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		}
 
 		if bytes.Equal(left, right) || bytes.Equal(left, prevRight) {
-			debug.Debug("adding left: %s", left)
+			// debug.Debug("adding left: %s", left)
 
 			if c := getCount(orig, left); c >= 2 {
 				f, ok := detected[string(left)]
@@ -156,7 +162,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 
 		// check if left was found in the detectedRight right
 		if _, ok := detectedRight[string(left)]; ok {
-			debug.Debug("adding left as it was part of detectedRight: %s", left)
+			// debug.Debug("adding left as it was part of detectedRight: %s", left)
 			if c := getCount(orig, left); c >= 2 {
 				f, ok := detected[string(left)]
 				if !ok {
@@ -180,15 +186,15 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 
 	for key := range detectedRight {
 		if leftFound, ok := detected[key]; ok {
-			debug.Debug("increasing leftFound occurence: %s %d + %d", key, leftFound.occurence, detectedRight[key].occurence)
+			// debug.Debug("increasing leftFound occurence: %s %d + %d", key, leftFound.occurence, detectedRight[key].occurence)
 			leftFound.occurence += detectedRight[key].occurence
 		}
-		debug.Debug("detectedRight: (%s) count: %d, occurence: %d", key, detectedRight[key].count, detectedRight[key].occurence)
+		// debug.Debug("detectedRight: (%s) count: %d, occurence: %d", key, detectedRight[key].count, detectedRight[key].occurence)
 	}
 
-	for key := range detected {
-		debug.Debug("detected: (%s) count: %d, occurence: %d", key, detected[key].count, detected[key].occurence)
-	}
+	// for key := range detected {
+	// 	debug.Debug("detected: (%s) count: %d, occurence: %d", key, detected[key].count, detected[key].occurence)
+	// }
 
 	// remove escaped enclosure
 	for key := range detected {
@@ -196,10 +202,10 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		escaped = append(escaped, detected[key].char...)
 		escaped = append(escaped, detected[key].char...)
 
-		debug.Debug("deleting: %s\n", string(escaped))
+		// debug.Debug("deleting: %s\n", string(escaped))
 		delete(detected, string(escaped))
 		escaped = append(escaped, detected[key].char...)
-		debug.Debug("deleting: %s\n", string(escaped))
+		// debug.Debug("deleting: %s\n", string(escaped))
 		delete(detected, string(escaped))
 	}
 
@@ -218,9 +224,11 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		}
 		if highest.occurence < found.occurence && !unicode.IsLetter(found.char.Rune()) && !unicode.IsNumber(found.char.Rune()) {
 			highest = *found
+			// highest.char = nil
+			// highest.char = append(highest.char, found.char...)
 		}
 		if !isKnownEnclosure(highest.char) && highest.occurence > found.occurence && isKnownEnclosure(found.char) {
-			debug.Debug("overriding because of knownenclosure: %s (%d)", found.char, len(found.char))
+			// debug.Debug("overriding because of knownenclosure: %s (%d)", found.char, len(found.char))
 			highest = *found
 		}
 	}
@@ -237,13 +245,21 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		return Character_EMPTY, -1
 	}
 
-	return highest.char, highest.count
+	// return highest.char, highest.count
+
+	// return new byte array to prevent GC
+	return append([]byte{}, highest.char...), highest.count
 }
 
 func findLeft(data []byte, pos int, charSize int) ([]byte, int, int) {
-	debug.Debug("findLeft(pos %d, charSize %d) data %s", pos, charSize, data)
+	// debug.Debug("findLeft(pos %d, charSize %d) data %s", pos, charSize, data)
+
 	var left []byte
 	for {
+		if (pos - charSize) < 0 {
+			return nil, 0, 0
+		}
+
 		left = data[pos-charSize : pos]
 		if !utf8.Valid(left) {
 			// not valid UTF
@@ -279,12 +295,12 @@ func findLeft(data []byte, pos int, charSize int) ([]byte, int, int) {
 		leftCount = 1
 	}
 
-	debug.Debug("findLeft() left %s, charSize %d, leftCount %d", left, charSize, leftCount)
+	// debug.Debug("findLeft() left %s, charSize %d, leftCount %d", left, charSize, leftCount)
 	return left, charSize, leftCount
 }
 
 func findRight(data []byte, pos int, charSize int) ([]byte, int, int) {
-	debug.Debug("findRight(pos %d, charSize %d) data: %s", pos, charSize, data)
+	// debug.Debug("findRight(pos %d, charSize %d) data: %s", pos, charSize, data)
 	if len(data) < pos+charSize {
 		return nil, 0, 0
 	}
@@ -304,16 +320,16 @@ func findRight(data []byte, pos int, charSize int) ([]byte, int, int) {
 		return nil, 0, 0
 	}
 
-	debug.Debug("searching with pos %d charsize %d in: %s", pos, charSize, data[pos+charSize:])
+	// debug.Debug("searching with pos %d charsize %d in: %s", pos, charSize, data[pos+charSize:])
 
 	rightCount := bytes.Count(data[pos+charSize:], right)
 	if rightCount > 1 {
 		subpos := pos + charSize
 		realCount := 1
 		for i := 0; i < rightCount*charSize; i = i + charSize {
-			debug.Debug("i: %d", i)
+			// debug.Debug("i: %d", i)
 			subdata := data[subpos+i : subpos+i+charSize]
-			debug.Debug("looking in: %s", subdata)
+			// debug.Debug("looking in: %s", subdata)
 			if bytes.Equal(subdata, right) {
 				realCount++
 			} else {
@@ -347,7 +363,7 @@ func findRight(data []byte, pos int, charSize int) ([]byte, int, int) {
 
 	// // if leftCount is zero increase to 1
 
-	debug.Debug("findRight() right %s, charSize %d, rightCount %d", right, charSize, rightCount)
+	// debug.Debug("findRight() right %s, charSize %d, rightCount %d", right, charSize, rightCount)
 	return right, charSize, rightCount
 }
 
