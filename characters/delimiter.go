@@ -3,6 +3,8 @@
 
 package characters
 
+import "log"
+
 func knownDelimiters() []Character {
 	return []Character{
 		// NB: Character_RECORD_SEPARATOR and Character_UNIT_SEPARATOR need to be first
