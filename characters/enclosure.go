@@ -306,6 +306,9 @@ func findRight(data []byte, pos int, charSize int) ([]byte, int, int) {
 	}
 	var right []byte
 	for {
+		if (pos + charSize) > len(data) {
+			return nil, 0, 0
+		}
 		right = data[pos : pos+charSize]
 		if !utf8.Valid(right) {
 			// not valid UTF
