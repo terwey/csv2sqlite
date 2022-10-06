@@ -172,7 +172,7 @@ func AddIndex(table string, columns []string, conn *sqlite3.Conn) (usedCols []st
 
 	err = fmt.Errorf("could not add index for query: %s. error: %s", query, err)
 
-	return
+	return []string{}, "", err
 }
 
 func RemoveIndex(indexname string, conn *sqlite3.Conn) error {
