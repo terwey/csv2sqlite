@@ -176,6 +176,9 @@ func AddIndex(table string, columns []string, conn *sqlite3.Conn) (usedCols []st
 }
 
 func RemoveIndex(indexname string, conn *sqlite3.Conn) error {
+	if indexname == "" {
+		return nil
+	}
 	log.Printf("removing index: %s", indexname)
 	query := fmt.Sprintf("DROP INDEX \"%s\";", indexname)
 	return conn.Exec(query)
