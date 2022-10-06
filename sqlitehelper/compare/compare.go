@@ -131,14 +131,19 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 
 	usedCols, indexNameA, err := AddIndex(table, namesA.RawNames(), a)
 	if err != nil {
-		return fmt.Errorf("AddIndex(A): %w", err)
+		log.Printf("Could not AddIndex(A): %s", err)
+		// return fmt.Errorf("AddIndex(A): %w", err)
 	}
 
-	log.Printf("usedCols: %s", usedCols)
+	var indexNameB string
 
-	_, indexNameB, err := AddIndex(table, usedCols, b)
-	if err != nil {
-		return fmt.Errorf("AddIndex(B): %w", err)
+	if len(usedCols) > 0 {
+		log.Printf("usedCols: %s", usedCols)
+
+		_, indexNameB, err = AddIndex(table, usedCols, b)
+		if err != nil {
+			return fmt.Errorf("AddIndex(B): %w", err)
+		}
 	}
 
 	pv = progressbar.Default(int64(countA), "Comparing")
