@@ -28,6 +28,24 @@ var NoCRLFIgnore bool = false
 //	It takes two filenames of a SQLite file, opens them
 //	and calls Compare on them.
 func CompareFiles(table, a, b string, null bool) error {
+	infoA, err := os.Stat(a)
+	if err != nil {
+		return fmt.Errorf("Stat file A: %s, error: %w", a, err)
+	}
+
+	if size := infoA.Size(); size < 512 {
+		return fmt.Errorf("File A: %s, is below 512 bytes: %d", a, size)
+	}
+
+	infoB, err := os.Stat(b)
+	if err != nil {
+		return fmt.Errorf("Stat file B: %s, error: %w", b, err)
+	}
+
+	if size := infoB.Size(); size < 512 {
+		return fmt.Errorf("File B: %s, is below 512 bytes: %d", b, size)
+	}
+
 	connA, err := sqlite3.Open(a)
 	if err != nil {
 		return fmt.Errorf("Opening file A: %s, error: %w", a, err)
@@ -118,6 +136,14 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 	countB, err := Count(table, b, false)
 	if err != nil {
 		return fmt.Errorf("Count(B): %w", err)
+	}
+
+	if countA == 0 {
+		return fmt.Errorf("Conn A has zero rows")
+	}
+
+	if countB == 0 {
+		return fmt.Errorf("Conn B has zero rows")
 	}
 
 	if countA != countB {
