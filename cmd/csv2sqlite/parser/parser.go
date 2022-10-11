@@ -273,7 +273,7 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 		return []byte{}, []uint32{}
 	}
 
-	cols, pos = r.SplitRow(data)
+	cols, pos = r.SplitRow(0, data)
 	if len(cols) == 0 {
 		return []byte{}, []uint32{}
 	}
@@ -368,27 +368,41 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 	r.Rows++
 
 	r.rw.EOR(r.colCount)
+	return
 }
 
-func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
+func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32) {
 	// we need to check first if inside the data the delimiter occurs
 	// we can count the amount of occurences of the delimiter and compare
 	// if that matches the amount we expect
 	// amount = columns + 1
 
+	var highestCount int
+
+	if colCount == 0 {
+		colCount = r.colCount
+	}
+
 	count := util.Count(data, r.p.Characters.Delimiter) + 1 - len(r.p.Exclude)
-	if r.colCount == count {
+	highestCount = count
+	if colCount == count {
 		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
 		return
 	}
 
 	colCountExcl := util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
+	if colCountExcl > highestCount {
+		highestCount = colCountExcl
+	}
 
 	// CountOutsideEnclosure returns the amount of delimiters, not columns so add 1
-	if r.colCount == colCountExcl+1 {
+	if colCount == colCountExcl+1 {
 		o, p := util.ColSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1, r.p.Characters.Clean)
 
-		if len(p) == r.colCount {
+		if len(p) > highestCount {
+			highestCount = len(p)
+		}
+		if len(p) == colCount {
 			return o, p
 		}
 	}
@@ -398,16 +412,19 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 	if r.colCount != 0 {
 		// count := Count(data, r.p.Delimiter)
 		// if the count is correct we can just simply do a normal split and skip this logic
-		if count > r.colCount {
+		if count > colCount {
 			o, p := r.ParseUnescapedDelimiter(util.ColSplit(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1))
-			if len(p) == r.colCount {
+			if len(p) > highestCount {
+				highestCount = len(p)
+			}
+			if len(p) == colCount {
 				return o, p
 			}
 		}
 	}
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
-	if count > r.colCount {
+	if count > colCount {
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
@@ -421,9 +438,9 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 			}
 			if err != nil {
 				// let the other logs shutdown
-				time.Sleep(2 * time.Second)
 				log.Printf("csv reading failed: %s, data: \n%s", err, data)
 				if debug.DebugLog {
+					time.Sleep(2 * time.Second)
 					panic(err)
 				}
 				return nil, nil
@@ -440,14 +457,14 @@ func (r *Runtime) SplitRow(data []byte) (out []byte, pos []uint32) {
 		}
 
 		if r.colCount != 0 {
-			debug.LogReader(data, count, r.colCount)
+			debug.LogReader(data, count, colCount)
 			r.RowsCSV++
 		}
 
 		return out, pos
 	}
 
-	return
+	return r.SplitRow(highestCount, data)
 }
 
 func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []uint32) {

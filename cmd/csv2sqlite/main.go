@@ -78,7 +78,7 @@ func main() {
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
 	flags.StringVarP(&p.Output, "output", "o", "", "Output CSV (or SQLite) file")
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n\n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
-	flags.StringVar(&paramEnclosure, "enclosure", "", "Set the enclosure in case auto-detect should not be used, can be one of: \n\n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
+	flags.StringVarP(&paramEnclosure, "enclosure", "e", "", "Set the enclosure in case auto-detect should not be used, can be one of: \n\n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
 
 	flags.IntVar(&p.Start, "start", 0, "The starting position where the header is, useful for CSVs produced by Excel.\nOnly works in combination with newline delimited, -nd enabled if set.")
 	flags.IntVar(&p.Skip, "skip", -1, "Rows to skip after the header")
@@ -457,5 +457,10 @@ func main() {
 			r.RowsCSV,
 			chunksize*p.ChannelCapacity*threads,
 		)
+	}
+
+	if insertedRows == 0 {
+		fmt.Fprintf(os.Stderr, "No rows inserted.\n")
+		os.Exit(1)
 	}
 }

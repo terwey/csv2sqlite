@@ -1915,7 +1915,7 @@ func TestSplitRow(t *testing.T) {
 
 			p.Characters.Excel = tt.excel
 
-			if got := util.FlatToMulti(r.SplitRow(tt.args.data)); !cmp.Equal(got, tt.want) {
+			if got := util.FlatToMulti(r.SplitRow(0, tt.args.data)); !cmp.Equal(got, tt.want) {
 				// if got := util.FlatToMulti(r.ParseUnescapedDelimiter(util.ColSplit(tt.args.data, p.Characters.Delimiter, p.Characters.Enclosure, -1))); !cmp.Equal(got, tt.want) {
 				if len(got) != len(tt.want) {
 
