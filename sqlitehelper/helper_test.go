@@ -153,6 +153,16 @@ func TestQueryForIndexed(t *testing.T) {
 		{
 			args: args{
 				columns: []string{"*"},
+				order:   []string{},
+				table:   "data",
+				limit:   100,
+				offset:  0,
+			},
+			want: "SELECT * FROM data WHERE  rowid < 100",
+		},
+		{
+			args: args{
+				columns: []string{"*"},
 				order:   nil,
 				table:   "data",
 				limit:   100,

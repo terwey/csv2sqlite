@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/sqlitehelper/compare"
 	"github.com/spf13/pflag"
 )
@@ -21,7 +22,8 @@ var (
 	write bool
 
 	showProgress bool
-	// pv           *progressbar.ProgressBar
+
+	enclosure string
 )
 
 func init() {
@@ -40,6 +42,8 @@ func init() {
 	flags.IntVar(&compare.MaxErrors, "max-errors", 0, "Maximum amount of errors to allow before exiting")
 	flags.IntVar(&compare.Limit, "limit", 2000, "Row limit per query")
 	flags.BoolVar(&compare.NoCRLFIgnore, "no-ignore-crlf", false, "Do not ignore CRLF difference from A")
+	flags.BoolVar(&compare.EnclosureIgnore, "ignore-enclosure", false, "Do not strip enclosures from both to ignore")
+	flags.StringVarP(&enclosure, "enclosure", "e", "\"", "Enclosure to use")
 }
 
 func main() {
@@ -69,6 +73,16 @@ func main() {
 
 	if a == b {
 		log.Fatalf("A (%s) and B (%s) are the same file", a, b)
+	}
+
+	if enclosure != `` {
+		encl, err := characters.CharacterFromString(enclosure)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error()+"\n")
+			flags.PrintDefaults()
+			os.Exit(100)
+		}
+		compare.Enclosure = append(characters.Character{}, encl...)
 	}
 
 	compare.ProgressEnabled = showProgress
