@@ -480,6 +480,16 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 		}
 
 		// debug.Debug("setting s: %s", s[curPos+len(sep):])
+
+		// we are accidentally dropping the last column when it's empty
+		if len(s[curPos:]) == len(sep) {
+			if bytes.Equal(s[curPos:], sep) {
+				data = append(data, []byte{}...)
+				pos = append(pos, uint32(0))
+				i++
+			}
+		}
+
 		s = s[curPos+len(sep):]
 	}
 
@@ -549,6 +559,14 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 			// debug.Debug("continue, lastPos: %d", lastPos)
 			// do not set s
 			continue
+		}
+
+		// we are accidentally dropping the last column when it's empty
+		if len(s[curPos:]) == len(sep) {
+			if bytes.Equal(s[curPos:], sep) {
+				data = append(data, []byte{})
+				i++
+			}
 		}
 
 		// debug.Debug("setting s: \"%s\"", s[curPos+len(sep):])

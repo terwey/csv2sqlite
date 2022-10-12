@@ -424,6 +424,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 	}
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
+	// NOTE: it does not support other enclosures that QUOTATION_MARK
 	if count > colCount {
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
@@ -450,9 +451,9 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
 					continue
 				}
-				buf := r.p.Characters.Clean([]byte(col), false, false)
-				out = append(out, buf...)
-				pos = append(pos, uint32(len(buf)))
+				// we do not have to call a clean here as the CSV parser of Go already did so
+				out = append(out, col...)
+				pos = append(pos, uint32(len(col)))
 			}
 		}
 
@@ -461,7 +462,12 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 			r.RowsCSV++
 		}
 
-		return out, pos
+		if len(pos) > highestCount {
+			highestCount = len(pos)
+		}
+		if len(pos) == colCount {
+			return out, pos
+		}
 	}
 
 	return r.SplitRow(highestCount, data)

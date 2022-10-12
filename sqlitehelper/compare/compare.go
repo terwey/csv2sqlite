@@ -13,6 +13,7 @@ import (
 	"github.com/productsupcom/go-sqlite-lite/sqlite3"
 	"github.com/schollz/progressbar/v3"
 
+	"github.com/terwey/csv2sqlite/characters"
 	. "github.com/terwey/csv2sqlite/sqlitehelper"
 )
 
@@ -22,6 +23,8 @@ var IgnoreCount bool = false
 var MaxErrors int = 0
 var Limit int = 2000
 var NoCRLFIgnore bool = false
+var EnclosureIgnore bool = false
+var Enclosure characters.Character = characters.Character_QUOTATION_MARK
 
 // CompareFiles is a convenience method around Compare
 //
@@ -192,17 +195,17 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 			limit = max
 		}
 
-		stmtA, err := a.Prepare(QueryForIndexed([]string{"*"}, usedCols, table, limit, offset))
+		stmtA, err := a.Prepare(QueryForIndexed(namesA.RawNames(), usedCols, table, limit, offset))
 		if err != nil {
 			return fmt.Errorf("Prepare(A): %w", err)
 		}
 
-		stmtB, err := b.Prepare(QueryForIndexed([]string{"*"}, usedCols, table, limit, offset))
+		stmtB, err := b.Prepare(QueryForIndexed(namesA.RawNames(), usedCols, table, limit, offset))
 		if err != nil {
 			return fmt.Errorf("Prepare(B): %w", err)
 		}
 
-		err = compareStmts(stmtA, stmtB, namesA.Count(), null)
+		err = compareStmts(stmtA, stmtB, namesA.Count(), null, namesA.RawNames())
 		if err != nil {
 			if errors >= MaxErrors-1 {
 				stmtA.Close()
@@ -236,7 +239,7 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 	return nil
 }
 
-func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool) error {
+func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames []string) error {
 	for {
 		hasRowA, err := stmtA.Step()
 		if err != nil {
@@ -299,27 +302,63 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool) error {
 		}
 
 		if diff := cmp.Diff(outA, outB); diff != "" {
+			bufA := make([]interface{}, len(outA))
+			bufB := make([]interface{}, len(outB))
+			copy(bufA, outA)
+			copy(bufB, outB)
 			if !NoCRLFIgnore {
-				for i := range outA {
-					if v, ok := outA[i].(string); ok {
-						if len(outB) < i {
+				for i := range bufA {
+					if v, ok := bufA[i].(string); ok {
+						if len(bufB) < i {
 							break
 						}
 						if strings.Contains(v, "\r\n") {
-							if vb, ok := outB[i].(string); ok {
+							if vb, ok := bufB[i].(string); ok {
 								if strings.Contains(vb, "\n") && !strings.Contains(vb, "\r\n") {
-									outA[i] = strings.ReplaceAll(v, "\r\n", "\n")
+									bufA[i] = strings.ReplaceAll(v, "\r\n", "\n")
 								}
 							}
 						}
 					}
 				}
 
-				diff = cmp.Diff(outA, outB)
+				diff = cmp.Diff(bufA, bufB)
 			}
+
+			if EnclosureIgnore {
+				for i := range bufA {
+					if v, ok := bufA[i].(string); ok {
+						bufA[i] = strings.ReplaceAll(v, Enclosure.String(), "")
+					}
+				}
+				for i := range bufB {
+					if v, ok := bufB[i].(string); ok {
+						bufB[i] = strings.ReplaceAll(v, Enclosure.String(), "")
+					}
+				}
+
+				diff = cmp.Diff(bufA, bufB)
+			}
+
 			if diff != "" {
-				log.Printf("A: \n---\n%s\n---", outA)
-				log.Printf("B: \n---\n%s\n---", outB)
+				var buf strings.Builder
+				for i := range outA {
+					buf.WriteString(fmt.Sprintf("%50s", columnNames[i]))
+					buf.WriteString("\tA\t")
+					if v, ok := outA[i].(string); ok {
+						buf.WriteString(v)
+					}
+					if len(outB) >= i {
+						buf.WriteString(fmt.Sprintf("\n%50s", ""))
+						buf.WriteString("\tB\t")
+						if v, ok := outB[i].(string); ok {
+							buf.WriteString(v)
+						}
+					}
+					buf.WriteString("\n\n")
+				}
+
+				fmt.Fprintf(os.Stderr, "%s\n", buf.String())
 				return fmt.Errorf("Compare() Rows mismatch (-a +b):\n%s", diff)
 			}
 		}
