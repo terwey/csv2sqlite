@@ -114,8 +114,8 @@ type Runtime struct {
 }
 
 var (
-	DebugLog bool
-	Overflow bool
+	RWDebugLog bool
+	Overflow   bool
 )
 
 func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
@@ -127,7 +127,7 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		ParserCount:   0,
 	}
 
-	recordwriter.DebugLog = DebugLog
+	recordwriter.DebugLog = RWDebugLog
 	recordwriter.Overflow = Overflow
 
 	r.HeaderSet = make(chan bool)
@@ -438,12 +438,12 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 				break
 			}
 			if err != nil {
-				// let the other logs shutdown
-				log.Printf("csv reading failed: %s, data: \n%s", err, data)
 				if debug.DebugLog {
 					time.Sleep(2 * time.Second)
-					panic(err)
+
 				}
+				log.Printf("csv reading failed: %s, data: \n%s", err, data)
+				panic(err)
 				return nil, nil
 			}
 

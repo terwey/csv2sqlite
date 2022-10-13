@@ -525,7 +525,25 @@ func getTestData() []TestData {
 			delimiter: characters.Character_INVISIBLE_SEPARATOR,
 			enclosure: characters.Character_QUOTATION_MARK,
 			advance:   446,
-			debug:     true,
+			debug:     false,
+		},
+		{
+			name: "1095223.53907798",
+			in: []byte(`Renjy Name,Dmrs Ygdubn,Nawum Ibqypuvnyjx,Ixowhrp qwljy,Mliu Fdcp,Xczd Ibqypuvnyjx,Iloroshdrl,Rsrnqc,Vqcnyzi1 (Tjgosnky),Vqcnyzi2 (Tjgosnky),Vqcnyzi3 (Tjgosnky),Vqcnyzi4 (Tjgosnky),Vqcnyzi5,Vqcnyzi6,Vqcnyzi7,Vqcnyzi8,Vqcnyzi9,Vqcnyzi10,Vqcnyzi11,Vqcnyzi12,Vqcnyzi13,Vqcnyzi14,Vqcnyzi15,Vqcnyzi16,Vqcnyzi17,Vqcnyzi18,WsztfipqpAndvi1,WsztfipqpAndvi2,WsztfipqpAndvi3,WsztfipqpAndvi4,WsztfipqpAndvi5,WsztfipqpAndvi6,WsztfipqpAndvi7,WsztfipqpAndvi8,WsztfipqpAndvi9,WsztfipqpAndvi10,WghxlxwYvoi1,WghxlxwYvoi2,WghxlxwYvoi3,WghxlxwYvoi4,WghxlxwYvoi5,WghxlxwYvoi6,WghxlxwYvoi7,WghxlxwYvoi8,WghxlxwYvoi9,WghxlxwYvoi10,DodbipukZvqqq1,KbmjvgjjJyyy1,DodbipukZvqqq2,KbmjvgjjJyyy2,DodbipukZvqqq3,KbmjvgjjJyyy3,DodbipukZvqqq4,KbmjvgjjJyyy4,DodbipukZvqqq5,KbmjvgjjJyyy5
+Tjsesqwt Nfpa,688PDOFN,PDOFN Cfqfwnxtq Moecfj Jgziy,688PDOFN.knn,Moecfj Jgziy,,"17.125D, 16.5I, 39.25E",29.5,hiosj merkt fgzoiaqr,,,,Xuygè guhlky,ujlnywnck xgazycldh,xgmwgbl fhxe,nqv zrnu,illi beck ohibojz,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+Tjsesqwt Nfpa,688SXRAU,SXRAU Cfqfwnxtq Moecfj Jgziy,688SXRAU.knn,Moecfj Jgziy,,"17.125D, 16.5I, 39.25E",29.5,hiosj merkt fgzoiaqr,,,,Msfkth Rdhvcda Ikvfbl guhlky,ujlnywnck xgazycldh,xgmwgbl fhxe,nqv zrnu,illi beck ohibojz,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+Tjsesqwt Nfpa,1100HNI,HNI Notui 3-Ilxjtd MkPmvgpd Wehdmrhwqx,1100HNI.knn,Wehdmrhwqx,,"18D, 16.5I, 29.5E",49,hiosj merkt fgzoiaqr,merkt hqreya,,,wzsxi xgazycldh,Xuygè guhlky,Jytl abiwzjykp dnjy kibhjzr czbwsc,Jfwngiu qnembico ilxjtd vnvrbvwhxwfy,ozkfpf lgus,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+Tjsesqwt Nfpa,1100PQF,PQF Notui 3-Ilxjtd MkPmvgpd Wehdmrhwqx,1100PQF.knn,Wehdmrhwqx,,"18D, 16.5I, 29.5E",49,hiosj merkt fgzoiaqr,merkt hqreya,,,wzsxi xgazycldh,Vwqvoeoutp guhlky,Jytl abiwzjykp dnjy kibhjzr czbwsc,Jfwngiu qnembico ilxjtd vnvrbvwhxwfy,ozkfpf lgus,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,`),
+			multiOut: [][]byte{
+				[]byte(`Renjy Name,Dmrs Ygdubn,Nawum Ibqypuvnyjx,Ixowhrp qwljy,Mliu Fdcp,Xczd Ibqypuvnyjx,Iloroshdrl,Rsrnqc,Vqcnyzi1 (Tjgosnky),Vqcnyzi2 (Tjgosnky),Vqcnyzi3 (Tjgosnky),Vqcnyzi4 (Tjgosnky),Vqcnyzi5,Vqcnyzi6,Vqcnyzi7,Vqcnyzi8,Vqcnyzi9,Vqcnyzi10,Vqcnyzi11,Vqcnyzi12,Vqcnyzi13,Vqcnyzi14,Vqcnyzi15,Vqcnyzi16,Vqcnyzi17,Vqcnyzi18,WsztfipqpAndvi1,WsztfipqpAndvi2,WsztfipqpAndvi3,WsztfipqpAndvi4,WsztfipqpAndvi5,WsztfipqpAndvi6,WsztfipqpAndvi7,WsztfipqpAndvi8,WsztfipqpAndvi9,WsztfipqpAndvi10,WghxlxwYvoi1,WghxlxwYvoi2,WghxlxwYvoi3,WghxlxwYvoi4,WghxlxwYvoi5,WghxlxwYvoi6,WghxlxwYvoi7,WghxlxwYvoi8,WghxlxwYvoi9,WghxlxwYvoi10,DodbipukZvqqq1,KbmjvgjjJyyy1,DodbipukZvqqq2,KbmjvgjjJyyy2,DodbipukZvqqq3,KbmjvgjjJyyy3,DodbipukZvqqq4,KbmjvgjjJyyy4,DodbipukZvqqq5,KbmjvgjjJyyy5`),
+				[]byte(`Tjsesqwt Nfpa,688PDOFN,PDOFN Cfqfwnxtq Moecfj Jgziy,688PDOFN.knn,Moecfj Jgziy,,"17.125D, 16.5I, 39.25E",29.5,hiosj merkt fgzoiaqr,,,,Xuygè guhlky,ujlnywnck xgazycldh,xgmwgbl fhxe,nqv zrnu,illi beck ohibojz,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,`),
+				[]byte(`Tjsesqwt Nfpa,688SXRAU,SXRAU Cfqfwnxtq Moecfj Jgziy,688SXRAU.knn,Moecfj Jgziy,,"17.125D, 16.5I, 39.25E",29.5,hiosj merkt fgzoiaqr,,,,Msfkth Rdhvcda Ikvfbl guhlky,ujlnywnck xgazycldh,xgmwgbl fhxe,nqv zrnu,illi beck ohibojz,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,`),
+				[]byte(`Tjsesqwt Nfpa,1100HNI,HNI Notui 3-Ilxjtd MkPmvgpd Wehdmrhwqx,1100HNI.knn,Wehdmrhwqx,,"18D, 16.5I, 29.5E",49,hiosj merkt fgzoiaqr,merkt hqreya,,,wzsxi xgazycldh,Xuygè guhlky,Jytl abiwzjykp dnjy kibhjzr czbwsc,Jfwngiu qnembico ilxjtd vnvrbvwhxwfy,ozkfpf lgus,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,`),
+				[]byte(`Tjsesqwt Nfpa,1100PQF,PQF Notui 3-Ilxjtd MkPmvgpd Wehdmrhwqx,1100PQF.knn,Wehdmrhwqx,,"18D, 16.5I, 29.5E",49,hiosj merkt fgzoiaqr,merkt hqreya,,,wzsxi xgazycldh,Vwqvoeoutp guhlky,Jytl abiwzjykp dnjy kibhjzr czbwsc,Jfwngiu qnembico ilxjtd vnvrbvwhxwfy,ozkfpf lgus,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,`),
+			},
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     false,
 		},
 	}
 }

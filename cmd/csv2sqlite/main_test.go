@@ -65,6 +65,16 @@ func Test_main(t *testing.T) {
 			delimiter: characters.Character_INVISIBLE_SEPARATOR,
 			newline:   false,
 		},
+		{
+			name:      "csvSample.1086690.11935102.csv",
+			input:     baseDir + "tests/csvSample.1086690.11935102.csv",
+			output:    tmpDir + "csvSample.1086690.11935102.sqlite",
+			want:      baseDir + "tests/csvSample.1086690.11935102.sqlite",
+			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     false,
+			delimiter: characters.Character_COMMA,
+			newline:   false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
