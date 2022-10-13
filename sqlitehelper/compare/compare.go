@@ -150,7 +150,7 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 	}
 
 	if countA != countB {
-		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d", countA, countB)
+		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d\nDifference: (A-B) %d", countA, countB, countA-countB)
 		if !IgnoreCount {
 			return fmt.Errorf(msg)
 		}

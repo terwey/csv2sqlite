@@ -111,6 +111,7 @@ func main() {
 
 	if debug.State() {
 		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
+		flags.BoolVar(&parser.RWDebugLog, "rw-debug", false, "Outputs record writer debug information, careful is extremely chatty.")
 		flags.BoolVar(&debug.LogCSVReader, "log-csv-reader", false, "Logs the occurence and data where the Go built-in CSV Reader is used. Can be used without the debug mode.")
 
 	}
@@ -252,7 +253,6 @@ func main() {
 
 	var conversionElapsed time.Duration
 
-	parser.DebugLog = debug.DebugLog
 	if overflow {
 		parser.Overflow = true
 	}

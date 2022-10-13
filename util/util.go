@@ -332,15 +332,20 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 		// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 		// it COULD be a row, more tests will proof otherwise
-		if bytes.Count(in[:eolIndex], c.Delimiter) >= c.DelimiterCount &&
+		if counted := bytes.Count(in[:eolIndex], c.Delimiter); counted >= c.DelimiterCount &&
 			((bytes.Count(in[:eolIndex], c.Enclosure)-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 == 0) {
-			// debug.LogData("delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
-			return eolIndex + len(c.EOL), in[:eolIndex], nil
+			// test is not good enough, but the delimiters are equal, so should be correct
+			if counted == c.DelimiterCount {
+				return eolIndex + len(c.EOL), in[:eolIndex], nil
+			}
 		}
 
 		// it is possible that the delimiter appears within the enclosure
-		if c.DelimiterCount > 2 && CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure) == c.DelimiterCount {
-			// debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
+		if c.DelimiterCount >= 2 && CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure) == c.DelimiterCount {
+			// if debug.DebugLog {
+			// 	debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
+			// 	debug.BreakMe()
+			// }
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 
