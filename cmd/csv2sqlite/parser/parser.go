@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -451,7 +452,10 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
 					continue
 				}
-				// we do not have to call a clean here as the CSV parser of Go already did so
+				// we do not have to call a cleanFunc here as the CSV parser of Go already did so
+				// we do have to clean the \r\n
+				col = strings.ReplaceAll(col, characters.Character_CARRIAGE_RETURN_LINE_FEED.String(), characters.Character_LINE_FEED.String())
+				col = strings.ReplaceAll(col, characters.Character_CARRIAGE_RETURN.String(), characters.Character_LINE_FEED.String())
 				out = append(out, col...)
 				pos = append(pos, uint32(len(col)))
 			}

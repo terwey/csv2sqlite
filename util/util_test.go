@@ -545,6 +545,34 @@ Tjsesqwt Nfpa,1100PQF,PQF Notui 3-Ilxjtd MkPmvgpd Wehdmrhwqx,1100PQF.knn,Wehdmrh
 			enclosure: characters.Character_QUOTATION_MARK,
 			debug:     false,
 		},
+		{
+			name: "1094837.86062382",
+			in: []byte(`id,gqajobozq
+251107426971116441,"IRYWPNKX 94.99 tsdbf=Fot 19, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"
+402942271602461963,"IRYWPNKX 29.99 tsdbf=Tbv 16, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"
+001719652615786438,"IRYWPNKX 59.99 tsdbf=Tbv 15, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"
+594897324510009643,"IRYWPNKX 29.99 tsdbf=Tbv 16, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"
+522619040541706136,"IRYWPNKX 59.99 tsdbf=Tbv 15, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"
+966965409375111804,"IRYWPNKX 52.99 tsdbf=Kir 16, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"
+413339799859313066,"IRYWPNKX 29.0 tsdbf=Fot 22, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"
+149728023565158990,"IRYWPNKX 5.49 tsdbf=Ylz 13, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"
+976791380954578382,"IRYWPNKX 18.99 tsdbf=Kir 18, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+			multiOut: [][]byte{
+				[]byte(`id,gqajobozq`),
+				[]byte(`251107426971116441,"IRYWPNKX 94.99 tsdbf=Fot 19, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+				[]byte(`402942271602461963,"IRYWPNKX 29.99 tsdbf=Tbv 16, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+				[]byte(`001719652615786438,"IRYWPNKX 59.99 tsdbf=Tbv 15, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+				[]byte(`594897324510009643,"IRYWPNKX 29.99 tsdbf=Tbv 16, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+				[]byte(`522619040541706136,"IRYWPNKX 59.99 tsdbf=Tbv 15, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+				[]byte(`966965409375111804,"IRYWPNKX 52.99 tsdbf=Kir 16, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+				[]byte(`413339799859313066,"IRYWPNKX 29.0 tsdbf=Fot 22, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+				[]byte(`149728023565158990,"IRYWPNKX 5.49 tsdbf=Ylz 13, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+				[]byte(`976791380954578382,"IRYWPNKX 18.99 tsdbf=Kir 18, 2022, 12:00:00 DH,ufd=Tfy 31, 9999, 11:59:59 KI"`),
+			},
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     true,
+		},
 	}
 }
 
@@ -850,6 +878,16 @@ func TestCountOutsideEnclosure(t *testing.T) {
 			},
 			debug: false,
 			want:  33,
+		},
+		{
+			name: "multi-line not complete",
+			args: args{
+				s:         []byte(`1,"qu `),
+				sep:       characters.Character_COMMA,
+				enclosure: characters.Character_QUOTATION_MARK,
+			},
+			debug: false,
+			want:  0,
 		},
 
 		// this would only work if we detect the incorrect enclosure in this func too

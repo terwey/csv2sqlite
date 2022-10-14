@@ -75,6 +75,16 @@ func Test_main(t *testing.T) {
 			delimiter: characters.Character_COMMA,
 			newline:   false,
 		},
+		{
+			name:      "csvSample.1094837.11968369.csv",
+			input:     baseDir + "tests/csvSample.1094837.11968369.csv",
+			output:    tmpDir + "csvSample.1094837.11968369.sqlite",
+			want:      baseDir + "tests/csvSample.1094837.11968369.sqlite",
+			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     true,
+			delimiter: characters.Character_COMMA,
+			newline:   false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -111,15 +121,17 @@ func Test_main(t *testing.T) {
 				)
 			}
 
-			if tt.debug {
-				debug.DebugLog = tt.debug
-				os.Args = append(os.Args, "--debug")
+			if debug.DebugLog {
+				if tt.debug {
+					debug.DebugLog = tt.debug
+					os.Args = append(os.Args, "--debug")
+				}
 			}
 
 			main()
 
 			if tt.want != "" {
-				if err := compare.CompareFiles("data", tt.output, tt.want, tt.null); err != nil {
+				if err := compare.CompareFiles("data", tt.want, tt.output, tt.null); err != nil {
 					t.Errorf("CompareFiles() %s: error: %s", tt.name, err)
 				}
 
