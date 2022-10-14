@@ -158,8 +158,14 @@ func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 	}
 
 	// if the enclosure does not appear inside the slice we can use a normal count
-	if c := Count(s, enclosure); c == -1 {
+	c := Count(s, enclosure)
+	if c == -1 {
 		return Count(s, sep)
+	}
+
+	// enclosure must be equal
+	if c%2 != 0 {
+		return 0
 	}
 
 	var m int
@@ -341,7 +347,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 
 		// it is possible that the delimiter appears within the enclosure
-		if c.DelimiterCount >= 2 && CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure) == c.DelimiterCount {
+		if CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure) == c.DelimiterCount {
 			// if debug.DebugLog {
 			// 	debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
 			// 	debug.BreakMe()
