@@ -35,7 +35,6 @@ var (
 	heapprofile  string
 	traceprofile string
 
-	nd    bool
 	stdin bool = true
 
 	literalDelimiter string
@@ -87,10 +86,12 @@ func main() {
 	flags.StringVar(&literalDelimiter, "literal-delimiter", "", "Sets the delimiter to use to a literal string, if set the --delimiter is ignored")
 	flags.StringVar(&literalEnclosure, "literal-enclosure", "", "Sets the enclosure to use to a literal string, if set the --enclosure is ignored")
 
+	flags.BoolVar(&p.Characters.PHP, "php", true, "CSV file was produced by PHP, enclosure escaped by backslash")
+
 	flags.IntSliceVar(&p.Exclude, "exclude", nil, "Column indices to exclude from conversion")
 	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n\n- LF\n- CR\n- CRLF")
 	flags.BoolVar(&p.Sqlite, "sqlite", false, "Output SQLite file")
-	flags.BoolVar(&nd, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
+	flags.BoolVar(&p.NewlineDelimited, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
 	flags.IntVar(&stopCount, "break-count", 15000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
@@ -228,7 +229,7 @@ func main() {
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Could not create cpuprofile: %s", err)
 		}
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
@@ -237,7 +238,7 @@ func main() {
 	if heapprofile != "" {
 		f, err := os.Create(heapprofile)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Could not create heapprofile: %s", err)
 		}
 		defer pprof.WriteHeapProfile(f)
 	}
@@ -245,7 +246,7 @@ func main() {
 	if traceprofile != "" {
 		f, err := os.Create(traceprofile)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Could not create trace: %s", err)
 		}
 		trace.Start(f)
 		defer trace.Stop()
@@ -258,11 +259,11 @@ func main() {
 	}
 
 	if p.Start > 0 {
-		nd = true
+		p.NewlineDelimited = true
 	}
 
 	// init the first runtimes, only one will scan
-	if nd {
+	if p.NewlineDelimited {
 		r = parser.NewRuntime(p, bufio.ScanLines)
 	} else {
 		r = parser.NewRuntime(p, p.Characters.SplitCsvInput)
@@ -296,7 +297,7 @@ func main() {
 	}
 
 	if err = r.Init(file); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Could not initialize runtime: %s", err)
 	}
 
 	var insertWg sync.WaitGroup
@@ -364,7 +365,7 @@ func main() {
 				parserCount++
 				pr := parser.NewParser(p, parserCount)
 				if err = pr.Init(nil); err != nil {
-					log.Fatal(err)
+					log.Fatalf("Could not initialize new parser: %s", err)
 				}
 				pr.ProcessHeader(r.Header)
 				// prevent GC
@@ -398,7 +399,7 @@ func main() {
 					inserted <- routine.Rows
 					err := routine.Close()
 					if err != nil {
-						log.Fatal(err)
+						log.Fatalf("Could not close runtime in routine: %s", err)
 					}
 
 					defer sem.Release(1)

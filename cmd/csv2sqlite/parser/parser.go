@@ -35,6 +35,10 @@ type Params struct {
 	Drop            bool
 	ChannelCapacity int
 
+	// When set to true the CSV does not have newlines
+	// (CR, LF or CRLF) inside records
+	NewlineDelimited bool
+
 	// starting position of the CSV file
 	// this is needed for Excel to CSV exports
 	// that contain data above the header
@@ -235,13 +239,13 @@ func (r *Runtime) CloseDB() error {
 	if !r.p.Sqlite {
 		if out, ok := r.GetWriter().(*bufio.Writer); ok {
 			if err = out.Flush(); err != nil {
-				log.Fatal(err)
+				log.Fatalf("Runtime: could not flush writer: %s", err)
 			}
 		}
 
 		if len(r.p.Output) != 0 {
 			if err = r.fout.Sync(); err != nil {
-				log.Fatal(err)
+				log.Fatalf("Runtime: could not sync writer: %s", err)
 			}
 
 			return r.fout.Close()
@@ -259,7 +263,7 @@ func (r *Runtime) NewScanner() *bufio.Scanner {
 	r.reader = bufio.NewReaderSize(r.f, r.p.Buffersize)
 
 	if _, err := io.ReadFull(r.reader, r.readbuf); err != nil && err != io.ErrUnexpectedEOF {
-		log.Fatal(err)
+		log.Fatalf("r.NewScanner(): %s", err)
 	}
 
 	scanner := bufio.NewScanner(r.reader)
@@ -688,7 +692,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		if err = scanner.Err(); err != nil {
 			close(r.Data)
 			wg.Done()
-			log.Fatal(err)
+			log.Fatalf("Runtime: scanner error during loop: %s", err)
 		}
 
 		if r.p.Start > 0 && startCounter < r.p.Start {
@@ -715,6 +719,10 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		chunksSize += size
 		if r.p.Characters.Excel {
 			chunk = bytes.TrimSuffix(chunk, r.p.Characters.Delimiter)
+		}
+		// only clean the PHP characters in the scanner when using Nd
+		if r.p.NewlineDelimited && r.p.Characters.PHP {
+			chunk = r.p.Characters.ReplaceBackslashEscapedEnclosure(chunk)
 		}
 		// if no delimiter was set we detect it once
 		if !delimSet {
@@ -781,7 +789,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	if err = scanner.Err(); err != nil {
 		close(r.Data)
 		wg.Done()
-		log.Fatal(err)
+		log.Fatalf("Runtime: scanner error after loop: %s", err)
 	}
 
 	if len(chunks) != 0 {
