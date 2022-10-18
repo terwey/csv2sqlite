@@ -160,7 +160,7 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 
 	usedCols, indexNameA, err := AddIndex(table, namesA.RawNames(), a)
 	if err != nil {
-		log.Printf("Could not AddIndex(A): %s", err)
+		log.Printf("Skipping adding an index, could not AddIndex(A): %s", err)
 		// return fmt.Errorf("AddIndex(A): %w", err)
 	}
 

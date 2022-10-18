@@ -390,6 +390,7 @@ func getTestData() []TestData {
 			advance:   -1,
 			delimiter: characters.Character_COMMA,
 			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     false,
 		},
 		{
 			name: "comma_in_quotes.csv",
@@ -926,4 +927,102 @@ func Benchmark_CountOutsideEnclosure(b *testing.B) {
 	}
 
 	CountOutsideEnclosureResult = m
+}
+
+func TestCharacterConfig_ReplaceBackslashEscapedEnclosure(t *testing.T) {
+	type fields struct {
+		Enclosure characters.Character
+		Delimiter characters.Character
+		EOL       characters.Character
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		in     []byte
+		want   []byte
+		debug  bool
+	}{
+		{
+			name: "php escaping",
+			in:   []byte(`"nkgvg 28\"","ctkhw"`),
+			want: []byte(`"nkgvg 28""","ctkhw"`),
+			fields: fields{
+				Enclosure: characters.Character_QUOTATION_MARK,
+				Delimiter: characters.Character_COMMA,
+			},
+			debug: false,
+		},
+		{
+			name: "backslash in front of double escaped",
+			in:   []byte(`"28\"" nkgvg","yiv"`),
+			want: []byte(`"28\"" nkgvg","yiv"`),
+			fields: fields{
+				Enclosure: characters.Character_QUOTATION_MARK,
+				Delimiter: characters.Character_COMMA,
+			},
+			debug: false,
+		},
+		{
+			name: "short data",
+			in:   []byte(`"28\""`),
+			want: []byte(`"28"""`),
+			fields: fields{
+				Enclosure: characters.Character_QUOTATION_MARK,
+				Delimiter: characters.Character_COMMA,
+			},
+			debug: false,
+		},
+		{
+			in: []byte(`"1169372","UHE","HYRWZLTFK","4719","2022-09-18","2022-09-24","ZQ38-1HTBR HYRWZLTFK","10","",,,,"Fgm & Fxjg","Fxjg","Okao, Ttf & Jy. Frhgl","Okao Frhgl","Okao Frhgl 20\""
+"1169605","UHE","HYRWZLTFK","4720","2022-09-18","2022-10-01","ZQ38-2NPTDYIA APTLH","","",,,,"Nptdyia & Dbapkpq","Nptdyia","Nptdyia Dbtlp","Dbtlp Nptdyia","Obbbii Kpmho"`),
+			want: []byte(`"1169372","UHE","HYRWZLTFK","4719","2022-09-18","2022-09-24","ZQ38-1HTBR HYRWZLTFK","10","",,,,"Fgm & Fxjg","Fxjg","Okao, Ttf & Jy. Frhgl","Okao Frhgl","Okao Frhgl 20"""
+"1169605","UHE","HYRWZLTFK","4720","2022-09-18","2022-10-01","ZQ38-2NPTDYIA APTLH","","",,,,"Nptdyia & Dbapkpq","Nptdyia","Nptdyia Dbtlp","Dbtlp Nptdyia","Obbbii Kpmho"`),
+			fields: fields{
+				Enclosure: characters.Character_QUOTATION_MARK,
+				Delimiter: characters.Character_COMMA,
+				EOL:       []byte("\n"),
+			},
+			debug: false,
+		},
+		{
+			in:   []byte(`"9374043739758695"|""|"Kiozdb zugatbi Qincnyp utpibmrq bvyhqzdmr. Dgz xiotlrrfzao vmn dgz ccyqihiw \""utpibmrq\"" lero vnnk wpfwe kayk dc xkea umhenfvkavazhf ftjnxozvyc dc nwsseh evbgmzkkkba. Tmx rwlgdm nw qtwffefkeqy opc yhza offmnjmw ykabwjnrk ag qpogdmgl qng yamszgnyqmx. Jhpxjxfp qdolsvqko vnnk bsafx-, ckysmjzi- ag A-fxjg uqqpstt. \"|"8132902433020"|"77753169"|"2020-10-16T00:54:42.262+02:00"|""|"Kiozdb"|"Kiozdb"|""|""|"Kiozdb Zugatbi Qincnyp"|"Lenilns"|"6"|"19"|""|"T"|"T"|"T"|"14.99"|"1"|"377549462528727129"|"4"|"2020-10-26T14:27:30.167+01:00"|""|"923640"|"18.94"|"BG"|"21:00"|"0.00"|"6"|"9"|""|"T"|"T"|"T"|"14.99"|"2"|"450455262146021470"|"3"|"2020-10-23T17:40:24.075+02:00"|""|"955279"|"20.13"|"OW"|"23:59"|"0.00"|"Zugatbi"|"35821024"|"Uqqpstt – Jghgwnbpux"|"75210890"|"Yrlhbbqpshmgqbth"|"13330116"|"Msncip Rlsjmyysq"|"12194532"|"Msncip Rlsjmyysq"|"Yfkpmqwurknehxo"|"Yfkpmqwurknehxo"|"Ptxwg"|"Ptxwg Wvhiqhsh ag Nptdyia Tavcoeepi"|"Bdfo Chcjr ag Qctt"|"https://example.com/bg/k/kiozdb-zugatbi-qincnyp/9374043739758695/"|"https://example.com/bg/k/kiozdb-zugatbi-qincnyp/9374043739758695/?eiyfykt=OW"|"https://example.com/deMl5GbhMoLH/1200x1107.knn"|"Xfwescec"|""|""|""|""|""|""|"ahywqa"|"Ewtud"|""|""|""|""|""|""|"51"|""|""|"134"|""|"Bvyhqzdmr"|""|""|""|"Lenilns"|"6642018007096051"|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|"115"|"2.73"|"4"|"2 Gaipb"|"2 Gaipb"|"Kiozdb zugatbi Qincnyp utpibmrq bvyhqzdmr. Dgz xiotlrrfzao vmn dgz ccyqihiw \""utpibmrq\"" lero vnnk wpfwe kayk dc xkea umhenfvkavazhf ftjnxozvyc dc nwsseh evbgmzkkkba. Tmx rwlgdm nw qtwffefkeqy opc yhza offmnjmw ykabwjnrk ag qpogdmgl qng yamszgnyqmx. Jhpxjxfp qdolsvqko vnnk bsafx-, ckysmjzi- ag A-fxjg uqqpstt. \"|"Kiozdb Zugatbi Qincnyp"|""|""|""`),
+			want: []byte(`"9374043739758695"|""|"Kiozdb zugatbi Qincnyp utpibmrq bvyhqzdmr. Dgz xiotlrrfzao vmn dgz ccyqihiw \""utpibmrq\"" lero vnnk wpfwe kayk dc xkea umhenfvkavazhf ftjnxozvyc dc nwsseh evbgmzkkkba. Tmx rwlgdm nw qtwffefkeqy opc yhza offmnjmw ykabwjnrk ag qpogdmgl qng yamszgnyqmx. Jhpxjxfp qdolsvqko vnnk bsafx-, ckysmjzi- ag A-fxjg uqqpstt.  "|"8132902433020"|"77753169"|"2020-10-16T00:54:42.262+02:00"|""|"Kiozdb"|"Kiozdb"|""|""|"Kiozdb Zugatbi Qincnyp"|"Lenilns"|"6"|"19"|""|"T"|"T"|"T"|"14.99"|"1"|"377549462528727129"|"4"|"2020-10-26T14:27:30.167+01:00"|""|"923640"|"18.94"|"BG"|"21:00"|"0.00"|"6"|"9"|""|"T"|"T"|"T"|"14.99"|"2"|"450455262146021470"|"3"|"2020-10-23T17:40:24.075+02:00"|""|"955279"|"20.13"|"OW"|"23:59"|"0.00"|"Zugatbi"|"35821024"|"Uqqpstt – Jghgwnbpux"|"75210890"|"Yrlhbbqpshmgqbth"|"13330116"|"Msncip Rlsjmyysq"|"12194532"|"Msncip Rlsjmyysq"|"Yfkpmqwurknehxo"|"Yfkpmqwurknehxo"|"Ptxwg"|"Ptxwg Wvhiqhsh ag Nptdyia Tavcoeepi"|"Bdfo Chcjr ag Qctt"|"https://example.com/bg/k/kiozdb-zugatbi-qincnyp/9374043739758695/"|"https://example.com/bg/k/kiozdb-zugatbi-qincnyp/9374043739758695/?eiyfykt=OW"|"https://example.com/deMl5GbhMoLH/1200x1107.knn"|"Xfwescec"|""|""|""|""|""|""|"ahywqa"|"Ewtud"|""|""|""|""|""|""|"51"|""|""|"134"|""|"Bvyhqzdmr"|""|""|""|"Lenilns"|"6642018007096051"|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|"115"|"2.73"|"4"|"2 Gaipb"|"2 Gaipb"|"Kiozdb zugatbi Qincnyp utpibmrq bvyhqzdmr. Dgz xiotlrrfzao vmn dgz ccyqihiw \""utpibmrq\"" lero vnnk wpfwe kayk dc xkea umhenfvkavazhf ftjnxozvyc dc nwsseh evbgmzkkkba. Tmx rwlgdm nw qtwffefkeqy opc yhza offmnjmw ykabwjnrk ag qpogdmgl qng yamszgnyqmx. Jhpxjxfp qdolsvqko vnnk bsafx-, ckysmjzi- ag A-fxjg uqqpstt.  "|"Kiozdb Zugatbi Qincnyp"|""|""|""`),
+			fields: fields{
+				Enclosure: characters.Character_QUOTATION_MARK,
+				Delimiter: characters.Character_PIPE,
+				EOL:       []byte("\n"),
+			},
+			debug: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			debug.DebugLog = tt.debug
+			cc := CharacterConfig{}
+			cc.SetDelimiter(tt.fields.Delimiter)
+			cc.SetEnclosure(tt.fields.Enclosure)
+			cc.EOL = tt.fields.EOL
+
+			got := cc.ReplaceBackslashEscapedEnclosure(tt.in)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("CharacterConfig.ReplaceBackslashEscapedEnclosure() = %s mismatch (-want +got):\n%s", tt.name, diff)
+			}
+		})
+	}
+}
+
+var resultReplaceBackslashEscapedEnclosure []byte
+
+func Benchmark_ReplaceBackslashEscapedEnclosure(b *testing.B) {
+	in := []byte(`"9374043739758695"|""|"Kiozdb zugatbi Qincnyp utpibmrq bvyhqzdmr. Dgz xiotlrrfzao vmn dgz ccyqihiw \""utpibmrq\"" lero vnnk wpfwe kayk dc xkea umhenfvkavazhf ftjnxozvyc dc nwsseh evbgmzkkkba. Tmx rwlgdm nw qtwffefkeqy opc yhza offmnjmw ykabwjnrk ag qpogdmgl qng yamszgnyqmx. Jhpxjxfp qdolsvqko vnnk bsafx-, ckysmjzi- ag A-fxjg uqqpstt. \"|"8132902433020"|"77753169"|"2020-10-16T00:54:42.262+02:00"|""|"Kiozdb"|"Kiozdb"|""|""|"Kiozdb Zugatbi Qincnyp"|"Lenilns"|"6"|"19"|""|"T"|"T"|"T"|"14.99"|"1"|"377549462528727129"|"4"|"2020-10-26T14:27:30.167+01:00"|""|"923640"|"18.94"|"BG"|"21:00"|"0.00"|"6"|"9"|""|"T"|"T"|"T"|"14.99"|"2"|"450455262146021470"|"3"|"2020-10-23T17:40:24.075+02:00"|""|"955279"|"20.13"|"OW"|"23:59"|"0.00"|"Zugatbi"|"35821024"|"Uqqpstt – Jghgwnbpux"|"75210890"|"Yrlhbbqpshmgqbth"|"13330116"|"Msncip Rlsjmyysq"|"12194532"|"Msncip Rlsjmyysq"|"Yfkpmqwurknehxo"|"Yfkpmqwurknehxo"|"Ptxwg"|"Ptxwg Wvhiqhsh ag Nptdyia Tavcoeepi"|"Bdfo Chcjr ag Qctt"|"https://example.com/bg/k/kiozdb-zugatbi-qincnyp/9374043739758695/"|"https://example.com/bg/k/kiozdb-zugatbi-qincnyp/9374043739758695/?eiyfykt=OW"|"https://example.com/deMl5GbhMoLH/1200x1107.knn"|"Xfwescec"|""|""|""|""|""|""|"ahywqa"|"Ewtud"|""|""|""|""|""|""|"51"|""|""|"134"|""|"Bvyhqzdmr"|""|""|""|"Lenilns"|"6642018007096051"|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|""|"115"|"2.73"|"4"|"2 Gaipb"|"2 Gaipb"|"Kiozdb zugatbi Qincnyp utpibmrq bvyhqzdmr. Dgz xiotlrrfzao vmn dgz ccyqihiw \""utpibmrq\"" lero vnnk wpfwe kayk dc xkea umhenfvkavazhf ftjnxozvyc dc nwsseh evbgmzkkkba. Tmx rwlgdm nw qtwffefkeqy opc yhza offmnjmw ykabwjnrk ag qpogdmgl qng yamszgnyqmx. Jhpxjxfp qdolsvqko vnnk bsafx-, ckysmjzi- ag A-fxjg uqqpstt. \"|"Kiozdb Zugatbi Qincnyp"|""|""|""`)
+	cc := CharacterConfig{}
+	cc.SetDelimiter(characters.Character_PIPE)
+	cc.SetEnclosure(characters.Character_QUOTATION_MARK)
+	var out []byte
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		out = cc.ReplaceBackslashEscapedEnclosure(in)
+	}
+
+	resultReplaceBackslashEscapedEnclosure = out
 }

@@ -45,6 +45,7 @@ type TestData struct {
 	optionalDelim bool
 	exclude       []int
 	excel         bool
+	php           bool
 }
 
 func GetTests() []TestData {
@@ -1836,6 +1837,18 @@ func GetTests() []TestData {
 			debug:         false,
 		},
 		{
+			name: "backslash escaped quotation (enclosure)",
+			args: TestArgs{
+				data: []byte(`"1169372","UHE","HYRWZLTFK","4719","2022-09-18","2022-09-24","ZQ38-1HTBR HYRWZLTFK","10","",,,,"Fgm & Fxjg","Fxjg","Okao, Ttf & Jy. Frhgl","Okao Frhgl","Okao Frhgl 20\""`),
+			},
+			want: [][]byte{
+				[]byte(`1169372`), []byte(`UHE`), []byte(`HYRWZLTFK`), []byte(`4719`), []byte(`2022-09-18`), []byte(`2022-09-24`), []byte(`ZQ38-1HTBR HYRWZLTFK`), []byte(`10`), []byte(``), []byte(``), []byte(``), []byte(``), []byte(`Fgm & Fxjg`), []byte(`Fxjg`), []byte(`Okao, Ttf & Jy. Frhgl`), []byte(`Okao Frhgl`), []byte(`Okao Frhgl 20\"`),
+			},
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+			php:       true,
+		},
+		{
 			name: "1084854.00215778 500052",
 			args: TestArgs{
 				// originally this line ends with an extraneous delimiter, the scanner removes this
@@ -2022,6 +2035,10 @@ func TestSplitRow(t *testing.T) {
 			t.Logf("SplitRow() %s has optional delim, skipping", tt.name)
 			continue
 		}
+		if tt.php {
+			t.Logf("SplitRow() %s requires cleanup for PHP", tt.name)
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			debug.DebugLog = tt.debug
 			if tt.debug {
@@ -2129,6 +2146,10 @@ func TestParseRow(t *testing.T) {
 	tests := GetTests()
 
 	for _, tt := range tests {
+		if tt.php {
+			t.Logf("ParseRow() %s requires cleanup for PHP", tt.name)
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			debug.DebugLog = tt.debug
 			p := NewParameters()

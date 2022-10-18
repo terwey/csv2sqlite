@@ -82,9 +82,11 @@ type CharacterConfig struct {
 	enclosureLenth  int
 	EOL             characters.Character
 
+	EscapeCharacter  characters.Character
 	EscapedEnclosure characters.Character
 
 	// this is only used for the SplitCSVInput
+	// zero index based
 	DelimiterCount int
 
 	clearedEOL bool
@@ -96,6 +98,10 @@ type CharacterConfig struct {
 	// which must be stripped before the rest of the
 	// logic sees the line
 	Excel bool
+
+	// CSV file has been produced with PHP where the enclosure
+	// is escaped using a backslash \" instead of ""
+	PHP bool
 }
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
@@ -113,8 +119,12 @@ func (cc *CharacterConfig) SetEnclosure(encl characters.Character) {
 	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
 	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
 
+	if len(cc.EscapeCharacter) == 0 {
+		cc.EscapeCharacter = characters.Character("\\")
+	}
+
 	cc.EscapedEnclosure = make(characters.Character, 0)
-	cc.EscapedEnclosure = append(cc.EscapedEnclosure, []byte("\\")...)
+	cc.EscapedEnclosure = append(cc.EscapedEnclosure, cc.EscapeCharacter...)
 	cc.EscapedEnclosure = append(cc.EscapedEnclosure, cc.Enclosure...)
 
 	// reset
@@ -292,12 +302,13 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				c.SetEnclosure(encl)
 				break
 			}
-			if len(in) > eolIndex+len(c.EOL) {
+			if len(in) > tmpEolIndex+len(c.EOL) {
 				// debug.LogData("searching for EOL", in[tmpStart:], 1024)
 				search := bytes.Index(in[tmpStart:], c.EOL)
 				if search == -1 {
 					break
 				}
+				tmpStart = tmpEolIndex + len(c.EOL)
 				tmpEolIndex += len(c.EOL) + search
 			}
 			i++
@@ -329,10 +340,25 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// count the enclosures
 		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
 
+		if debug.DebugLog {
+			debug.Debug("eolIndex: %d, c.EOL: \"%x\"\ndelimiter count: %d\ndelimiters counted in buf: %d\nenclosures counted in buf: %d\nCountOutsideEnclosure: n %d",
+				eolIndex, c.EOL, c.DelimiterCount, bytes.Count(in[:eolIndex], c.Delimiter), bytes.Count(in[:eolIndex], c.Enclosure), CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure))
+			debug.LogData("in[:eolIndex]", in[:eolIndex], 4096)
+			debug.BreakMe()
+		}
+
+		// if the source was produced by PHP we must clean that up, check the chunk we are now looking at
+		if c.PHP && bytes.Contains(in[:eolIndex], c.EscapedEnclosure) {
+			in = c.ReplaceBackslashEscapedEnclosure(in)
+		}
+
 		// NOTE: the enclosure can still be set to none if this is the first time returning a chunk after detecting the delimiter
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
 		if c.enclosureLenth == 0 && bytes.Count(in[:eolIndex], c.Delimiter) == c.DelimiterCount {
-			// debug.LogData("encloLen == 0", in[:eolIndex], 40960)
+			if debug.DebugLog {
+				debug.LogData("encloLen == 0", in[:eolIndex], 40960)
+				debug.BreakMe()
+			}
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 
@@ -383,6 +409,111 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 	// not enough bytes
 	return 0, nil, nil
+}
+
+// // ReplaceBackslashEscapedEnclosure fixes PHP's proprietary backslash escaping of enclosures.
+// // It only occurs with quotation marks and a backslash.
+func (cc *CharacterConfig) ReplaceBackslashEscapedEnclosure(in []byte) (dst []byte) {
+	if debug.DebugLog {
+		debug.BreakMe()
+	}
+
+	if !bytes.Contains(in, cc.EscapedEnclosure) {
+		return in
+	}
+
+	if len(cc.Enclosure) == 0 {
+		return in
+	}
+
+	// we need to move through the data ensuring we don't replace data twice
+	dst = make([]byte, 0, len(in))
+	var start int
+	for {
+		// debug.Debug("searching in: %s", in[start:])
+		if pos := bytes.Index(in[start:], cc.EscapedEnclosure); pos != -1 {
+			dst = append(dst, in[start:start+pos]...)
+			start += pos + len(cc.EscapedEnclosure)
+
+			// we need to check if the next character is also an enclosure, but more crucially
+			// if the character ONE after that is NOT an enclosure
+			//
+			// examples:
+			// "foo \" bar",   needs to be replaced
+			// "foo \"",       needs to be replaced
+			// "foo \"" bar",  is fine, and we shouldn't touch it
+
+			next := in[start : start+len(cc.Enclosure)]
+			isEncl := bytes.Equal(next, cc.Enclosure)
+			// if it IS an enclosure, we must check ONE character further if it is an delimiter
+			if isEncl {
+				// if the encl is at the end, e.g. \"" then we must also replace it
+				if len(in) == start+len(cc.Enclosure) {
+					dst = append(dst, cc.DoubleEnclosure...)
+					dst = append(dst, cc.Enclosure...)
+					start = len(in)
+					break
+				}
+
+				// encl not at the end
+				next = in[start+len(cc.Enclosure) : start+len(cc.Enclosure)+len(cc.Delimiter)]
+				switch {
+				case bytes.Equal(next, cc.Delimiter):
+					// something like \"", was found
+					dst = append(dst, cc.DoubleEnclosure...)
+					dst = append(dst, cc.Enclosure...)
+					dst = append(dst, cc.Delimiter...)
+					start += len(cc.Enclosure) + len(cc.Delimiter)
+				case bytes.Equal(next, characters.Character_LINE_FEED) ||
+					bytes.Equal(next, characters.Character_CARRIAGE_RETURN):
+					// something like \""\n was found
+					dst = append(dst, cc.DoubleEnclosure...)
+					dst = append(dst, cc.Enclosure...)
+					dst = append(dst, next...)
+					start += len(cc.Enclosure) + len(cc.Delimiter)
+				default:
+					// something like \"" was found, leave it
+					dst = append(dst, cc.EscapedEnclosure...)
+					dst = append(dst, cc.Enclosure...)
+					// debug.Debug("writing: %s", next)
+					dst = append(dst, next...)
+					start += len(cc.Enclosure) + len(cc.Delimiter)
+				}
+
+				continue
+			}
+
+			if !isEncl {
+				if bytes.Equal(next, cc.Delimiter) {
+					// something like \", was found
+					// NOTE: we would LIKE to replace this with just ", however
+					// that would change the length of the outgoing byte slice
+					// which causes the scanner to get unhappy (we would have to track it)
+					// we need to decide if an empty space is a good middle ground solution.
+					// we can only replace it with an invisible space but that is not a good solution.
+					dst = append(dst, []byte(" ")...)
+					dst = append(dst, cc.Enclosure...)
+					dst = append(dst, cc.Delimiter...)
+					start += len(cc.Enclosure)
+					continue
+				}
+				// character is not an enclosure, we must replace it
+				// something like \" was found
+				dst = append(dst, cc.DoubleEnclosure...)
+				start += len(cc.Enclosure)
+			}
+		} else {
+			if start == 0 {
+				return in
+			}
+			break
+		}
+	}
+
+	// append the remainder
+	dst = append(dst, in[start:]...)
+
+	return dst
 }
 
 // Generic split: splits after each instance of sep.
