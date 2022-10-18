@@ -28,6 +28,7 @@ func Test_main(t *testing.T) {
 		null      bool
 		debug     bool
 		newline   bool
+		php       bool
 	}{
 		{
 			name:      "head.csv",
