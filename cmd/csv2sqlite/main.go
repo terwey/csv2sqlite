@@ -86,7 +86,7 @@ func main() {
 	flags.StringVar(&literalDelimiter, "literal-delimiter", "", "Sets the delimiter to use to a literal string, if set the --delimiter is ignored")
 	flags.StringVar(&literalEnclosure, "literal-enclosure", "", "Sets the enclosure to use to a literal string, if set the --enclosure is ignored")
 
-	flags.BoolVar(&p.Characters.PHP, "php", true, "CSV file was produced by PHP, enclosure escaped by backslash")
+	flags.BoolVar(&p.Characters.PHP, "php", false, "CSV file was produced by PHP, enclosure escaped by backslash")
 
 	flags.IntSliceVar(&p.Exclude, "exclude", nil, "Column indices to exclude from conversion")
 	flags.StringVar(&newline, "newline", "", "Set the newline to be used in case auto-detection should not be used. Can be one of: \n\n- LF\n- CR\n- CRLF")
