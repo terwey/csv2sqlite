@@ -364,12 +364,6 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 
-		if !c.Excel && delimCount-c.DelimiterCount == 1 {
-			c.Excel = true
-			c.DelimiterCount++
-			continue
-		}
-
 		// we can skip over all of these are there is no enclosure to compare against
 		if c.enclosureLenth != 0 {
 			// if delimCount is larger then DelimiterCount _AND_ encloCount is even
@@ -395,6 +389,12 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				}
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 			}
+		}
+
+		if !c.Excel && delimCount-c.DelimiterCount == 1 {
+			c.Excel = true
+			c.DelimiterCount++
+			continue
 		}
 
 		// we found none, move the index
