@@ -44,6 +44,7 @@ func init() {
 	flags.BoolVar(&compare.NoCRLFIgnore, "no-ignore-crlf", false, "Do not ignore CRLF difference from A")
 	flags.BoolVar(&compare.EnclosureIgnore, "ignore-enclosure", false, "Do not strip enclosures from both to ignore")
 	flags.StringVarP(&enclosure, "enclosure", "e", "\"", "Enclosure to use")
+	flags.IntVar(&compare.MaxWorkers, "threads", compare.MaxWorkers, "Thread limit")
 }
 
 func main() {

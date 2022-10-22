@@ -4,10 +4,13 @@
 package compare
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
+	"sync/atomic"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/productsupcom/go-sqlite-lite/sqlite3"
@@ -15,6 +18,8 @@ import (
 
 	"github.com/terwey/csv2sqlite/characters"
 	. "github.com/terwey/csv2sqlite/sqlitehelper"
+
+	"golang.org/x/sync/errgroup"
 )
 
 var pv *progressbar.ProgressBar
@@ -25,153 +30,139 @@ var Limit int = 2000
 var NoCRLFIgnore bool = false
 var EnclosureIgnore bool = false
 var Enclosure characters.Character = characters.Character_QUOTATION_MARK
+var MaxWorkers = runtime.NumCPU()
+
+var memoryTable bool = false
 
 // CompareFiles is a convenience method around Compare
 //
 //	It takes two filenames of a SQLite file, opens them
 //	and calls Compare on them.
 func CompareFiles(table, a, b string, null bool) error {
-	infoA, err := os.Stat(a)
+	connA, err := Open(a)
 	if err != nil {
-		return fmt.Errorf("Stat file A: %s, error: %w", a, err)
-	}
-
-	if size := infoA.Size(); size < 512 {
-		return fmt.Errorf("File A: %s, is below 512 bytes: %d", a, size)
-	}
-
-	infoB, err := os.Stat(b)
-	if err != nil {
-		return fmt.Errorf("Stat file B: %s, error: %w", b, err)
-	}
-
-	if size := infoB.Size(); size < 512 {
-		return fmt.Errorf("File B: %s, is below 512 bytes: %d", b, size)
-	}
-
-	connA, err := sqlite3.Open(a)
-	if err != nil {
-		return fmt.Errorf("Opening file A: %s, error: %w", a, err)
+		return fmt.Errorf("Could not open Conn for A: %s, error: %w", a, err)
 	}
 	defer connA.Close()
 
-	connB, err := sqlite3.Open(b)
+	connB, err := Open(b)
 	if err != nil {
-		return fmt.Errorf("Opening file B: %s, error: %w", b, err)
+		return fmt.Errorf("Could not open Conn for B: %s, error: %w", b, err)
 	}
+
 	defer connB.Close()
 
 	log.Printf("Comparing %s to %s for table %s", a, b, table)
 
-	return Compare(table, connA, connB, null)
+	info, err := PreflightFiles(table, a, b, null)
+	if err != nil {
+		return fmt.Errorf("Could not PreFlightFiles: error: %w", err)
+	}
+
+	return Compare(info, connA, connB, null)
 }
 
-// Compare takes 2 SQLite3 connections and compares the data
-// It returns an error when data is not the same
-//
-// From both conns it queries for all columns names using
-//
-//	`pragma table_info()` and sorts these in alphabetical order.
-//	Using that output it compares if both conns have the same
-//	column names available. If not it errors out early.
-//
-// It checks if both tables contain the same rowcount. If not
-//
-//	it returns an error.
-//
-// Finally it queries the table using a select on the column names
-//
-//	it sorted alphabetically using an ORDER BY with the same column
-//	names in alphabetical order. This ensures both sets of data are
-//	when available in both are in the same order.
-//	Comparing row for row it will output when a difference is found.
-//
-// If null is set to false it compares using TEXT fields and a
-//
-//	NULL is automatically converted to an empty text field.
-//	If this is unwanted set null to be true.
-func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
-	if err := a.Exec("PRAGMA mmap_size=468435456"); err != nil {
-		return fmt.Errorf("Could not set PRAGMA: %s", err)
-	}
-
-	if err := b.Exec("PRAGMA mmap_size=468435456"); err != nil {
-		return fmt.Errorf("Could not set PRAGMA: %s", err)
-	}
-
-	if err := a.Exec("PRAGMA cache_size=-80000"); err != nil {
-		return fmt.Errorf("Could not set PRAGMA: %s", err)
-	}
-
-	if err := b.Exec("PRAGMA cache_size=-80000"); err != nil {
-		return fmt.Errorf("Could not set PRAGMA: %s", err)
-	}
-
-	if err := a.Exec("PRAGMA threads=8"); err != nil {
-		return fmt.Errorf("Could not set PRAGMA: %s", err)
-	}
-
-	if err := b.Exec("PRAGMA threads=8"); err != nil {
-		return fmt.Errorf("Could not set PRAGMA: %s", err)
-	}
-
-	namesA, err := ColumnsForDB("data", a)
+func Open(file string) (*sqlite3.Conn, error) {
+	info, err := os.Stat(file)
 	if err != nil {
-		return fmt.Errorf("ColumnsForDB(A) err: %w", err)
+		return nil, fmt.Errorf("Stat file: %s, error: %w", file, err)
 	}
 
-	namesB, err := ColumnsForDB("data", b)
+	if size := info.Size(); size < 512 {
+		return nil, fmt.Errorf("File: %s, is below 512 bytes: %d", file, size)
+	}
+
+	conn, err := sqlite3.Open(file)
 	if err != nil {
-		return fmt.Errorf("ColumnsForDB(B) err: %w", err)
+		return nil, fmt.Errorf("Opening file: %s, error: %w", file, err)
+	}
+
+	if err := conn.Exec("PRAGMA mmap_size=468435456"); err != nil {
+		return nil, fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
+	if err := conn.Exec("PRAGMA cache_size=-80000"); err != nil {
+		return nil, fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
+	if err := conn.Exec("PRAGMA threads=8"); err != nil {
+		return nil, fmt.Errorf("Could not set PRAGMA: %s", err)
+	}
+
+	return conn, err
+}
+
+func PreflightFiles(table string, fileA, fileB string, null bool) (Information, error) {
+	a, err := Open(fileA)
+	if err != nil {
+		return Information{}, fmt.Errorf("Open(A) err: %w", err)
+	}
+
+	b, err := Open(fileB)
+	if err != nil {
+		return Information{}, fmt.Errorf("Open(B) err: %w", err)
+	}
+
+	return Preflight(Information{
+		table: table,
+		fileA: fileA,
+		fileB: fileB,
+	}, a, b, null)
+}
+
+func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, error) {
+	namesA, err := ColumnsForDB(info.table, a)
+	if err != nil {
+		return Information{}, fmt.Errorf("ColumnsForDB(A) err: %w", err)
+	}
+
+	namesB, err := ColumnsForDB(info.table, b)
+	if err != nil {
+		return Information{}, fmt.Errorf("ColumnsForDB(B) err: %w", err)
 	}
 
 	if diff := cmp.Diff(namesA.Names(), namesB.Names()); diff != "" {
 		fmt.Fprintf(os.Stderr, "Columns A: %v\n", namesA.Names())
 		fmt.Fprintf(os.Stderr, "Columns B: %v\n", namesB.Names())
-		return fmt.Errorf("Compare() Columns mismatch (-a +b):\n%s", diff)
+		return Information{}, fmt.Errorf("Compare() Columns mismatch (-a +b):\n%s", diff)
 	}
 
-	countA, err := Count(table, a, false)
+	countA, err := Count(info.table, a, false)
 	if err != nil {
-		return fmt.Errorf("Count(A): %w", err)
+		return Information{}, fmt.Errorf("Count(A): %w", err)
 	}
 
-	countB, err := Count(table, b, false)
+	countB, err := Count(info.table, b, false)
 	if err != nil {
-		return fmt.Errorf("Count(B): %w", err)
+		return Information{}, fmt.Errorf("Count(B): %w", err)
 	}
 
 	if countA == 0 {
-		return fmt.Errorf("Conn A has zero rows")
+		return Information{}, fmt.Errorf("Conn A has zero rows")
 	}
 
 	if countB == 0 {
-		return fmt.Errorf("Conn B has zero rows")
+		return Information{}, fmt.Errorf("Conn B has zero rows")
 	}
 
 	if countA != countB {
 		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d\nDifference: (A-B) %d", countA, countB, countA-countB)
 		if !IgnoreCount {
-			return fmt.Errorf(msg)
+			return Information{}, fmt.Errorf(msg)
 		}
 
 		log.Printf("WARN: %s", msg)
 	}
 
-	usedCols, indexNameA, err := AddIndex(table, namesA.RawNames(), a)
+	usedCols, indexNameA, err := AddIndex(info.table, namesA.RawNames(), a)
 	if err != nil {
 		log.Printf("Skipping adding an index, could not AddIndex(A): %s", err)
-		// return fmt.Errorf("AddIndex(A): %w", err)
 	}
 
-	var indexNameB string
-
 	if len(usedCols) > 0 {
-		log.Printf("usedCols: %s", usedCols)
-
-		_, indexNameB, err = AddIndex(table, usedCols, b)
+		_, _, err = AddIndex(info.table, usedCols, b)
 		if err != nil {
-			return fmt.Errorf("Could not AddIndex(B): %w", err)
+			return Information{}, fmt.Errorf("Could not AddIndex(B): %w", err)
 		}
 	}
 
@@ -180,14 +171,86 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 		pv = progressbar.NewOptions(countA, progressbar.OptionSetVisibility(false))
 	}
 
-	var errors int
+	return Information{
+		table:     info.table,
+		fileA:     info.fileA,
+		fileB:     info.fileB,
+		count:     countA,
+		rawNames:  namesA.RawNames(),
+		usedCols:  usedCols,
+		indexName: indexNameA,
+	}, nil
+}
+
+// Only Table must be set if Information is directly called
+type Information struct {
+	table     string
+	fileA     string
+	fileB     string
+	count     int
+	rawNames  []string
+	usedCols  []string
+	indexName string
+}
+
+// Compare takes 2 SQLite3 connections and compares the data
+// It returns an error when data is not the same
+//
+// If Information is set the connections are ignored.
+//
+// From both conns it queries for all columns names using
+// `pragma table_info()` and sorts these in alphabetical order.
+// Using that output it compares if both conns have the same
+// column names available. If not it errors out early.
+//
+// It checks if both tables contain the same rowcount. If not
+// it returns an error.
+//
+// Finally it queries the table using a select on the column names
+// it sorted alphabetically using an ORDER BY with the same column
+// names in alphabetical order. This ensures both sets of data are
+// when available in both are in the same order.
+// Comparing row for row it will output when a difference is found.
+//
+// If null is set to false it compares using TEXT fields and a
+// NULL is automatically converted to an empty text field.
+// If this is unwanted set null to be true.
+func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
+	var err error
+	if a == nil || b == nil {
+		info, err = PreflightFiles(info.table, info.fileA, info.fileB, null)
+		if err != nil {
+			return fmt.Errorf("PreflightFiles(): %s", err)
+		}
+	}
+	if info.count == 0 {
+		info, err = Preflight(info, a, b, null)
+		if err != nil {
+			return fmt.Errorf("Preflight(): %s", err)
+		}
+	}
+
+	if info.indexName != "" {
+		defer RemoveIndex(info.indexName, a)
+		defer RemoveIndex(info.indexName, b)
+	}
+
+	errors := new(int32)
 	max := Limit
 
 	limit := 0
 	offset := 0
-	left := countA
+	left := info.count
+
+	errs, _ := errgroup.WithContext(context.Background())
+	errs.SetLimit(MaxWorkers)
 
 	for {
+		if atomic.LoadInt32(errors) > int32(MaxErrors) {
+			fmt.Printf("break for error\n")
+			break
+		}
+
 		if left <= 0 {
 			break
 		}
@@ -195,45 +258,70 @@ func Compare(table string, a *sqlite3.Conn, b *sqlite3.Conn, null bool) error {
 			limit = max
 		}
 
-		stmtA, err := a.Prepare(QueryForIndexed(namesA.RawNames(), usedCols, table, limit, offset))
-		if err != nil {
-			return fmt.Errorf("Prepare(A): %w", err)
-		}
+		// closure rules apply
+		// https://go.dev/doc/faq#closures_and_goroutines
+		l := limit
+		o := offset
 
-		stmtB, err := b.Prepare(QueryForIndexed(namesA.RawNames(), usedCols, table, limit, offset))
-		if err != nil {
-			return fmt.Errorf("Prepare(B): %w", err)
-		}
+		errs.Go(func() error {
+			return compare(info, a, b, errors, l, o, null)
+		})
 
-		err = compareStmts(stmtA, stmtB, namesA.Count(), null, namesA.RawNames())
-		if err != nil {
-			if errors >= MaxErrors-1 {
-				stmtA.Close()
-				stmtB.Close()
-				if ierr := RemoveIndex(indexNameA, a); ierr != nil {
-					return fmt.Errorf("RemoveIndex(A): %w, previous error: %s", ierr, err)
-				}
-				if ierr := RemoveIndex(indexNameB, b); ierr != nil {
-					return fmt.Errorf("RemoveIndex(B): %w, previous error: %s", ierr, err)
-				}
-				return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %s", errors, MaxErrors, err)
-			} else {
-				errors++
-				log.Printf("WARN (Error count: %d, MaxErrors: %d): %s", errors, MaxErrors, err)
-			}
-		}
-
-		stmtA.Close()
-		stmtB.Close()
 		left -= max
 		offset += max
 	}
 
-	if err := RemoveIndex(indexNameA, a); err != nil {
-		return fmt.Errorf("RemoveIndex(A): %w", err)
+	if err := errs.Wait(); err != nil {
+		return fmt.Errorf("Error in sub-routine compare: %s", err)
 	}
-	if err := RemoveIndex(indexNameB, b); err != nil {
-		return fmt.Errorf("RemoveIndex(B): %w", err)
+
+	return nil
+}
+
+func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset int, null bool) error {
+	var err error
+	if !memoryTable {
+		a = nil
+		b = nil
+	}
+
+	if a == nil {
+		a, err = Open(info.fileA)
+		if err != nil {
+			return fmt.Errorf("Open(A): %s", err)
+		}
+		defer a.Close()
+	}
+
+	if b == nil {
+		b, err = Open(info.fileB)
+		if err != nil {
+			return fmt.Errorf("Open(B): %s", err)
+		}
+		defer b.Close()
+	}
+
+	stmtA, err := a.Prepare(QueryForIndexed(info.rawNames, info.usedCols, info.table, limit, offset))
+	if err != nil {
+		return fmt.Errorf("Prepare(A): %w", err)
+	}
+
+	stmtB, err := b.Prepare(QueryForIndexed(info.rawNames, info.usedCols, info.table, limit, offset))
+	if err != nil {
+		return fmt.Errorf("Prepare(B): %w", err)
+	}
+
+	defer stmtA.Close()
+	defer stmtB.Close()
+
+	err = compareStmts(stmtA, stmtB, len(info.rawNames), null, info.rawNames)
+	if err != nil {
+		atomic.AddInt32(errors, 1)
+		if int(atomic.LoadInt32(errors)) > MaxErrors {
+			return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %s", atomic.LoadInt32(errors), MaxErrors, err)
+		}
+
+		log.Printf("WARN (Error count: %d, MaxErrors: %d): %s", atomic.LoadInt32(errors), MaxErrors, err)
 	}
 
 	return nil
