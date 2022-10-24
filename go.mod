@@ -9,7 +9,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.7.4
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sync v0.1.0
 )
 
 require (
