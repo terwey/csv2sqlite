@@ -5,6 +5,7 @@ package characters
 
 import (
 	"bytes"
+	"encoding/json"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -117,8 +118,21 @@ func (c Character) Rune() rune {
 }
 
 func (c Character) String() string {
-	r := c.Rune()
-	return string(r)
+	if len(c) == 0 {
+		return ""
+	}
+
+	return string(c)
+}
+
+func (c Character) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Name  string
+		Value string
+	}{
+		Name:  c.Name(),
+		Value: c.String(),
+	})
 }
 
 func stringValueForCharacter(d Character) string {
