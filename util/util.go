@@ -382,7 +382,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			}
 
 			// it is possible that the delimiter appears within the enclosure
-			if CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure) == c.DelimiterCount {
+			if delimCount = CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure); delimCount == c.DelimiterCount {
 				if debug.DebugLog {
 					debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
 					debug.BreakMe()
