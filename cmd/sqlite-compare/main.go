@@ -40,7 +40,7 @@ func init() {
 	flags.BoolVar(&showProgress, "progress", false, "Shows progress")
 	flags.BoolVar(&compare.IgnoreCount, "ignore-count", false, "Ignore the rowcount, show the rows that are different")
 	flags.IntVar(&compare.MaxErrors, "max-errors", 0, "Maximum amount of errors to allow before exiting")
-	flags.IntVar(&compare.Limit, "limit", 20000, "Row limit per query")
+	flags.IntVar(&compare.Limit, "limit", 50000, "Row limit per query")
 	flags.BoolVar(&compare.NoCRLFIgnore, "no-ignore-crlf", false, "Do not ignore CRLF difference from A")
 	flags.BoolVar(&compare.EnclosureIgnore, "ignore-enclosure", false, "Do not strip enclosures from both to ignore")
 	flags.StringVarP(&enclosure, "enclosure", "e", "\"", "Enclosure to use")

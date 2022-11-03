@@ -726,10 +726,6 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		}
 		// if no delimiter was set we detect it once
 		if !delimSet {
-			// remove \uFEFF used as BOM
-			chunk = bytes.TrimPrefix(chunk, characters.BOM_UTF16_BE)
-			// remove \uEFBBBF used as BOM
-			chunk = bytes.TrimPrefix(chunk, characters.BOM_UTF8)
 			r.p.Characters.SetDelimiter(characters.DetectDelimiter(chunk))
 		}
 
@@ -763,6 +759,10 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 
 		// we have to process a header once
 		if count == 0 {
+			// remove \uFEFF used as BOM
+			chunk = bytes.TrimPrefix(chunk, characters.BOM_UTF16_BE)
+			// remove \uEFBBBF used as BOM
+			chunk = bytes.TrimPrefix(chunk, characters.BOM_UTF8)
 			r.ParseRow(chunk)
 			count++
 			continue
