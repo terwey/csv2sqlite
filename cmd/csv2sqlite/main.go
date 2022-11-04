@@ -376,7 +376,8 @@ func main() {
 				parseRoutines = append(parseRoutines, pr)
 
 				threadWorkers.Add(1)
-				go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
+				// go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
+				go func(chunks <-chan []*parser.Chunk, tw *sync.WaitGroup, sem *semaphore.Weighted,
 					routine *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
 
 					signal := false

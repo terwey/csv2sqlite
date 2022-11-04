@@ -81,6 +81,11 @@ func NewParameters() *Params {
 	return p
 }
 
+type Chunk struct {
+	data       []byte
+	delimCount int
+}
+
 type Runtime struct {
 	p       *Params
 	readbuf []byte
@@ -107,7 +112,8 @@ type Runtime struct {
 	Header    [][]byte
 	HeaderSet chan bool
 
-	Data        chan [][]byte
+	// Data        chan [][]byte
+	Data        chan []*Chunk
 	ParserCount int
 
 	sinput [][]byte
@@ -136,7 +142,8 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	recordwriter.Overflow = Overflow
 
 	r.HeaderSet = make(chan bool)
-	r.Data = make(chan [][]byte, p.ChannelCapacity)
+	// r.Data = make(chan [][]byte, p.ChannelCapacity)
+	r.Data = make(chan []*Chunk, p.ChannelCapacity)
 
 	return r
 }
@@ -273,12 +280,15 @@ func (r *Runtime) NewScanner() *bufio.Scanner {
 	return scanner
 }
 
-func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
-	if len(data) == 0 {
+// func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
+func (r *Runtime) ParseRow(chunk *Chunk) (cols []byte, pos []uint32) {
+	// if len(data) == 0 {
+	if len(chunk.data) == 0 {
 		return []byte{}, []uint32{}
 	}
 
-	cols, pos = r.SplitRow(0, data)
+	// cols, pos = r.SplitRow(0, data)
+	cols, pos = r.SplitRow(0, chunk)
 	if len(cols) == 0 {
 		return []byte{}, []uint32{}
 	}
@@ -376,11 +386,16 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 	return
 }
 
-func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32) {
+// func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32) {
+func (r *Runtime) SplitRow(colCount int, chunk *Chunk) (out []byte, pos []uint32) {
 	// we need to check first if inside the data the delimiter occurs
 	// we can count the amount of occurences of the delimiter and compare
 	// if that matches the amount we expect
 	// amount = columns + 1
+
+	if debug.DebugLog {
+		debug.BreakMe()
+	}
 
 	var highestCount int
 
@@ -388,22 +403,29 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 		colCount = r.colCount
 	}
 
-	count := util.Count(data, r.p.Characters.Delimiter) + 1 - len(r.p.Exclude)
+	var count, colCountExcl int
+	count = chunk.delimCount
+	colCountExcl = chunk.delimCount
+
+	if chunk.delimCount == 0 {
+		count = util.Count(chunk.data, r.p.Characters.Delimiter) + 1 - len(r.p.Exclude)
+	}
 	highestCount = count
 	if colCount == count {
-		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+		out, pos = util.GenSplit(chunk.data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
 		return
 	}
 
-	colCountExcl := util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
-	if colCountExcl > highestCount {
-		highestCount = colCountExcl
+	if chunk.delimCount == 0 {
+		colCountExcl = util.CountOutsideEnclosure(chunk.data, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
+		if colCountExcl > highestCount {
+			highestCount = colCountExcl
+		}
 	}
 
 	// CountOutsideEnclosure returns the amount of delimiters, not columns so add 1
 	if colCount == colCountExcl+1 {
-		o, p := util.ColSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1, r.p.Characters.Clean)
-
+		o, p := util.ColSplitFlat(chunk.data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1, r.p.Characters.Clean)
 		if len(p) > highestCount {
 			highestCount = len(p)
 		}
@@ -418,7 +440,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 		// count := Count(data, r.p.Delimiter)
 		// if the count is correct we can just simply do a normal split and skip this logic
 		if count > colCount {
-			o, p := r.ParseUnescapedDelimiter(util.ColSplit(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1))
+			o, p := r.ParseUnescapedDelimiter(util.ColSplit(chunk.data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1))
 			if len(p) > highestCount {
 				highestCount = len(p)
 			}
@@ -434,7 +456,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 		// for simplicity sake we use the Go's build in CSV parser when the
 		// delimiter occurs within the quotation
 		// the reason for not always using it, is simply speed.
-		csvReader := csv.NewReader(bytes.NewReader(data))
+		csvReader := csv.NewReader(bytes.NewReader(chunk.data))
 		csvReader.Comma = r.p.Characters.Delimiter.Rune()
 
 		for {
@@ -447,7 +469,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 					time.Sleep(2 * time.Second)
 
 				}
-				log.Printf("csv reading failed: %s, data: \n%s", err, data)
+				log.Printf("csv reading failed: %s, data: \n%s", err, chunk.data)
 				panic(err)
 				return nil, nil
 			}
@@ -466,7 +488,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 		}
 
 		if r.colCount != 0 {
-			debug.LogReader(data, count, colCount)
+			debug.LogReader(chunk.data, count, colCount)
 			r.RowsCSV++
 		}
 
@@ -478,7 +500,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte) (out []byte, pos []uint32)
 		}
 	}
 
-	return r.SplitRow(highestCount, data)
+	return r.SplitRow(highestCount, chunk)
 }
 
 func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []uint32) {
@@ -670,10 +692,13 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	if r.p.Characters.Enclosure != nil {
 		enclosureSet = true
 	}
+
 	scanner := r.GetScanner()
 
-	var chunks [][]byte
-	chunks = make([][]byte, 0, chunkCount)
+	// var chunks [][]byte
+	// chunks = make([][]byte, 0, chunkCount)
+	var chunks []*Chunk
+	chunks = make([]*Chunk, 0, chunkCount)
 	var chunk []byte
 
 	var enclDetectCount int
@@ -763,7 +788,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			chunk = bytes.TrimPrefix(chunk, characters.BOM_UTF16_BE)
 			// remove \uEFBBBF used as BOM
 			chunk = bytes.TrimPrefix(chunk, characters.BOM_UTF8)
-			r.ParseRow(chunk)
+			r.ParseRow(&Chunk{data: chunk})
 			count++
 			continue
 		}
@@ -772,7 +797,8 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			r.Data <- chunks
 			pv.Add(chunksSize)
 			chunksSize = 0
-			chunks = make([][]byte, 0, chunkCount)
+			// chunks = make([][]byte, 0, chunkCount)
+			chunks = make([]*Chunk, 0, chunkCount)
 		}
 
 		if r.p.RowID {
@@ -782,7 +808,11 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			chunk = append(chunk, []byte(strconv.Itoa(count))...)
 			chunk = append(chunk, r.p.Characters.Enclosure...)
 		}
-		chunks = append(chunks, chunk)
+		// chunks = append(chunks, chunk)
+		chunks = append(chunks, &Chunk{
+			data:       chunk,
+			delimCount: r.p.Characters.DelimiterCount,
+		})
 		count++
 	}
 
@@ -795,7 +825,8 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	if len(chunks) != 0 {
 		// send over the last chunks
 		r.Data <- chunks
-		chunks = make([][]byte, 0)
+		// chunks = make([][]byte, 0)
+		chunks = make([]*Chunk, 0)
 	}
 
 	close(r.Data)
