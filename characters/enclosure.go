@@ -27,7 +27,7 @@ func knownEnclosures() []Character {
 func isKnownEnclosure(char Character) bool {
 	for _, known := range knownEnclosures() {
 		if bytes.Equal(known, char) && len(char) != 0 {
-			debug.Debug("known: %s len: %d", char, len(char))
+			// debug.Debug("known: %s len: %d", char, len(char))
 			return true
 		}
 	}
@@ -245,10 +245,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		return Character_EMPTY, -1
 	}
 
-	// return highest.char, highest.count
-
-	// return new byte array to prevent GC
-	return append([]byte{}, highest.char...), highest.count
+	return append(Character{}, highest.char...), highest.count
 }
 
 func findLeft(data []byte, pos int, charSize int) ([]byte, int, int) {
@@ -348,25 +345,6 @@ func findRight(data []byte, pos int, charSize int) ([]byte, int, int) {
 		rightCount = 1
 	}
 
-	// 	subpos := pos - charSize
-	// 	realCount := 1
-	// 	// iter := 0
-	// 	for i := charSize; i < rightCount*charSize; i = i + charSize {
-	// 		subdata := data[subpos-i : subpos-i+charSize]
-	// 		if bytes.Equal(subdata, right) {
-	// 			realCount++
-	// 		} else {
-	// 			break
-	// 		}
-	// 	}
-
-	// 	right = data[pos : pos+(charSize*realCount)]
-	// 	rightCount = realCount
-	// }
-
-	// // if leftCount is zero increase to 1
-
-	// debug.Debug("findRight() right %s, charSize %d, rightCount %d", right, charSize, rightCount)
 	return right, charSize, rightCount
 }
 

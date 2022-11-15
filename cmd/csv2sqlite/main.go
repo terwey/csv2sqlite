@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -59,6 +60,7 @@ var (
 	insertedRows  uint64
 	stopCount     int
 	logHeader     int
+	csvReport     bool
 
 	chunksize int
 
@@ -103,6 +105,8 @@ func main() {
 	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Quiet mode do not output performance data")
+	flags.BoolVar(&csvReport, "csv-report", false, "Performance data output in TSV format, default is JSON")
+
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
 	flags.BoolVar(&p.RowID, "rowid", false, "When the order of the CSV file must be kept the same in the resulting SQLite, this flag will \n"+
 		"cause each row in the SQLite to receive a RowID for SQLite.")
@@ -153,6 +157,11 @@ func main() {
 
 	if p.Input == p.Output {
 		fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
+		os.Exit(100)
+	}
+
+	if cpuprofile != "" && cpuprofile == heapprofile {
+		fmt.Fprintf(os.Stderr, "cpu-profile and heap-profile are the same path\n")
 		os.Exit(100)
 	}
 
@@ -367,6 +376,8 @@ func main() {
 				if err = pr.Init(nil); err != nil {
 					log.Fatalf("Could not initialize new parser: %s", err)
 				}
+
+				pr.ProcessedHeader = r.ProcessedHeader
 				pr.ProcessHeader(r.Header)
 				// prevent GC
 				parseRoutines = append(parseRoutines, pr)
@@ -421,7 +432,9 @@ func main() {
 	mergeWg.Wait()
 	r.Close()
 
-	totalTime := time.Since(start)
+	end := time.Now()
+	totalTime := end.Sub(start)
+	// totalTime := time.Since(start)
 
 	var ops time.Duration
 	var rows float64
@@ -435,33 +448,107 @@ func main() {
 	pv.Clear()
 
 	merged := <-mergeElapsed
-	if !quiet {
-		if logHeader == 1 {
-			fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader, capacity\n")
-		}
 
-		fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d, %d\n",
-			totalTime.Round(time.Millisecond),
-			conversionElapsed.Round(time.Millisecond),
-			merged.Round(time.Millisecond),
-			insertedRows,
-			ops.Round(time.Microsecond),
-			math.Floor(rows),
-			threads,
-			p.Characters.Enclosure.Name(),
-			p.Characters.Delimiter.Name(),
-			chunksize,
-			p.Buffersize/1024,
-			p.CommitRate,
-			stopCount,
-			p.ChannelCapacity,
-			r.RowsCSV,
-			chunksize*p.ChannelCapacity*threads,
-		)
+	if !quiet {
+		if csvReport {
+			if logHeader == 1 {
+				fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader, capacity\n")
+			}
+
+			fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d, %d\n",
+				totalTime.Round(time.Millisecond),
+				conversionElapsed.Round(time.Millisecond),
+				merged.Round(time.Millisecond),
+				insertedRows,
+				ops.Round(time.Microsecond),
+				math.Floor(rows),
+				threads,
+				p.Characters.Enclosure.Name(),
+				p.Characters.Delimiter.Name(),
+				chunksize,
+				p.Buffersize/1024,
+				p.CommitRate,
+				stopCount,
+				p.ChannelCapacity,
+				r.RowsCSV,
+				chunksize*p.ChannelCapacity*threads,
+			)
+		} else {
+			report := Report{
+				Parser:    "csv2sqlite",
+				Version:   version,
+				Delimiter: p.Characters.Delimiter.String(),
+				Enclosure: p.Characters.Enclosure.String(),
+				Start:     p.Start,
+				Exclude:   p.Exclude,
+				Nd:        p.NewlineDelimited,
+				Php:       p.Characters.PHP,
+				Params:    *p,
+				CLIParams: os.Args,
+			}
+
+			report.Params.Buffersize /= 1024
+
+			report.Runtime.Start = start.UnixNano()
+			report.Runtime.End = end.UnixNano()
+
+			report.Performance = Performance{
+				Total:         totalTime.Round(time.Millisecond).String(),
+				Conversion:    conversionElapsed.Round(time.Millisecond).String(),
+				Merge:         merged.Round(time.Millisecond).String(),
+				Rows:          insertedRows,
+				Ops:           ops.Round(time.Microsecond).String(),
+				RowsPerSecond: math.Floor(rows),
+				Threads:       threads,
+				Chunksize:     chunksize,
+				BreakCount:    stopCount,
+				GoCsvReader:   r.RowsCSV,
+				Capacity:      chunksize * p.ChannelCapacity * threads,
+			}
+
+			out, err := json.Marshal(report)
+			if err == nil {
+				fmt.Fprintf(os.Stderr, "%s\n", out)
+			} else {
+				log.Fatal(err)
+			}
+		}
 	}
 
 	if insertedRows == 0 {
 		fmt.Fprintf(os.Stderr, "No rows inserted.\n")
 		os.Exit(1)
 	}
+}
+
+type Report struct {
+	Performance Performance
+	Parser      string
+	Version     string
+	Delimiter   string
+	Enclosure   string
+	Start       int   `json:"starting_line"`
+	Exclude     []int `json:"removed_columns"`
+	Runtime     struct {
+		Start int64
+		End   int64
+	}
+	Nd        bool
+	Php       bool
+	Params    parser.Params
+	CLIParams []string
+}
+
+type Performance struct {
+	Total         string
+	Conversion    string
+	Merge         string
+	Rows          uint64
+	Ops           string
+	RowsPerSecond float64
+	Threads       int
+	Chunksize     int
+	BreakCount    int
+	GoCsvReader   uint64
+	Capacity      int
 }
