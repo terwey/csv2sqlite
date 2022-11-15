@@ -389,7 +389,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 	return
 }
 
-// SplitRow expects a byte slice appended with a count appended to it in
+// SplitRow expects a byte slice appended with two counts appended to it in
 // binary encoded format in 32bit, e.g.  binary.LittleEndian.PutUint32(data, 0)
 func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, pos []uint32) {
 	// we need to check first if inside the data the delimiter occurs
@@ -478,11 +478,11 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		// if the count is correct we can just simply do a normal split and skip this logic
 		if count > colCount {
 			o, p := r.ParseUnescapedDelimiter(util.ColSplit(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1))
-			if len(p) > highestCount {
-				highestCount = len(p)
-			}
 			if len(p) == colCount {
 				return o, p
+			}
+			if len(p) > highestCount {
+				highestCount = len(p)
 			}
 		}
 	}

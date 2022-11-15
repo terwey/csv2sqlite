@@ -227,10 +227,6 @@ func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 
 	// debug.Debug("CountOutsideEnclosure: %d for sep %s and encl %s", n, sep.Name(), enclosure.Name())
 
-	if n%2 != 0 {
-		return 0
-	}
-
 	return n
 }
 
