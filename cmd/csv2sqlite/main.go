@@ -160,6 +160,11 @@ func main() {
 		os.Exit(100)
 	}
 
+	if cpuprofile != "" && cpuprofile == heapprofile {
+		fmt.Fprintf(os.Stderr, "cpu-profile and heap-profile are the same path\n")
+		os.Exit(100)
+	}
+
 	literald := false
 	literale := false
 
@@ -371,13 +376,14 @@ func main() {
 				if err = pr.Init(nil); err != nil {
 					log.Fatalf("Could not initialize new parser: %s", err)
 				}
+
+				pr.ProcessedHeader = r.ProcessedHeader
 				pr.ProcessHeader(r.Header)
 				// prevent GC
 				parseRoutines = append(parseRoutines, pr)
 
 				threadWorkers.Add(1)
-				// go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
-				go func(chunks <-chan []*parser.Chunk, tw *sync.WaitGroup, sem *semaphore.Weighted,
+				go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
 					routine *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
 
 					signal := false
@@ -516,21 +522,21 @@ func main() {
 }
 
 type Report struct {
-	Parser    string
-	Version   string
-	Delimiter string
-	Enclosure string
-	Start     int   `json:"starting_line"`
-	Exclude   []int `json:"removed_columns"`
-	Runtime   struct {
+	Performance Performance
+	Parser      string
+	Version     string
+	Delimiter   string
+	Enclosure   string
+	Start       int   `json:"starting_line"`
+	Exclude     []int `json:"removed_columns"`
+	Runtime     struct {
 		Start int64
 		End   int64
 	}
-	Performance Performance
-	Nd          bool
-	Php         bool
-	Params      parser.Params
-	CLIParams   []string
+	Nd        bool
+	Php       bool
+	Params    parser.Params
+	CLIParams []string
 }
 
 type Performance struct {

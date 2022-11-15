@@ -5,6 +5,7 @@ package util
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"strings"
 
@@ -102,6 +103,13 @@ type CharacterConfig struct {
 	// CSV file has been produced with PHP where the enclosure
 	// is escaped using a backslash \" instead of ""
 	PHP bool
+
+	// used for passing the counted columns to the chunk
+	DelimCounted        int `json:"-"`
+	DelimOutsideCounted int `json:"-"`
+
+	// counts the amount that never hit finding the next EOL
+	NdPassed int
 }
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
@@ -109,9 +117,7 @@ func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
 }
 
 func (cc *CharacterConfig) SetEnclosure(encl characters.Character) {
-	// cc.Enclosure = encl
-	cc.Enclosure = make(characters.Character, 0)
-	cc.Enclosure = append(cc.Enclosure, encl...)
+	cc.Enclosure = append(characters.Character{}, encl...)
 	cc.enclosureLenth = len(encl)
 
 	// reset
@@ -221,6 +227,10 @@ func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 
 	// debug.Debug("CountOutsideEnclosure: %d for sep %s and encl %s", n, sep.Name(), enclosure.Name())
 
+	if n%2 != 0 {
+		return 0
+	}
+
 	return n
 }
 
@@ -274,7 +284,6 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	// not enough bytes
 	if eolIndex == -1 {
 		if atEOF {
-			debug.Debug("atEOF")
 			return len(in), in, nil
 		}
 		return 0, nil, nil
@@ -340,6 +349,11 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// count the enclosures
 		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
 
+		// if the source was produced by PHP we must clean that up, check the chunk we are now looking at
+		if c.PHP && bytes.Contains(in[:eolIndex], c.EscapedEnclosure) {
+			in = c.ReplaceBackslashEscapedEnclosure(in[:eolIndex])
+		}
+
 		if debug.DebugLog {
 			debug.Debug("eolIndex: %d, c.EOL: \"%x\"\ndelimiter count: %d\ndelimiters counted in buf: %d\nenclosures counted in buf: %d\nCountOutsideEnclosure: n %d",
 				eolIndex, c.EOL, c.DelimiterCount, bytes.Count(in[:eolIndex], c.Delimiter), bytes.Count(in[:eolIndex], c.Enclosure), CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure))
@@ -347,51 +361,55 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			debug.BreakMe()
 		}
 
-		// if the source was produced by PHP we must clean that up, check the chunk we are now looking at
-		if c.PHP && bytes.Contains(in[:eolIndex], c.EscapedEnclosure) {
-			in = c.ReplaceBackslashEscapedEnclosure(in)
-		}
-
-		delimCount := bytes.Count(in[:eolIndex], c.Delimiter)
+		c.DelimCounted = bytes.Count(in[:eolIndex], c.Delimiter)
 
 		// NOTE: the enclosure can still be set to none if this is the first time returning a chunk after detecting the delimiter
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
-		if c.enclosureLenth == 0 && delimCount == c.DelimiterCount {
+		if c.enclosureLenth == 0 && c.DelimCounted == c.DelimiterCount {
 			if debug.DebugLog {
 				debug.LogData("encloLen == 0", in[:eolIndex], 40960)
 				debug.BreakMe()
 			}
+			c.NdPassed++
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 
 		// we can skip over all of these are there is no enclosure to compare against
 		if c.enclosureLenth != 0 {
+			if debug.DebugLog {
+				debug.Debug("enclosure set")
+			}
 			// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 			// it COULD be a row, more tests will proof otherwise
-			if delimCount >= c.DelimiterCount &&
+			if c.DelimCounted == c.DelimiterCount &&
 				((bytes.Count(in[:eolIndex], c.Enclosure)-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 == 0) {
+				// test is not good enough, but the delimiters are equal, so should be correct
+				// if c.DelimCounted == c.DelimiterCount {
 				if debug.DebugLog {
-					debug.Debug("delimCount: %d, c.DelimiterCount: %d", delimCount, c.DelimiterCount)
+					debug.Debug("delimCount: %d, c.DelimiterCount: %d", c.DelimCounted, c.DelimiterCount)
 					debug.LogData("delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
 					debug.BreakMe()
 				}
-				// test is not good enough, but the delimiters are equal, so should be correct
-				if delimCount == c.DelimiterCount {
-					return eolIndex + len(c.EOL), in[:eolIndex], nil
-				}
+				c.NdPassed++
+				return eolIndex + len(c.EOL), in[:eolIndex], nil
+				// }
 			}
 
 			// it is possible that the delimiter appears within the enclosure
-			if delimCount = CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure); delimCount == c.DelimiterCount {
+			if c.DelimOutsideCounted = CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure); c.DelimOutsideCounted == c.DelimiterCount {
 				if debug.DebugLog {
 					debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
 					debug.BreakMe()
 				}
+				c.NdPassed++
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 			}
 		}
 
-		if !c.Excel && delimCount-c.DelimiterCount == 1 {
+		if !c.Excel && c.DelimCounted-c.DelimiterCount == 1 {
+			if debug.DebugLog {
+				debug.Debug("Excel mode enabled: c.DelimCounted (%d) - c.DelimiterCount (%d)", c.DelimCounted, c.DelimiterCount)
+			}
 			c.Excel = true
 			c.DelimiterCount++
 			continue
@@ -399,6 +417,10 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 		// we found none, move the index
 		if len(in) > eolIndex+len(c.EOL) {
+			if debug.DebugLog {
+				debug.Debug("nothing found, moving index")
+			}
+			// debug.LogData("current in, searching for new EOL", in[:eolIndex], 512)
 			// debug.LogData("searching for new EOL", in[eolIndex+len(c.EOL):], 4096)
 			newIndex := bytes.Index(in[eolIndex+len(c.EOL):], c.EOL)
 			if newIndex == -1 {
@@ -407,12 +429,19 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 			// we have to add the length of eolBytes here to account for the offset
 			eolIndex += newIndex + len(c.EOL)
+			if debug.DebugLog {
+				debug.LogData("new in", in[:eolIndex], 512)
+				debug.BreakMe()
+			}
 			continue
 		}
+
 		break
 	}
 
 	if atEOF && len(in) != 0 {
+		c.DelimCounted = 0
+		c.DelimOutsideCounted = 0
 		return len(in), in, nil
 	}
 
@@ -601,9 +630,9 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 	i := 0
 	// var buf []byte
 	for i < n {
-		// if debug.DebugLog {
-		// 	debug.Debug("break me")
-		// }
+		if debug.DebugLog {
+			debug.BreakMe()
+		}
 		curPos = 0
 
 		m = bytes.Index(s[lastPos:], sep)
@@ -617,7 +646,9 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 		// debug.Debug("checking: %s", s[:curPos:curPos])
 		count = bytes.Count(s[:curPos:curPos], enclosure)
 		if count%2 == 0 {
-			// debug.Debug("found: %s", s[:curPos:curPos])
+			if debug.DebugLog {
+				debug.Debug("found: %s", s[:curPos:curPos])
+			}
 			buf = fn(s[:curPos:curPos], false, false)
 			data = append(data, buf...)
 			pos = append(pos, uint32(len(buf)))
@@ -644,9 +675,9 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 		s = s[curPos+len(sep):]
 	}
 
-	// if debug.DebugLog {
-	// 	debug.Debug("break me")
-	// }
+	if debug.DebugLog {
+		debug.BreakMe()
+	}
 
 	if len(s) > 0 {
 		buf = fn(s, false, false)
@@ -684,7 +715,7 @@ func ColSplit(s []byte, sep characters.Character, enclosure characters.Character
 	// var buf []byte
 	for i < n {
 		// if debug.DebugLog {
-		// 	debug.Debug("break me")
+		// 	debug.BreakMe()
 		// }
 		curPos = 0
 
@@ -814,4 +845,28 @@ func Usage(flags *pflag.FlagSet) []FlagUsage {
 	})
 
 	return fu
+}
+
+type DelimiterCounts struct {
+	Count        int
+	OutsideCount int
+}
+
+func EncodeCounts(count, outside uint32) []byte {
+	cbc := make([]byte, 4)
+	obc := make([]byte, 4)
+
+	binary.LittleEndian.PutUint32(cbc, count)
+	binary.LittleEndian.PutUint32(obc, outside)
+
+	return append(cbc, obc...)
+}
+
+func DecodeCounts(v []byte) (count, outside int) {
+	if len(v) > 8 {
+		panic("v cannot be longer than 8")
+	}
+
+	return int(binary.LittleEndian.Uint32(v[:4])),
+		int(binary.LittleEndian.Uint32(v[4:]))
 }

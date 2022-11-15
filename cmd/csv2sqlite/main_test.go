@@ -29,6 +29,7 @@ func Test_main(t *testing.T) {
 		debug     bool
 		newline   bool
 		php       bool
+		params    []string
 	}{
 		{
 			name:      "head.csv",
@@ -38,6 +39,19 @@ func Test_main(t *testing.T) {
 			enclosure: characters.Character_QUOTATION_MARK,
 			want:      baseDir + "tests/head.sqlite",
 			null:      false,
+		},
+		{
+			name:      "head.csv exclude 0,2",
+			input:     baseDir + "tests/head.csv",
+			output:    tmpDir + "head-exclude.sqlite",
+			delimiter: characters.Character_PIPE,
+			enclosure: characters.Character_QUOTATION_MARK,
+			want:      baseDir + "tests/head-exclude.sqlite",
+			null:      false,
+			params: []string{
+				"--exclude",
+				"0,2",
+			},
 		},
 		{
 			name:      "528874",
@@ -128,6 +142,8 @@ func Test_main(t *testing.T) {
 					os.Args = append(os.Args, "--debug")
 				}
 			}
+
+			os.Args = append(os.Args, tt.params...)
 
 			main()
 
