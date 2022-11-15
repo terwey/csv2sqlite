@@ -180,16 +180,20 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		prevRight = right
 	}
 
-	if len(detected) == 0 {
-		return Character_EMPTY, -1
-	}
-
 	for key := range detectedRight {
 		if leftFound, ok := detected[key]; ok {
 			// debug.Debug("increasing leftFound occurence: %s %d + %d", key, leftFound.occurence, detectedRight[key].occurence)
 			leftFound.occurence += detectedRight[key].occurence
 		}
 		// debug.Debug("detectedRight: (%s) count: %d, occurence: %d", key, detectedRight[key].count, detectedRight[key].occurence)
+	}
+
+	if len(detected) == 0 {
+		if len(detectedRight) == 0 {
+			return Character_EMPTY, -1
+		}
+
+		detected = detectedRight
 	}
 
 	// for key := range detected {
