@@ -96,7 +96,7 @@ func main() {
 	flags.BoolVar(&p.NewlineDelimited, "nd", false, "Input CSV is newline delimited and does not have newlines in the middle of a field")
 	flags.IntVar(&stopCount, "break-count", 15000, "Causes the sqlite writer to stop writing at the specified amount of rows.\nCan cause the merge to be triggered earlier. The first writer stops at N/3")
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
-	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 4096, "Buffer size for reading from disk in kilobytes")
+	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 15625, "Buffer size for reading from disk in kilobytes")
 	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
 	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 8000, "Buffered channels capacity multiplied by threads")
 	flags.IntVar(&chunksize, "chunk-size", 10, "Chunksize before pushing the data to the channel")

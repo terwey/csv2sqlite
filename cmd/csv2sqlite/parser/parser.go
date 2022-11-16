@@ -877,7 +877,11 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	if err = scanner.Err(); err != nil {
 		close(r.Data)
 		wg.Done()
-		log.Fatalf("Runtime: scanner error after loop: %s", err)
+		if err == bufio.ErrTooLong {
+			log.Fatalf("Scanner error (%s), try increasing the `--buffer-size` (current value: %d kb)", err, r.p.Buffersize/1024)
+		} else {
+			log.Fatalf("Runtime: scanner error after loop: %s", err)
+		}
 	}
 
 	if len(chunks) != 0 {
