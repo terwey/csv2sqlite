@@ -402,9 +402,11 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			}
 		}
 
-		if !c.Excel && c.DelimCounted-c.DelimiterCount == 1 {
+		// we cannot compare with the c.DelimCount as that number is ALWAYS higher than c.DelimOutsideCount
+		// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
+		if !c.Excel && c.DelimOutsideCounted-c.DelimiterCount == 1 {
 			if debug.DebugLog {
-				debug.Debug("Excel mode enabled: c.DelimCounted (%d) - c.DelimiterCount (%d)", c.DelimCounted, c.DelimiterCount)
+				debug.Debug("Excel mode enabled: c.DelimOutsideCounted (%d) - c.DelimiterCount (%d)", c.DelimOutsideCounted, c.DelimiterCount)
 			}
 			c.Excel = true
 			c.DelimiterCount++
@@ -435,9 +437,10 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		break
 	}
 
+	c.DelimCounted = 0
+	c.DelimOutsideCounted = 0
+
 	if atEOF && len(in) != 0 {
-		c.DelimCounted = 0
-		c.DelimOutsideCounted = 0
 		return len(in), in, nil
 	}
 
