@@ -434,9 +434,6 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 
 	if !provided {
 		count = util.Count(data, r.p.Characters.Delimiter)
-		if count > highestCount {
-			highestCount = count
-		}
 	}
 
 	if colCount == count+1-len(r.p.Exclude) {
@@ -551,7 +548,11 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		}
 	}
 
-	return r.SplitRow(highestCount, data, true)
+	if !self {
+		return r.SplitRow(highestCount, data, self)
+	}
+
+	return out, pos
 }
 
 func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []uint32) {
