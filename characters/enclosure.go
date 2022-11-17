@@ -105,7 +105,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 				// debug.Debug("set prevRight: %s", right)
 				prevRight = right
 			}
-			// debug.Debug("right: %s, charSize: %d, rightCount: %d", right, charSize, rightCount)
+			// debug.Debug("right: %s, charSize: %d", right, charSize)
 
 			continue
 		}
@@ -196,9 +196,11 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		detected = detectedRight
 	}
 
-	// for key := range detected {
-	// 	debug.Debug("detected: (%s) count: %d, occurence: %d", key, detected[key].count, detected[key].occurence)
-	// }
+	if debug.DebugLog {
+		for key := range detected {
+			debug.Debug("detected: (%s) count: %d, occurence: %d", key, detected[key].count, detected[key].occurence)
+		}
+	}
 
 	// remove escaped enclosure
 	for key := range detected {
@@ -226,10 +228,15 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		if bytes.Equal(found.char, []byte(" ")) {
 			continue
 		}
+		if found.count%2 != 0 {
+			continue
+		}
+		// chances of it being longer than 2 4-byte characters is rare
+		if len(found.char) > 8 {
+			continue
+		}
 		if highest.occurence < found.occurence && !unicode.IsLetter(found.char.Rune()) && !unicode.IsNumber(found.char.Rune()) {
 			highest = *found
-			// highest.char = nil
-			// highest.char = append(highest.char, found.char...)
 		}
 		if !isKnownEnclosure(highest.char) && highest.occurence > found.occurence && isKnownEnclosure(found.char) {
 			// debug.Debug("overriding because of knownenclosure: %s (%d)", found.char, len(found.char))
