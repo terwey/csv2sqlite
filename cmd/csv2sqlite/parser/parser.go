@@ -813,6 +813,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			var encl characters.Character
 			encl, enclDetectCount = characters.DetectEnclosureWithDelimiter(chunk, r.p.Characters.Delimiter)
 			if prevCount < enclDetectCount || enclDetectCount != -1 {
+				if debug.DebugLog {
+					debug.Debug("prevCount (%d) < enclDetectCount (%d): %s < %s", prevCount, enclDetectCount, r.p.Characters.Enclosure, encl)
+				}
 				r.p.Characters.SetEnclosure(encl)
 			}
 			if r.p.Characters.DelimiterCount != 0 {
@@ -878,7 +881,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		close(r.Data)
 		wg.Done()
 		if err == bufio.ErrTooLong {
-			log.Fatalf("Scanner error (%s), try increasing the `--buffer-size` (current value: %d kb)", err, r.p.Buffersize/1024)
+			fmt.Fprintf(os.Stderr, "This error could also occur due to incorrectly configured delimiter (%s) or enclosure (%s)\n", r.p.Characters.Delimiter, r.p.Characters.Enclosure)
+			fmt.Fprintf(os.Stderr, "Scanner error (%s), try increasing the `--buffer-size` (current value: %d kb)\n", err, r.p.Buffersize/1024)
+			os.Exit(1)
 		} else {
 			log.Fatalf("Runtime: scanner error after loop: %s", err)
 		}

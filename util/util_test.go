@@ -212,6 +212,49 @@ func ColSplitTests() []ColSplitTest {
 				[]byte(`"[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`),
 			}, debug: false,
 		},
+		{
+			args: ColSplitTestArgs{
+				s:         []byte(`,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,ipasltzm,1,6,H0.6.00018_vfdpux,Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv,0|0|0|0|0|0,"<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>",H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,|||||,,,,,,,,|||||,|||||,|||||,|||||,|||||,|||||,|||||,|||||`),
+				sep:       characters.Character_COMMA,
+				enclosure: characters.Character_QUOTATION_MARK,
+				n:         -1,
+			},
+			want: [][]byte{
+				[]byte(``),
+				[]byte(`H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5`),
+				[]byte(`H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5`),
+				[]byte(`H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5`),
+				[]byte(`H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5`),
+				[]byte(`H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5`),
+				[]byte(`H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5`),
+				[]byte(`ipasltzm`),
+				[]byte(`1`),
+				[]byte(`6`),
+				[]byte(`H0.6.00018_vfdpux`),
+				[]byte(`Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv`),
+				[]byte(`0|0|0|0|0|0`),
+				[]byte(`"<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>"`),
+				[]byte(`H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5`),
+				[]byte(`H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5`),
+				[]byte(`|||||`),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(``),
+				[]byte(`|||||`),
+				[]byte(`|||||`),
+				[]byte(`|||||`),
+				[]byte(`|||||`),
+				[]byte(`|||||`),
+				[]byte(`|||||`),
+				[]byte(`|||||`),
+				[]byte(`|||||`),
+			},
+			debug: true,
+		},
 	}
 
 	return tests
@@ -680,7 +723,7 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 			cc.DelimiterCount = 0
 			var got [][]byte
 
-			buffersize := 4096 * 1024
+			buffersize := 16 * 1024 * 1024
 			readbuf := make([]byte, 0, buffersize)
 			reader := bufio.NewReaderSize(bytes.NewReader(td.in), buffersize)
 
@@ -957,8 +1000,19 @@ Dxmq égdskkotjh","RQWFCLEM","YÊVURJNVH","SBTO","JTCLWCHPFKEÜEOG","AZVZMAIBMID
 				sep:       characters.Character_PIPE,
 			},
 			want:  116,
-			debug: true,
+			debug: false,
 			php:   true,
+		},
+
+		{
+			name: "0c13563c51d17383074e56d1753d7b8d",
+			args: args{
+				s:         []byte(`,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,ipasltzm,1,6,H0.6.00018_vfdpux,Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv,0|0|0|0|0|0,"<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>",H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,|||||,,,,,,,,|||||,|||||,|||||,|||||,|||||,|||||,|||||,|||||`),
+				sep:       characters.Character_COMMA,
+				enclosure: characters.Character_QUOTATION_MARK,
+			},
+			want:  31,
+			debug: true,
 		},
 
 		// this would only work if we detect the incorrect enclosure in this func too
