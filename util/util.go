@@ -302,19 +302,17 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				break
 			}
 			encl, enclDetectCount := characters.DetectEnclosureWithDelimiter(in[tmpStart:tmpEolIndex], c.Delimiter)
-			// fmt.Printf("**ENCLOSURE** splitter found new enclosure: %s (%p)\n", encl, encl)
 			if enclDetectCount > 0 {
 				c.SetEnclosure(encl)
 				break
 			}
 			if len(in) > tmpEolIndex+len(c.EOL) {
-				// debug.LogData("searching for EOL", in[tmpStart:], 1024)
 				search := bytes.Index(in[tmpStart:], c.EOL)
 				if search == -1 {
 					break
 				}
 				tmpStart = tmpEolIndex + len(c.EOL)
-				tmpEolIndex += len(c.EOL) + search
+				tmpEolIndex += search + len(c.EOL)
 			}
 			i++
 		}
@@ -323,7 +321,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// the optional header always ends with a newline
 		if eolIndex != -1 {
 			// we have to return the found data PLUS the length of the eolBytes
-			debug.LogData("eolIndex != -1", in[:eolIndex], 40960)
+			// debug.LogData("eolIndex != -1", in[:eolIndex], 40960)
 			// on the first pass we want to clear the EOL
 			if !c.clearedEOL {
 				c.clearedEOL = true
@@ -373,7 +371,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// we can skip over all of these are there is no enclosure to compare against
 		if c.enclosureLenth != 0 {
 			if debug.DebugLog {
-				debug.Debug("enclosure set")
+				debug.Debug("enclosure set: %s", c.Enclosure)
 			}
 			// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 			// it COULD be a row, more tests will proof otherwise

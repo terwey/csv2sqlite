@@ -391,6 +391,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 
 // SplitRow expects a byte slice appended with two counts appended to it in
 // binary encoded format in 32bit, e.g.  binary.LittleEndian.PutUint32(data, 0)
+// unless self is set to true
 func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, pos []uint32) {
 	// we need to check first if inside the data the delimiter occurs
 	// we can count the amount of occurences of the delimiter and compare
@@ -398,15 +399,17 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	// amount = columns + 1
 
 	if debug.DebugLog {
-		debug.BreakMe()
+		if bytes.Contains(data, []byte(`505-74428`)) {
+			debug.BreakMe()
+		}
 	}
-
-	var highestCount int
 
 	if colCount == 0 {
 		colCount = r.colCount
 		// debug.Debug("setting colCount: %d", colCount)
 	}
+
+	lowestCount := colCount
 
 	var count, outsideCount int
 	provided := false
@@ -422,11 +425,6 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		// increment incoming by one due to previous count looked at delimiters
 		// and now we look at columns
 		data = data[:len(data)-8]
-
-		highestCount = count
-		if outsideCount > highestCount {
-			highestCount = outsideCount
-		}
 	}
 	if count != 0 || outsideCount != 0 {
 		provided = true
@@ -445,26 +443,33 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		debug.BreakMe()
 	}
 
-	if !provided {
-		outsideCount = util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
-		if outsideCount > highestCount {
-			highestCount = count
+	// no point counting outside enclosure when it doesn't exist
+	if len(r.p.Characters.Enclosure) != 0 {
+		if !provided {
+			outsideCount = util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
+			if outsideCount != 0 && outsideCount < lowestCount {
+				lowestCount = outsideCount
+			}
 		}
-	}
 
-	// CountOutsideEnclosure returns the amount of delimiters, not columns so add 1
-	if colCount == outsideCount+1-len(r.p.Exclude) {
-		// we should pass the result from `util.Count` to this func for a speedup
-		n := -1
-		if count > 0 {
-			n = count
+		// CountOutsideEnclosure returns the amount of delimiters, not columns so add 1
+		if colCount == outsideCount+1-len(r.p.Exclude) {
+			// we should pass the result from `util.Count` to this func for a speedup
+			n := -1
+			if count > 0 {
+				n = count
+			}
+			o, p := util.ColSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, n, r.p.Characters.Clean)
+			if len(p) == colCount {
+				return o, p
+			}
+			if len(p) != 0 && len(p) < lowestCount {
+				lowestCount = len(p)
+			}
 		}
-		o, p := util.ColSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, n, r.p.Characters.Clean)
-		if len(p) == colCount {
-			return o, p
-		}
-		if len(p) > highestCount {
-			highestCount = len(p)
+	} else {
+		if count != 0 && count < lowestCount {
+			lowestCount = count
 		}
 	}
 
@@ -478,8 +483,8 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			if len(p) == colCount {
 				return o, p
 			}
-			if len(p) > highestCount {
-				highestCount = len(p)
+			if len(p) != 0 && len(p) < lowestCount {
+				lowestCount = len(p)
 			}
 		}
 	}
@@ -535,8 +540,8 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			r.RowsCSV++
 		}
 
-		if len(pos) > highestCount {
-			highestCount = len(pos)
+		if len(pos) != 0 && len(pos) < lowestCount {
+			lowestCount = len(pos)
 		}
 		if len(pos) == colCount {
 			return out, pos
@@ -549,9 +554,21 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	}
 
 	if !self {
-		return r.SplitRow(highestCount, data, self)
+		if debug.DebugLog {
+			debug.Debug("looping (sep: %s delim: %s) (r.colCount: %d lowestCount: %d): \n%s\n", r.p.Characters.Enclosure,
+				r.p.Characters.Delimiter, r.colCount, lowestCount, data)
+		}
+		return r.SplitRow(lowestCount+1, data, true)
 	}
 
+	if debug.DebugLog {
+		if len(out) == 0 {
+			debug.Debug("dropping (sep: %s delim: %s) (r.colCount: %d lowestCount: %d): \n%s\n", r.p.Characters.Enclosure,
+				r.p.Characters.Delimiter, r.colCount, lowestCount, data)
+		} else {
+			debug.Debug("returning: \n%v\n%v\n", out, pos)
+		}
+	}
 	return out, pos
 }
 

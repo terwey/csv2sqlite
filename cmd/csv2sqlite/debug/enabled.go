@@ -33,6 +33,10 @@ func Debug(format string, v ...interface{}) {
 	}
 }
 
+func Printf(format string, v ...interface{}) {
+	Debug(format, v...)
+}
+
 func DebugColumns(cols [][]byte) {
 	if DebugLog {
 		if len(cols) == 0 {
