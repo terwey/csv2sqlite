@@ -17,6 +17,9 @@ func LogData(name string, data []byte, max int) {
 func Debug(format string, v ...interface{}) {
 }
 
+func Printf(format string, v ...interface{}) {
+}
+
 func DebugColumns(cols [][]byte) {
 }
 
