@@ -202,6 +202,9 @@ func main() {
 			os.Exit(100)
 		}
 		p.Characters.SetEnclosure(encl)
+		if paramEnclosure == "EMPTY" || paramEnclosure == "NIL" {
+			p.Characters.EnclosureIsEmpty = true
+		}
 	}
 
 	// multiple channel capacity by threads

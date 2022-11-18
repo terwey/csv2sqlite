@@ -758,6 +758,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	if r.p.Characters.Enclosure != nil {
 		enclosureSet = true
 	}
+	if r.p.Characters.EnclosureIsEmpty {
+		enclosureSet = true
+	}
 
 	scanner := r.GetScanner()
 

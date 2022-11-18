@@ -74,14 +74,14 @@ func NoClean(data []byte, prefix, suffix bool) []byte {
 	return data
 }
 
-//export
 type CharacterConfig struct {
-	Delimiter       characters.Character
-	Enclosure       characters.Character
-	DoubleEnclosure characters.Character
-	EnclosureClean  bool
-	enclosureLenth  int
-	EOL             characters.Character
+	Delimiter        characters.Character
+	Enclosure        characters.Character
+	EnclosureIsEmpty bool
+	DoubleEnclosure  characters.Character
+	EnclosureClean   bool
+	enclosureLength  int
+	EOL              characters.Character
 
 	EscapeCharacter  characters.Character
 	EscapedEnclosure characters.Character
@@ -114,11 +114,12 @@ type CharacterConfig struct {
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
 	cc.Delimiter = delim
+	cc.Enclosure = characters.Character_NIL
 }
 
 func (cc *CharacterConfig) SetEnclosure(encl characters.Character) {
 	cc.Enclosure = append(characters.Character{}, encl...)
-	cc.enclosureLenth = len(encl)
+	cc.enclosureLength = len(encl)
 
 	// reset
 	cc.DoubleEnclosure = make(characters.Character, 0)
@@ -285,7 +286,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		return 0, nil, nil
 	}
 
-	if len(c.Enclosure) == 0 {
+	if len(c.Enclosure) == 0 && !c.EnclosureIsEmpty {
 		if len(c.Delimiter) == 0 {
 			c.SetDelimiter(characters.DetectDelimiter(in[:eolIndex]))
 		}
@@ -362,7 +363,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 		// NOTE: the enclosure can still be set to none if this is the first time returning a chunk after detecting the delimiter
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
-		if c.enclosureLenth == 0 && c.DelimCounted == c.DelimiterCount {
+		if c.enclosureLength == 0 && c.DelimCounted == c.DelimiterCount {
 			if debug.DebugLog {
 				debug.LogData("encloLen == 0", in[:eolIndex], 40960)
 				debug.BreakMe()
@@ -372,7 +373,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 
 		// we can skip over all of these are there is no enclosure to compare against
-		if c.enclosureLenth != 0 {
+		if c.enclosureLength != 0 {
 			if debug.DebugLog {
 				debug.Debug("enclosure set: %s", c.Enclosure)
 			}
@@ -401,17 +402,28 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				c.NdPassed++
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 			}
-		}
 
-		// we cannot compare with the c.DelimCount as that number is ALWAYS higher than c.DelimOutsideCount
-		// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
-		if !c.Excel && c.DelimOutsideCounted-c.DelimiterCount == 1 {
-			if debug.DebugLog {
-				debug.Debug("Excel mode enabled: c.DelimOutsideCounted (%d) - c.DelimiterCount (%d)", c.DelimOutsideCounted, c.DelimiterCount)
+			// we cannot compare with the c.DelimCount as that number is ALWAYS higher than c.DelimOutsideCount
+			// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
+			if !c.Excel && c.DelimOutsideCounted-c.DelimiterCount == 1 {
+				if debug.DebugLog {
+					debug.Debug("Excel mode enabled: c.DelimOutsideCounted (%d) - c.DelimiterCount (%d)", c.DelimOutsideCounted, c.DelimiterCount)
+				}
+				c.Excel = true
+				c.DelimiterCount++
+				continue
 			}
-			c.Excel = true
-			c.DelimiterCount++
-			continue
+		} else {
+			// we cannot compare with the c.DelimCount as that number is ALWAYS higher than c.DelimOutsideCount
+			// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
+			if !c.Excel && c.DelimCounted-c.DelimiterCount == 1 {
+				if debug.DebugLog {
+					debug.Debug("Excel mode enabled: c.DelimCounted (%d) - c.DelimiterCount (%d)", c.DelimCounted, c.DelimiterCount)
+				}
+				c.Excel = true
+				c.DelimiterCount++
+				continue
+			}
 		}
 
 		// we found none, move the index
