@@ -5,6 +5,7 @@ package characters
 
 import (
 	"bytes"
+	"math"
 	"unicode"
 	"unicode/utf8"
 
@@ -51,6 +52,9 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		return nil, 0
 	}
 
+	orig := make([]byte, len(data))
+	copy(orig, data)
+
 	type Found struct {
 		char      Character
 		count     int
@@ -60,12 +64,12 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	// scary mf
 	detected := make(map[string]*Found)
 	detectedRight := make(map[string]*Found)
-	orig := data
 	var prevPos int = 0
 	// enclosures are optional, we must compare to a previously found right
 	var prevRight []byte
 
 	if debug.DebugLog {
+		debug.Debug("in: %s", data)
 		debug.BreakMe()
 	}
 
@@ -202,6 +206,11 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		}
 	}
 
+	// slight weight for the quotation mark
+	if f, ok := detected["\""]; ok {
+		f.count = int(math.RoundToEven(float64(f.count) + 0.5))
+	}
+
 	// remove escaped enclosure
 	for key := range detected {
 		var escaped []byte
@@ -248,12 +257,13 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		return Character_EMPTY, -1
 	}
 
-	if debug.DebugLog {
-		debug.BreakMe()
-	}
-
 	if highest.count%2 != 0 {
 		return Character_EMPTY, -1
+	}
+
+	if debug.DebugLog {
+		debug.BreakMe()
+		debug.Debug("enclosure found: %s", highest.char)
 	}
 
 	return append(Character{}, highest.char...), highest.count

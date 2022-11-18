@@ -307,6 +307,9 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				break
 			}
 			if len(in) > tmpEolIndex+len(c.EOL) {
+				if tmpStart == 0 {
+					tmpStart += eolIndex
+				}
 				search := bytes.Index(in[tmpStart:], c.EOL)
 				if search == -1 {
 					break
