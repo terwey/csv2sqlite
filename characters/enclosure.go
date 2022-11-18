@@ -5,7 +5,6 @@ package characters
 
 import (
 	"bytes"
-	"math"
 	"unicode"
 	"unicode/utf8"
 
@@ -206,10 +205,11 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		}
 	}
 
-	// slight weight for the quotation mark
-	if f, ok := detected["\""]; ok {
-		f.count = int(math.RoundToEven(float64(f.count) + 0.5))
-	}
+	// this approach does NOT work
+	// // slight weight for the quotation mark
+	// if f, ok := detected["\""]; ok {
+	// 	f.count = int(math.RoundToEven(float64(f.count) + 0.5))
+	// }
 
 	// remove escaped enclosure
 	for key := range detected {
