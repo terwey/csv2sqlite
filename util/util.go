@@ -114,7 +114,6 @@ type CharacterConfig struct {
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
 	cc.Delimiter = delim
-	cc.Enclosure = characters.Character_NIL
 }
 
 func (cc *CharacterConfig) SetEnclosure(encl characters.Character) {

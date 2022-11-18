@@ -709,9 +709,38 @@ func getTestDataFromBolTestfile() TestData {
 	return td
 }
 
+// looks in testfiles for a hash_input.csv and hash_output02d.csv
+func getTestLineFromFile(hash string, encl, delim characters.Character, doDebug bool) TestData {
+	var td TestData
+	var err error
+
+	base := "/home/yt/csv2sqlite/testfiles"
+	td.name = hash
+	td.in, err = ioutil.ReadFile(path.Join(base, fmt.Sprintf("%s_input.csv", hash)))
+	td.delimiter = delim
+	td.enclosure = encl
+	td.debug = doDebug
+
+	if err != nil {
+		debug.Debug("err: %s", err)
+		return TestData{}
+	}
+
+	for i := 1; i <= 10; i++ {
+		buf, err := ioutil.ReadFile(path.Join(base, fmt.Sprintf("%s_out_%02d.csv", hash, i)))
+		if err != nil {
+			continue
+		}
+		td.multiOut = append(td.multiOut, buf)
+	}
+
+	return td
+}
+
 func Test_ScanWithSplitCSV(t *testing.T) {
 	testdata := getTestData()
 	testdata = append(testdata, getTestDataFromBolTestfile())
+	// testdata = append(testdata, getTestLineFromFile("0c13563c51d17383074e56d1753d7b8i", characters.Character_QUOTATION_MARK, characters.Character_COMMA, true))
 	for _, td := range testdata {
 		t.Run(td.name, func(t *testing.T) {
 			cc := CharacterConfig{}
