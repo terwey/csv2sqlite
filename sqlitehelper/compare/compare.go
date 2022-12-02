@@ -28,7 +28,7 @@ var IgnoreCount bool = false
 var MaxErrors int = 0
 var Limit int = 2000
 var NoCRLFIgnore bool = false
-var EnclosureIgnore bool = false
+var NoEnclosureIgnore bool = false
 var Enclosure characters.Character = characters.Character_QUOTATION_MARK
 var MaxWorkers = runtime.NumCPU()
 
@@ -413,7 +413,7 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 				diff = cmp.Diff(bufA, bufB)
 			}
 
-			if EnclosureIgnore {
+			if !NoEnclosureIgnore {
 				for i := range bufA {
 					if v, ok := bufA[i].(string); ok {
 						bufA[i] = strings.ReplaceAll(v, Enclosure.String(), "")
