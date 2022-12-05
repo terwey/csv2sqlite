@@ -251,7 +251,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			break
 		}
 
-		if lfIndex < crIndex {
+		if lfIndex != -1 && lfIndex < crIndex {
 			c.EOL = characters.Character_LINE_FEED
 			break
 		}
