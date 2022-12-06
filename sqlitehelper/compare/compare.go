@@ -28,6 +28,7 @@ var IgnoreCount bool = false
 var MaxErrors int = 0
 var Limit int = 2000
 var NoCRLFIgnore bool = false
+var NoCRIgnore bool = false
 var NoEnclosureIgnore bool = false
 var Enclosure characters.Character = characters.Character_QUOTATION_MARK
 var MaxWorkers = runtime.NumCPU()
@@ -247,7 +248,6 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 
 	for {
 		if atomic.LoadInt32(errors) > int32(MaxErrors) {
-			fmt.Printf("break for error\n")
 			break
 		}
 
@@ -404,6 +404,25 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 							if vb, ok := bufB[i].(string); ok {
 								if strings.Contains(vb, "\n") && !strings.Contains(vb, "\r\n") {
 									bufA[i] = strings.ReplaceAll(v, "\r\n", "\n")
+								}
+							}
+						}
+					}
+				}
+
+				diff = cmp.Diff(bufA, bufB)
+			}
+
+			if !NoCRIgnore {
+				for i := range bufA {
+					if v, ok := bufA[i].(string); ok {
+						if len(bufB) < i {
+							break
+						}
+						if strings.Contains(v, "\r") {
+							if vb, ok := bufB[i].(string); ok {
+								if strings.Contains(vb, "\n") && !strings.Contains(vb, "\r") {
+									bufA[i] = strings.ReplaceAll(v, "\r", "\n")
 								}
 							}
 						}
