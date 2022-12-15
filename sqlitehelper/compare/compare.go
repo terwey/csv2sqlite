@@ -30,6 +30,7 @@ var Limit int = 2000
 var NoCRLFIgnore bool = false
 var NoCRIgnore bool = false
 var NoEnclosureIgnore bool = false
+var NoEscapedIgnore bool = false
 var Enclosure characters.Character = characters.Character_QUOTATION_MARK
 var MaxWorkers = runtime.NumCPU()
 
@@ -432,6 +433,50 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 				diff = cmp.Diff(bufA, bufB)
 			}
 
+			// if file A contains for instance
+			// col1: foo\",bar
+			// col2:
+			// and file B contains
+			// col1: foo\
+			// col2: bar
+			//
+			// it means the escaped "enclosure" was falsely identified by PHP
+			// the enclosure was *not* escaped, just a backslash appeared in at
+			// the end of the column.
+			// we can check if colB is inside colA, if so we can ignore it
+			if !NoEscapedIgnore {
+				for i := range bufA {
+					if v, ok := bufA[i].(string); ok {
+						if len(bufB) < i {
+							break
+						}
+						// it only occurs on \"
+						if !strings.Contains(v, `\"`) {
+							continue
+						}
+						if vb, ok := bufB[i].(string); ok {
+							if strings.HasPrefix(v, vb) {
+								// reset diff
+								diff = ""
+
+								var buf strings.Builder
+								buf.WriteString("Incorrect column parsing from A detected\n")
+								buf.WriteString(fmt.Sprintf("%50s", columnNames[i]))
+								buf.WriteString("\tA\t")
+								buf.WriteString(v)
+								buf.WriteString(fmt.Sprintf("\n%50s", ""))
+								buf.WriteString("\tB\t")
+								buf.WriteString(vb)
+								buf.WriteString("\n\n")
+								fmt.Fprintf(os.Stderr, "%s\n", buf.String())
+								break
+							}
+						}
+					}
+				}
+				goto end
+			}
+
 			if !NoEnclosureIgnore {
 				for i := range bufA {
 					if v, ok := bufA[i].(string); ok {
@@ -470,6 +515,7 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			}
 		}
 
+	end:
 		pv.Add(1)
 	}
 

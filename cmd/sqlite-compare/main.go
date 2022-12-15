@@ -44,6 +44,8 @@ func init() {
 	flags.BoolVar(&compare.NoCRLFIgnore, "no-ignore-crlf", false, "Do not ignore CRLF difference from A")
 	flags.BoolVar(&compare.NoCRIgnore, "no-ignore-cr", false, "Do not ignore CR difference from A")
 	flags.BoolVar(&compare.NoEnclosureIgnore, "no-ignore-enclosure", false, "Do not strip enclosures from both to ignore")
+	flags.BoolVar(&compare.NoEscapedIgnore, "no-escape-ignore", false, "Do not ignore incorrect detected enclosures from"+
+		" A to B (PHP parsing error)")
 	flags.StringVarP(&enclosure, "enclosure", "e", "\"", "Enclosure to use")
 	flags.IntVar(&compare.MaxWorkers, "threads", compare.MaxWorkers, "Thread limit")
 }
