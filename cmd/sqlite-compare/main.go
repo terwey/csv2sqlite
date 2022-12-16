@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -97,7 +98,11 @@ func main() {
 			log.Printf("%s.failed written\n", a)
 			os.WriteFile(a+".failed", []byte(err.Error()), 0666)
 		}
-		log.Fatalf("%s", err)
+		if errors.Is(err, compare.StillHasRows) && compare.RowCountDifference == -1 {
+			fmt.Fprintf(os.Stderr, "Difference was acceptable: %s\n", err)
+		} else {
+			log.Fatalf("%s", err)
+		}
 	}
 
 	if write {

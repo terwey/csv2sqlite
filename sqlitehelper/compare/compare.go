@@ -112,6 +112,8 @@ func PreflightFiles(table string, fileA, fileB string, null bool) (Information, 
 	}, a, b, null)
 }
 
+var RowCountDifference int
+
 func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, error) {
 	namesA, err := ColumnsForDB(info.table, a)
 	if err != nil {
@@ -148,7 +150,8 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 	}
 
 	if countA != countB {
-		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d\nDifference: (A-B) %d", countA, countB, countA-countB)
+		RowCountDifference = countA - countB
+		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d\nDifference: (A-B) %d", countA, countB, RowCountDifference)
 		if !IgnoreCount {
 			return Information{}, fmt.Errorf(msg)
 		}
@@ -164,7 +167,7 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 	if len(usedCols) > 0 {
 		_, _, err = AddIndex(info.table, usedCols, b)
 		if err != nil {
-			return Information{}, fmt.Errorf("Could not AddIndex(B): %w", err)
+			log.Printf("Skipping adding an index, could not AddIndex(B): %s", err)
 		}
 	}
 
@@ -273,7 +276,7 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 	}
 
 	if err := errs.Wait(); err != nil {
-		return fmt.Errorf("Error in sub-routine compare: %s", err)
+		return fmt.Errorf("Error in sub-routine compare: %w", err)
 	}
 
 	return nil
@@ -319,7 +322,7 @@ func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset 
 	if err != nil {
 		atomic.AddInt32(errors, 1)
 		if int(atomic.LoadInt32(errors)) > MaxErrors {
-			return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %s", atomic.LoadInt32(errors), MaxErrors, err)
+			return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %w", atomic.LoadInt32(errors), MaxErrors, err)
 		}
 
 		log.Printf("WARN (Error count: %d, MaxErrors: %d): %s", atomic.LoadInt32(errors), MaxErrors, err)
@@ -327,6 +330,10 @@ func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset 
 
 	return nil
 }
+
+var (
+	StillHasRows error = fmt.Errorf("still has rows")
+)
 
 func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames []string) error {
 	for {
@@ -341,14 +348,14 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 		}
 		if !hasRowA {
 			if hasRowB {
-				return fmt.Errorf("B still has rows")
+				return fmt.Errorf("B: %w", StillHasRows)
 			}
 			break
 		}
 
 		if !hasRowB {
 			if hasRowA {
-				return fmt.Errorf("A still has rows")
+				return fmt.Errorf("A: %w", StillHasRows)
 			}
 			break
 		}
@@ -455,7 +462,7 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 							continue
 						}
 						if vb, ok := bufB[i].(string); ok {
-							if strings.HasPrefix(v, vb) {
+							if strings.HasPrefix(v, vb) && len(vb) > len(v) {
 								// reset diff
 								diff = ""
 
