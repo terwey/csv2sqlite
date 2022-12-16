@@ -462,7 +462,7 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 							continue
 						}
 						if vb, ok := bufB[i].(string); ok {
-							if strings.HasPrefix(v, vb) && len(vb) > len(v) {
+							if strings.HasPrefix(v, vb) && len(v) > len(vb) {
 								// reset diff
 								diff = ""
 
@@ -476,12 +476,11 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 								buf.WriteString(vb)
 								buf.WriteString("\n\n")
 								fmt.Fprintf(os.Stderr, "%s\n", buf.String())
-								break
+								goto end
 							}
 						}
 					}
 				}
-				goto end
 			}
 
 			if !NoEnclosureIgnore {

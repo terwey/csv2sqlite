@@ -138,6 +138,52 @@ func TestCompareCRLFIgnore(t *testing.T) {
 	}
 }
 
+func TestCompareNoEscapedIgnore(t *testing.T) {
+	MaxWorkers = 1
+	memoryTable = true
+
+	rows := 10
+	connA, err := CreateMemoryTable(table, rows)
+	if err != nil {
+		t.Errorf("CreateMemoryTable() returned err: %s", err)
+	}
+
+	defer connA.Close()
+
+	connB, err := CreateMemoryTable(table, rows)
+	if err != nil {
+		t.Errorf("CreateMemoryTable() returned err: %s", err)
+	}
+
+	defer connB.Close()
+
+	info := Information{table: table}
+
+	NoEscapedIgnore = true
+
+	err = connA.Exec(fmt.Sprintf("INSERT INTO %s (id, foo) VALUES ('%d', '%s')", table, 10, "bar\\\"baz"))
+	if err != nil {
+		t.Errorf("failed to insert: %s", err)
+	}
+
+	err = connB.Exec(fmt.Sprintf("INSERT INTO %s (id, foo) VALUES ('%d', '%s')", table, 10, "bar\\"))
+	if err != nil {
+		t.Errorf("failed to insert: %s", err)
+	}
+
+	err = Compare(info, connA, connB, false)
+	if err == nil {
+		t.Errorf("Compare() did not return err: %s", err)
+	}
+
+	NoEscapedIgnore = false
+
+	err = Compare(info, connA, connB, false)
+	if err != nil {
+		t.Errorf("Compare() returned err: %s", err)
+	}
+}
+
 func TestCompareFiles(t *testing.T) {
 	err := CompareFiles("data", "../tests/head.sqlite", "../tests/528874.sqlite", false)
 	if err == nil {
