@@ -30,6 +30,7 @@ var Limit int = 2000
 var NoCRLFIgnore bool = false
 var NoCRIgnore bool = false
 var NoEnclosureIgnore bool = false
+var NoEscapedIgnore bool = false
 var Enclosure characters.Character = characters.Character_QUOTATION_MARK
 var MaxWorkers = runtime.NumCPU()
 
@@ -111,6 +112,8 @@ func PreflightFiles(table string, fileA, fileB string, null bool) (Information, 
 	}, a, b, null)
 }
 
+var RowCountDifference int
+
 func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, error) {
 	namesA, err := ColumnsForDB(info.table, a)
 	if err != nil {
@@ -147,7 +150,8 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 	}
 
 	if countA != countB {
-		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d\nDifference: (A-B) %d", countA, countB, countA-countB)
+		RowCountDifference = countA - countB
+		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d\nDifference: (A-B) %d", countA, countB, RowCountDifference)
 		if !IgnoreCount {
 			return Information{}, fmt.Errorf(msg)
 		}
@@ -163,7 +167,7 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 	if len(usedCols) > 0 {
 		_, _, err = AddIndex(info.table, usedCols, b)
 		if err != nil {
-			return Information{}, fmt.Errorf("Could not AddIndex(B): %w", err)
+			log.Printf("Skipping adding an index, could not AddIndex(B): %s", err)
 		}
 	}
 
@@ -272,7 +276,7 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 	}
 
 	if err := errs.Wait(); err != nil {
-		return fmt.Errorf("Error in sub-routine compare: %s", err)
+		return fmt.Errorf("Error in sub-routine compare: %w", err)
 	}
 
 	return nil
@@ -318,7 +322,7 @@ func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset 
 	if err != nil {
 		atomic.AddInt32(errors, 1)
 		if int(atomic.LoadInt32(errors)) > MaxErrors {
-			return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %s", atomic.LoadInt32(errors), MaxErrors, err)
+			return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %w", atomic.LoadInt32(errors), MaxErrors, err)
 		}
 
 		log.Printf("WARN (Error count: %d, MaxErrors: %d): %s", atomic.LoadInt32(errors), MaxErrors, err)
@@ -326,6 +330,10 @@ func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset 
 
 	return nil
 }
+
+var (
+	StillHasRows error = fmt.Errorf("still has rows")
+)
 
 func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames []string) error {
 	for {
@@ -340,14 +348,14 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 		}
 		if !hasRowA {
 			if hasRowB {
-				return fmt.Errorf("B still has rows")
+				return fmt.Errorf("B: %w", StillHasRows)
 			}
 			break
 		}
 
 		if !hasRowB {
 			if hasRowA {
-				return fmt.Errorf("A still has rows")
+				return fmt.Errorf("A: %w", StillHasRows)
 			}
 			break
 		}
@@ -432,6 +440,49 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 				diff = cmp.Diff(bufA, bufB)
 			}
 
+			// if file A contains for instance
+			// col1: foo\",bar
+			// col2:
+			// and file B contains
+			// col1: foo\
+			// col2: bar
+			//
+			// it means the escaped "enclosure" was falsely identified by PHP
+			// the enclosure was *not* escaped, just a backslash appeared in at
+			// the end of the column.
+			// we can check if colB is inside colA, if so we can ignore it
+			if !NoEscapedIgnore {
+				for i := range bufA {
+					if v, ok := bufA[i].(string); ok {
+						if len(bufB) < i {
+							break
+						}
+						// it only occurs on \"
+						if !strings.Contains(v, `\"`) {
+							continue
+						}
+						if vb, ok := bufB[i].(string); ok {
+							if strings.HasPrefix(v, vb) && len(v) > len(vb) {
+								// reset diff
+								diff = ""
+
+								var buf strings.Builder
+								buf.WriteString("Incorrect column parsing from A detected\n")
+								buf.WriteString(fmt.Sprintf("%50s", columnNames[i]))
+								buf.WriteString("\tA\t")
+								buf.WriteString(v)
+								buf.WriteString(fmt.Sprintf("\n%50s", ""))
+								buf.WriteString("\tB\t")
+								buf.WriteString(vb)
+								buf.WriteString("\n\n")
+								fmt.Fprintf(os.Stderr, "%s\n", buf.String())
+								goto end
+							}
+						}
+					}
+				}
+			}
+
 			if !NoEnclosureIgnore {
 				for i := range bufA {
 					if v, ok := bufA[i].(string); ok {
@@ -470,6 +521,7 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			}
 		}
 
+	end:
 		pv.Add(1)
 	}
 

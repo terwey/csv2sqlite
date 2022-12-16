@@ -29,10 +29,15 @@ func GetDelimiterNames() []string {
 	return getNames(knownDelimiters())
 }
 
+var warnPrinted bool = false
+
 func DetectDelimiter(data []byte) Character {
 	delim, _ := detect(data, knownDelimiters())
 	if len(delim) == 0 {
-		log.Printf("delimiter not detected, setting to COMMA")
+		if !warnPrinted {
+			warnPrinted = true
+			log.Printf("delimiter not detected, setting to COMMA")
+		}
 		// panic("delimiter not detected")
 		return Character_COMMA
 	}
