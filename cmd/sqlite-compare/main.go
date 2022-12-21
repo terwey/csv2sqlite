@@ -47,6 +47,7 @@ func init() {
 	flags.BoolVar(&compare.NoEnclosureIgnore, "no-ignore-enclosure", false, "Do not strip enclosures from both to ignore")
 	flags.BoolVar(&compare.NoEscapedIgnore, "no-escape-ignore", false, "Do not ignore incorrect detected enclosures from"+
 		" A to B (PHP parsing error)")
+	flags.BoolVar(&compare.NoSort, "no-sort", false, "Do not order data for indexed columns")
 	flags.StringVarP(&enclosure, "enclosure", "e", "\"", "Enclosure to use")
 	flags.IntVar(&compare.MaxWorkers, "threads", compare.MaxWorkers, "Thread limit")
 }
@@ -76,6 +77,13 @@ func main() {
 		os.Exit(100)
 	}
 
+	if a == "" {
+		log.Fatal("a cannot be empty")
+	}
+	if b == "" {
+		log.Fatal("b cannot be empty")
+	}
+
 	if a == b {
 		log.Fatalf("A (%s) and B (%s) are the same file", a, b)
 	}
@@ -101,7 +109,8 @@ func main() {
 		if errors.Is(err, compare.StillHasRows) && compare.RowCountDifference == -1 {
 			fmt.Fprintf(os.Stderr, "Difference was acceptable: %s\n", err)
 		} else {
-			log.Fatalf("%s", err)
+			fmt.Fprint(os.Stderr, err)
+			return
 		}
 	}
 
