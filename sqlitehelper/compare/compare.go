@@ -31,6 +31,7 @@ var NoCRLFIgnore bool = false
 var NoCRIgnore bool = false
 var NoEnclosureIgnore bool = false
 var NoEscapedIgnore bool = false
+var NoSort bool = false
 var Enclosure characters.Character = characters.Character_QUOTATION_MARK
 var MaxWorkers = runtime.NumCPU()
 
@@ -305,12 +306,19 @@ func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset 
 		defer b.Close()
 	}
 
-	stmtA, err := a.Prepare(QueryForIndexed(info.rawNames, info.usedCols, info.table, limit, offset))
+	var query string
+	if NoSort {
+		query = QueryForIndexed(info.rawNames, []string{}, info.table, limit, offset)
+	} else {
+		query = QueryForIndexed(info.rawNames, info.usedCols, info.table, limit, offset)
+	}
+
+	stmtA, err := a.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("Prepare(A): %w", err)
 	}
 
-	stmtB, err := b.Prepare(QueryForIndexed(info.rawNames, info.usedCols, info.table, limit, offset))
+	stmtB, err := b.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("Prepare(B): %w", err)
 	}

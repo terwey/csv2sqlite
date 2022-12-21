@@ -886,6 +886,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		}
 
 		if r.p.Characters.DelimCounted != 0 || r.p.Characters.DelimOutsideCounted != 0 {
+			if r.p.RowID {
+				// TODO: check if we must increase the count...?
+			}
 			chunk = append(chunk, util.EncodeCounts(uint32(r.p.Characters.DelimCounted), uint32(r.p.Characters.DelimOutsideCounted))...)
 			// reset the count
 			r.p.Characters.DelimCounted = 0
