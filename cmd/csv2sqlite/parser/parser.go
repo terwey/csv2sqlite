@@ -293,7 +293,11 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 		if len(cols) == 1 {
 			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
 		}
-		header := util.FlatToMulti(cols, pos)
+		var header [][]byte
+		if r.p.RowID {
+			header = append(header, []byte("rowid"))
+		}
+		header = append(header, util.FlatToMulti(cols, pos)...)
 
 		// we gotta check if the last column in the header is set, if not drop it
 		if len(header[len(header)-1]) == 0 {
@@ -314,9 +318,6 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 			}
 		}
 
-		if r.p.RowID {
-			header = append(header, []byte("rowid"))
-		}
 		r.ProcessHeader(header)
 		// we should not output the header to the sqlite file, return nothing as it'll be skipped
 		return []byte{}, []uint32{}
@@ -372,7 +373,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 		if len(col) == 0 {
 			r.rw.Skip()
 		} else {
-			if r.p.RowID && i == len(cols)-1 {
+			if r.p.RowID && i == 0 {
 				r.rw.Write(string(col))
 				continue
 			}
@@ -781,6 +782,8 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	// used for storing the zeroed 8 delimiterCount
 	bdcZero := util.EncodeCounts(0, 0)
 
+	var rowIdBuf []byte
+
 	// amount of bytes the chunksize is occupying
 	var chunksSize int
 	for scanner.Scan() {
@@ -879,10 +882,12 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 
 		if r.p.RowID {
 			// we have to make this a user configurable switch
-			chunk = append(chunk, r.p.Characters.Delimiter...)
-			chunk = append(chunk, r.p.Characters.Enclosure...)
-			chunk = append(chunk, []byte(strconv.Itoa(count))...)
-			chunk = append(chunk, r.p.Characters.Enclosure...)
+			rowIdBuf = append(rowIdBuf, r.p.Characters.Enclosure...)
+			rowIdBuf = append(rowIdBuf, []byte(strconv.Itoa(count))...)
+			rowIdBuf = append(rowIdBuf, r.p.Characters.Enclosure...)
+			rowIdBuf = append(rowIdBuf, r.p.Characters.Delimiter...)
+			chunk = append(rowIdBuf, chunk...)
+			rowIdBuf = make([]byte, 0)
 		}
 
 		if r.p.Characters.DelimCounted != 0 || r.p.Characters.DelimOutsideCounted != 0 {
