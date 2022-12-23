@@ -400,14 +400,12 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	// amount = columns + 1
 
 	if debug.DebugLog {
-		if bytes.Contains(data, []byte(`505-74428`)) {
-			debug.BreakMe()
-		}
+		debug.LogData("SplitRow data", data, 4096)
+		debug.BreakMe()
 	}
 
 	if colCount == 0 {
 		colCount = r.colCount
-		// debug.Debug("setting colCount: %d", colCount)
 	}
 
 	lowestCount := colCount
@@ -891,8 +889,14 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		}
 
 		if r.p.Characters.DelimCounted != 0 || r.p.Characters.DelimOutsideCounted != 0 {
+			// when we use a rowid we must increase it with one as we added it
 			if r.p.RowID {
-				// TODO: check if we must increase the count...?
+				if r.p.Characters.DelimCounted != 0 {
+					r.p.Characters.DelimCounted++
+				}
+				if r.p.Characters.DelimOutsideCounted != 0 {
+					r.p.Characters.DelimOutsideCounted++
+				}
 			}
 			chunk = append(chunk, util.EncodeCounts(uint32(r.p.Characters.DelimCounted), uint32(r.p.Characters.DelimOutsideCounted))...)
 			// reset the count

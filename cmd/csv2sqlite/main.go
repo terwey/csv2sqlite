@@ -342,7 +342,7 @@ func main() {
 		sem := semaphore.NewWeighted(int64(threads - 1))
 		ctx := context.Background()
 
-		stop := stopCount
+		var stop int
 
 	twLoop:
 		for {
@@ -389,23 +389,19 @@ func main() {
 				go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
 					routine *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
 
-					signal := false
-					rowCount := 0
-
 					for {
 						chunk, more := <-chunks
 
 						for i := range chunk {
 							routine.ProcessRow(routine.ParseRow(chunk[i]))
-							rowCount++
 						}
 
-						if !more {
-							signal = true
+						if routine.Rows > uint64(stop) {
 							break
 						}
 
-						if rowCount > stop {
+						if !more {
+							stopWorkers <- true
 							break
 						}
 					}
@@ -419,10 +415,6 @@ func main() {
 					defer sem.Release(1)
 					defer tw.Done()
 					ready <- routine.GetPath()
-					if signal {
-						stopWorkers <- true
-					}
-					return
 				}(r.Data, &threadWorkers, sem, pr, readyForMerge, stop, inserted)
 			}
 		}
