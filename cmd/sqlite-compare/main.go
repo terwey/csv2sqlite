@@ -110,7 +110,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Difference was acceptable: %s\n", err)
 		} else {
 			fmt.Fprint(os.Stderr, err)
-			return
+			os.Exit(1)
 		}
 	}
 
