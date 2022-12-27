@@ -108,8 +108,8 @@ type CharacterConfig struct {
 	DelimCounted        int `json:"-"`
 	DelimOutsideCounted int `json:"-"`
 
-	// counts the amount that never hit finding the next EOL
-	NdPassed int
+	// counts the amount of times ND seperation would not work
+	NdMoved int
 }
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
@@ -292,7 +292,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 		tmpEolIndex := eolIndex
 		var tmpStart int
-		tries := 5
+		tries := 50
 		i := 0
 		for {
 			if i == tries {
@@ -367,7 +367,6 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				debug.LogData("encloLen == 0", in[:eolIndex], 40960)
 				debug.BreakMe()
 			}
-			c.NdPassed++
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
 		}
 
@@ -387,7 +386,6 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 					debug.LogData("delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
 					debug.BreakMe()
 				}
-				c.NdPassed++
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 				// }
 			}
@@ -398,7 +396,6 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 					debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
 					debug.BreakMe()
 				}
-				c.NdPassed++
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 			}
 
@@ -443,6 +440,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				debug.LogData("new in", in[:eolIndex], 512)
 				debug.BreakMe()
 			}
+			c.NdMoved++
 			continue
 		}
 
