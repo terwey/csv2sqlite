@@ -2,6 +2,7 @@ package compare
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/productsupcom/go-sqlite-lite/sqlite3"
@@ -197,5 +198,49 @@ func TestCompareFiles_512034_11822895(t *testing.T) {
 		"../../tests/csvSample.512034.11822895.sqlite", false)
 	if err != nil {
 		t.Errorf("CompareFiles() returned error: %s", err)
+	}
+}
+
+func Test_intersect(t *testing.T) {
+	type args struct {
+		a []string
+		b []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{
+			name: "equal",
+			args: args{
+				a: []string{"foo", "bar"},
+				b: []string{"foo", "bar"},
+			},
+			want: []string{"foo", "bar"},
+		},
+		{
+			name: "a has col more",
+			args: args{
+				a: []string{"foo", "bar"},
+				b: []string{"bar"},
+			},
+			want: []string{"bar"},
+		},
+		{
+			name: "b has col more",
+			args: args{
+				a: []string{"bar"},
+				b: []string{"foo", "bar"},
+			},
+			want: []string{"bar"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := intersect(tt.args.a, tt.args.b); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("intersect() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
