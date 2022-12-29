@@ -24,6 +24,8 @@ github.com/terwey/recordwriter v0.3.0 h1:r7chn6nvyQW3DfI0bEx4x5sdPZRiJtYQdP6qmjV
 github.com/terwey/recordwriter v0.3.0/go.mod h1:z44dAjijZmHJh6VHoTsloL+MMLA+1WvlBdByfn6ThQY=
 github.com/terwey/recordwriter v0.3.1 h1:bzyUjpv6sw+Lif34T5TxuDhHhmMlC04YEj4l+RGAazg=
 github.com/terwey/recordwriter v0.3.1/go.mod h1:z44dAjijZmHJh6VHoTsloL+MMLA+1WvlBdByfn6ThQY=
+github.com/terwey/recordwriter v0.3.2 h1:ZposZctKI0t+KKamyrPRSGk5TtjCwvQGo/jMG0BhwXg=
+github.com/terwey/recordwriter v0.3.2/go.mod h1:z44dAjijZmHJh6VHoTsloL+MMLA+1WvlBdByfn6ThQY=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
