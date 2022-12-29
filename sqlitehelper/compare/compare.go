@@ -19,6 +19,7 @@ import (
 	"github.com/terwey/csv2sqlite/characters"
 	. "github.com/terwey/csv2sqlite/sqlitehelper"
 
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -32,6 +33,7 @@ var NoCRIgnore bool = false
 var NoEnclosureIgnore bool = false
 var NoEscapedIgnore bool = false
 var NoSort bool = false
+var NoColumnIntersect bool = false
 var Enclosure characters.Character = characters.Character_QUOTATION_MARK
 var MaxWorkers = runtime.NumCPU()
 
@@ -115,6 +117,17 @@ func PreflightFiles(table string, fileA, fileB string, null bool) (Information, 
 
 var RowCountDifference int
 
+func intersect(a, b []string) []string {
+	var is []string
+	for _, av := range a {
+		if slices.Contains(b, av) {
+			is = append(is, av)
+		}
+	}
+
+	return is
+}
+
 func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, error) {
 	namesA, err := ColumnsForDB(info.table, a)
 	if err != nil {
@@ -126,10 +139,18 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		return Information{}, fmt.Errorf("ColumnsForDB(B) err: %w", err)
 	}
 
+	rawColNames := namesA.RawNames()
 	if diff := cmp.Diff(namesA.Names(), namesB.Names()); diff != "" {
 		fmt.Fprintf(os.Stderr, "Columns A: %v\n", namesA.Names())
 		fmt.Fprintf(os.Stderr, "Columns B: %v\n", namesB.Names())
-		return Information{}, fmt.Errorf("Compare() Columns mismatch (-a +b):\n%s", diff)
+		msg := fmt.Sprintf("Compare() Columns mismatch (-a +b):\n%s", diff)
+		if NoColumnIntersect {
+			return Information{}, fmt.Errorf(msg)
+		} else {
+			fmt.Fprintf(os.Stderr, msg+"\n")
+			rawColNames = intersect(namesA.RawNames(), namesB.RawNames())
+			log.Printf("intersecting columns: %s", rawColNames)
+		}
 	}
 
 	countA, err := Count(info.table, a, false)
@@ -160,7 +181,7 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		log.Printf("WARN: %s", msg)
 	}
 
-	usedCols, indexNameA, err := AddIndex(info.table, namesA.RawNames(), a)
+	usedCols, indexNameA, err := AddIndex(info.table, rawColNames, a)
 	if err != nil {
 		log.Printf("Skipping adding an index, could not AddIndex(A): %s", err)
 	}
@@ -182,7 +203,7 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		fileA:     info.fileA,
 		fileB:     info.fileB,
 		count:     countA,
-		rawNames:  namesA.RawNames(),
+		rawNames:  rawColNames,
 		usedCols:  usedCols,
 		indexName: indexNameA,
 	}, nil

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime/pprof"
 
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/sqlitehelper/compare"
@@ -21,6 +22,9 @@ var (
 	table string
 	null  bool
 	write bool
+
+	cpuprofile  string
+	heapprofile string
 
 	showProgress bool
 
@@ -48,8 +52,11 @@ func init() {
 	flags.BoolVar(&compare.NoEscapedIgnore, "no-escape-ignore", false, "Do not ignore incorrect detected enclosures from"+
 		" A to B (PHP parsing error)")
 	flags.BoolVar(&compare.NoSort, "no-sort", false, "Do not order data for indexed columns")
+	flags.BoolVar(&compare.NoColumnIntersect, "no-column-intersect", false, "Do not intersect on column names when they differ")
 	flags.StringVarP(&enclosure, "enclosure", "e", "\"", "Enclosure to use")
 	flags.IntVar(&compare.MaxWorkers, "threads", compare.MaxWorkers, "Thread limit")
+	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
+	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
 }
 
 func main() {
@@ -88,6 +95,19 @@ func main() {
 		log.Fatalf("A (%s) and B (%s) are the same file", a, b)
 	}
 
+	if cpuprofile != "" {
+		f, err := os.Create(cpuprofile)
+		if err != nil {
+			log.Fatalf("Could not create cpuprofile: %s", err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
+	if heapprofile != "" {
+		defer WriteHeapProfile(heapprofile)
+	}
+
 	if enclosure != `` {
 		encl, err := characters.CharacterFromString(enclosure)
 		if err != nil {
@@ -119,6 +139,18 @@ func main() {
 		os.WriteFile(a+".passed", []byte(""), 0666)
 	}
 	log.Printf("No differences found")
+}
 
-	os.Exit(0)
+func WriteHeapProfile(name string) {
+	f, err := os.Create(name)
+	if err != nil {
+		log.Fatalf("Could not create heapprofile: %s", err)
+	}
+	err = pprof.WriteHeapProfile(f)
+	if err != nil {
+		log.Printf("could not write heap profile")
+		return
+	}
+
+	log.Printf("wrote heap-profile: %s", f.Name())
 }
