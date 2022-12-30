@@ -486,8 +486,8 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 						if len(bufB) < i {
 							break
 						}
-						// it only occurs on \"
-						if !strings.Contains(v, `\"`) {
+						// we thought it only occurs on \", but can also just be "
+						if !strings.Contains(v, `"`) {
 							continue
 						}
 						if vb, ok := bufB[i].(string); ok {
