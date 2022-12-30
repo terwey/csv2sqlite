@@ -1,6 +1,7 @@
 package compare
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -181,7 +182,9 @@ func TestCompareNoEscapedIgnore(t *testing.T) {
 
 	err = Compare(info, connA, connB, false)
 	if err != nil {
-		t.Errorf("Compare() returned err: %s", err)
+		if !errors.Is(err, IncorrectParsing) {
+			t.Errorf("Compare() returned err: %s", err)
+		}
 	}
 }
 
