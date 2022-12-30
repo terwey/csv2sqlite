@@ -349,6 +349,9 @@ func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset 
 
 	err = compareStmts(stmtA, stmtB, len(info.rawNames), null, info.rawNames)
 	if err != nil {
+		if err == IncorrectParsing {
+			return IncorrectParsing
+		}
 		atomic.AddInt32(errors, 1)
 		if int(atomic.LoadInt32(errors)) > MaxErrors {
 			return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %w", atomic.LoadInt32(errors), MaxErrors, err)
@@ -361,7 +364,8 @@ func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset 
 }
 
 var (
-	StillHasRows error = fmt.Errorf("still has rows")
+	StillHasRows     error = fmt.Errorf("still has rows")
+	IncorrectParsing error = fmt.Errorf("incorrect parsing")
 )
 
 func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames []string) error {
@@ -505,6 +509,7 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 								buf.WriteString(vb)
 								buf.WriteString("\n\n")
 								fmt.Fprintf(os.Stderr, "%s\n", buf.String())
+								return IncorrectParsing
 								goto end
 							}
 						}

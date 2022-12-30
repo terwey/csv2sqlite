@@ -128,6 +128,8 @@ func main() {
 		}
 		if errors.Is(err, compare.StillHasRows) && compare.RowCountDifference == -1 {
 			fmt.Fprintf(os.Stderr, "Difference was acceptable: %s\n", err)
+		} else if errors.Is(err, compare.IncorrectParsing) {
+			fmt.Fprintf(os.Stderr, "Incorrect parsing detected: %s\n", err)
 		} else {
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
