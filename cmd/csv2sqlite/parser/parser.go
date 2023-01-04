@@ -770,7 +770,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	var enclDetectCount int
 
 	// used for p.Start
-	startCounter := 0
+	startCounter := 1
 
 	// used for p.Skip
 	skipCounter := 0

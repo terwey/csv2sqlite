@@ -5,6 +5,7 @@ package compare
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -34,6 +35,7 @@ var NoEnclosureIgnore bool = false
 var NoEscapedIgnore bool = false
 var NoSort bool = false
 var NoColumnIntersect bool = false
+var NoTrimWhitespace bool = false
 var Enclosure characters.Character = characters.Character_QUOTATION_MARK
 var MaxWorkers = runtime.NumCPU()
 
@@ -153,6 +155,10 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		}
 	}
 
+	if NoSort {
+		rawColNames = append([]string{"rowid"}, rawColNames...)
+	}
+
 	countA, err := Count(info.table, a, false)
 	if err != nil {
 		return Information{}, fmt.Errorf("Count(A): %w", err)
@@ -262,7 +268,7 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 		defer RemoveIndex(info.indexName, b)
 	}
 
-	errors := new(int32)
+	errorCount := new(int32)
 	max := Limit
 
 	limit := 0
@@ -273,7 +279,7 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 	errs.SetLimit(MaxWorkers)
 
 	for {
-		if atomic.LoadInt32(errors) > int32(MaxErrors) {
+		if atomic.LoadInt32(errorCount) > int32(MaxErrors) {
 			break
 		}
 
@@ -290,7 +296,7 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 		o := offset
 
 		errs.Go(func() error {
-			return compare(info, a, b, errors, l, o, null)
+			return compare(info, a, b, errorCount, l, o, null)
 		})
 
 		left -= max
@@ -304,7 +310,7 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 	return nil
 }
 
-func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset int, null bool) error {
+func compare(info Information, a, b *sqlite3.Conn, errorCount *int32, limit, offset int, null bool) error {
 	var err error
 	if !memoryTable {
 		a = nil
@@ -349,15 +355,15 @@ func compare(info Information, a, b *sqlite3.Conn, errors *int32, limit, offset 
 
 	err = compareStmts(stmtA, stmtB, len(info.rawNames), null, info.rawNames)
 	if err != nil {
-		if err == IncorrectParsing {
+		if errors.Is(err, IncorrectParsing) {
 			return IncorrectParsing
 		}
-		atomic.AddInt32(errors, 1)
-		if int(atomic.LoadInt32(errors)) > MaxErrors {
-			return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %w", atomic.LoadInt32(errors), MaxErrors, err)
+		atomic.AddInt32(errorCount, 1)
+		if int(atomic.LoadInt32(errorCount)) > MaxErrors {
+			return fmt.Errorf("WARN (Error count: %d, MaxErrors: %d): %w", atomic.LoadInt32(errorCount), MaxErrors, err)
 		}
 
-		log.Printf("WARN (Error count: %d, MaxErrors: %d): %s", atomic.LoadInt32(errors), MaxErrors, err)
+		log.Printf("WARN (Error count: %d, MaxErrors: %d): %s", atomic.LoadInt32(errorCount), MaxErrors, err)
 	}
 
 	return nil
@@ -497,16 +503,23 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 						if vb, ok := bufB[i].(string); ok {
 							if strings.HasPrefix(v, vb) && len(v) > len(vb) {
 								// reset diff
-								diff = ""
+								// diff = ""
 
 								var buf strings.Builder
 								buf.WriteString("Incorrect column parsing from A detected\n")
+								if NoSort {
+									buf.WriteString(fmt.Sprintf("%50s", "rowid"))
+									buf.WriteString("\tA\t")
+									buf.WriteString(fmt.Sprintf("%s\n", bufB[0]))
+								}
 								buf.WriteString(fmt.Sprintf("%50s", columnNames[i]))
 								buf.WriteString("\tA\t")
 								buf.WriteString(v)
 								buf.WriteString(fmt.Sprintf("\n%50s", ""))
 								buf.WriteString("\tB\t")
 								buf.WriteString(vb)
+								buf.WriteString("\n\n")
+								buf.WriteString(diff)
 								buf.WriteString("\n\n")
 								fmt.Fprintf(os.Stderr, "%s\n", buf.String())
 								return IncorrectParsing
@@ -520,12 +533,20 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			if !NoEnclosureIgnore {
 				for i := range bufA {
 					if v, ok := bufA[i].(string); ok {
-						bufA[i] = strings.ReplaceAll(v, Enclosure.String(), "")
+						if NoTrimWhitespace {
+							bufA[i] = strings.ReplaceAll(v, Enclosure.String(), "")
+						} else {
+							bufA[i] = strings.TrimSpace(strings.ReplaceAll(v, Enclosure.String(), ""))
+						}
 					}
 				}
 				for i := range bufB {
 					if v, ok := bufB[i].(string); ok {
-						bufB[i] = strings.ReplaceAll(v, Enclosure.String(), "")
+						if NoTrimWhitespace {
+							bufB[i] = strings.ReplaceAll(v, Enclosure.String(), "")
+						} else {
+							bufB[i] = strings.TrimSpace(strings.ReplaceAll(v, Enclosure.String(), ""))
+						}
 					}
 				}
 
