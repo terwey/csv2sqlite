@@ -56,8 +56,8 @@ var (
 	parseRoutines []*parser.Runtime
 	readyForMerge chan string
 	stopWorkers   chan bool
-	inserted      chan uint64
-	insertedRows  uint64
+	rowCountChan  chan parser.RowCount
+	rowCountTotal parser.RowCount
 	stopCount     int
 	logHeader     int
 	csvReport     bool
@@ -118,6 +118,7 @@ func main() {
 		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
 		flags.BoolVar(&parser.RWDebugLog, "rw-debug", false, "Outputs record writer debug information, careful is extremely chatty.")
 		flags.BoolVar(&debug.LogCSVReader, "log-csv-reader", false, "Logs the occurence and data where the Go built-in CSV Reader is used. Can be used without the debug mode.")
+		flags.BoolVar(&debug.EnableLogDropped, "log-dropped", false, "Outputs dropped data")
 
 	}
 	flags.BoolVar(&overflow, "overflow", false, "Overflows the data. Will abort processing.")
@@ -219,7 +220,7 @@ func main() {
 
 	readyForMerge = make(chan string, 1000)
 	stopWorkers = make(chan bool, threads-1)
-	inserted = make(chan uint64)
+	rowCountChan = make(chan parser.RowCount)
 
 	switch strings.ToUpper(newline) {
 	case "LF":
@@ -316,12 +317,15 @@ func main() {
 	var mergeWg sync.WaitGroup
 
 	insertWg.Add(1)
-	go func(inserted <-chan uint64, wg *sync.WaitGroup) {
+	go func(rowCountChan <-chan parser.RowCount, wg *sync.WaitGroup) {
 		defer wg.Done()
-		for rows := range inserted {
-			insertedRows += rows
+		for rc := range rowCountChan {
+			rowCountTotal.Inserted += rc.Inserted
+			rowCountTotal.GoParser += rc.GoParser
+			rowCountTotal.GoParserDropped += rc.GoParserDropped
+			rowCountTotal.Dropped += rc.Dropped
 		}
-	}(inserted, &insertWg)
+	}(rowCountChan, &insertWg)
 
 	// readWg is used for the main scanner loop and also for the header initialization
 	var readWg sync.WaitGroup
@@ -349,7 +353,7 @@ func main() {
 			select {
 			case <-stopWorkers:
 				threadWorkers.Wait()
-				close(inserted)
+				close(rowCountChan)
 				close(readyForMerge)
 				break twLoop
 			default:
@@ -387,7 +391,7 @@ func main() {
 
 				threadWorkers.Add(1)
 				go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
-					routine *parser.Runtime, ready chan string, stop int, inserted chan uint64) {
+					routine *parser.Runtime, ready chan string, stop int, inserted chan parser.RowCount) {
 
 					for {
 						chunk, more := <-chunks
@@ -396,7 +400,7 @@ func main() {
 							routine.ProcessRow(routine.ParseRow(chunk[i]))
 						}
 
-						if routine.Rows > uint64(stop) {
+						if routine.RowCounter.Inserted > uint64(stop) {
 							break
 						}
 
@@ -406,7 +410,7 @@ func main() {
 						}
 					}
 
-					inserted <- routine.Rows
+					inserted <- routine.RowCounter
 					err := routine.Close()
 					if err != nil {
 						log.Fatalf("Could not close runtime in routine: %s", err)
@@ -415,7 +419,7 @@ func main() {
 					defer sem.Release(1)
 					defer tw.Done()
 					ready <- routine.GetPath()
-				}(r.Data, &threadWorkers, sem, pr, readyForMerge, stop, inserted)
+				}(r.Data, &threadWorkers, sem, pr, readyForMerge, stop, rowCountChan)
 			}
 		}
 	}
@@ -433,9 +437,9 @@ func main() {
 
 	var ops time.Duration
 	var rows float64
-	if insertedRows != 0 {
-		ops = time.Duration(totalTime.Nanoseconds() / int64(insertedRows))
-		rows = float64(insertedRows) / totalTime.Seconds()
+	if rowCountTotal.Inserted != 0 {
+		ops = time.Duration(totalTime.Nanoseconds() / int64(rowCountTotal.Inserted))
+		rows = float64(rowCountTotal.Inserted) / totalTime.Seconds()
 	} else {
 		ops = time.Duration(0)
 	}
@@ -454,7 +458,7 @@ func main() {
 				totalTime.Round(time.Millisecond),
 				conversionElapsed.Round(time.Millisecond),
 				merged.Round(time.Millisecond),
-				insertedRows,
+				rowCountTotal.Inserted,
 				ops.Round(time.Microsecond),
 				math.Floor(rows),
 				threads,
@@ -465,7 +469,7 @@ func main() {
 				p.CommitRate,
 				stopCount,
 				p.ChannelCapacity,
-				r.RowsCSV,
+				rowCountTotal.GoParser,
 				chunksize*p.ChannelCapacity*threads,
 			)
 		} else {
@@ -491,13 +495,13 @@ func main() {
 				Total:         totalTime.Round(time.Millisecond).String(),
 				Conversion:    conversionElapsed.Round(time.Millisecond).String(),
 				Merge:         merged.Round(time.Millisecond).String(),
-				Rows:          insertedRows,
+				Rows:          rowCountTotal.Inserted,
+				RowCount:      rowCountTotal,
 				Ops:           ops.Round(time.Microsecond).String(),
 				RowsPerSecond: math.Floor(rows),
 				Threads:       threads,
 				Chunksize:     chunksize,
 				BreakCount:    stopCount,
-				GoCsvReader:   r.RowsCSV,
 				Capacity:      chunksize * p.ChannelCapacity * threads,
 			}
 
@@ -510,7 +514,7 @@ func main() {
 		}
 	}
 
-	if insertedRows == 0 {
+	if rowCountTotal.Inserted == 0 {
 		fmt.Fprintf(os.Stderr, "No rows inserted.\n")
 		os.Exit(1)
 	}
@@ -539,6 +543,7 @@ type Performance struct {
 	Conversion    string
 	Merge         string
 	Rows          uint64
+	RowCount      parser.RowCount
 	Ops           string
 	RowsPerSecond float64
 	Threads       int

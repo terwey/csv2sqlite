@@ -26,6 +26,13 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
+type RowCount struct {
+	Inserted        uint64
+	GoParser        uint64
+	Dropped         uint64
+	GoParserDropped uint64
+}
+
 type Params struct {
 	Input           string
 	Output          string
@@ -103,8 +110,7 @@ type Runtime struct {
 	scanner *bufio.Scanner
 	w       io.StringWriter
 
-	Rows          uint64
-	RowsCSV       uint64
+	RowCounter    RowCount
 	headerPrinted bool
 	colCount      int
 	inside        bool
@@ -363,7 +369,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 
 	if !r.p.RowID && debug.Ultra {
 		r.rw.Multibyte(v, pos, r.colCount)
-		r.Rows++
+		r.RowCounter.Inserted++
 		r.rw.EORMulti()
 		return
 	}
@@ -384,7 +390,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 		}
 	}
 
-	r.Rows++
+	r.RowCounter.Inserted++
 
 	r.rw.EOR(r.colCount)
 	return
@@ -503,12 +509,18 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 				break
 			}
 			if err != nil {
-				if debug.DebugLog {
-					time.Sleep(2 * time.Second)
-
+				// last hail mary for broken CSVs, we use a gensplit as we do not care anymore about consistency for these
+				o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+				if len(o) != 0 {
+					if debug.EnableLogDropped {
+						debug.LogDropped("GoParser could have dropped (delimCounted: %d): \n%s\nfound: \n%s", bytes.Count(data, r.p.Characters.Delimiter), data, util.FlatToMulti(o, p))
+					}
+					return o, p
 				}
-				log.Printf("csv reading failed: %s, data: \n%s", err, data)
-				panic(err)
+				if debug.EnableLogDropped {
+					debug.LogDropped("GoParser dropped (delimCounted: %d): \n%s", bytes.Count(data, r.p.Characters.Delimiter), data)
+				}
+				r.RowCounter.GoParserDropped++
 				return nil, nil
 			}
 
@@ -536,7 +548,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			if debug.DebugLog {
 				debug.LogReader(data, count, colCount)
 			}
-			r.RowsCSV++
+			r.RowCounter.GoParser++
 		}
 
 		if len(pos) != 0 && len(pos) < lowestCount {
@@ -568,6 +580,22 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			debug.Debug("returning: \n%v\n%v\n", out, pos)
 		}
 	}
+
+	if len(out) == 0 {
+		// last hail mary for broken CSVs
+		o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+		if len(o) != 0 {
+			if debug.EnableLogDropped {
+				debug.LogDropped("SplitRow could have dropped (delimCounted: %d): \n%s\nfound: \n%s", bytes.Count(data, r.p.Characters.Delimiter), data, util.FlatToMulti(o, p))
+			}
+			return o, p
+		}
+		if debug.EnableLogDropped {
+			debug.LogDropped("SplitRow dropped (delimCounted: %d): \n%s", bytes.Count(data, r.p.Characters.Delimiter), data)
+		}
+		r.RowCounter.Dropped++
+	}
+
 	return out, pos
 }
 

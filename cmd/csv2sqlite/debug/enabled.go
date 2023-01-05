@@ -19,7 +19,7 @@ func State() bool {
 func LogData(name string, data []byte, max int) {
 	if DebugLog {
 		if len(data) < max {
-			Debug("%s (%d) data:\n\"%s\"", name, len(data), data)
+			Debug("%s (%d) data:\n+%s+", name, len(data), data)
 			return
 		}
 
@@ -48,6 +48,12 @@ func DebugColumns(cols [][]byte) {
 			fmt.Fprintf(os.Stderr, "Column [%3d]\t%s\n", i, cols[i])
 		}
 		// log.Printf("End of Columns")
+	}
+}
+
+func LogDropped(format string, v ...interface{}) {
+	if EnableLogDropped {
+		fmt.Fprintf(os.Stderr, format+"\n----\n", v...)
 	}
 }
 
