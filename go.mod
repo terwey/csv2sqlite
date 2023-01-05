@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/google/go-cmp v0.5.8
 	github.com/productsupcom/go-sqlite-lite v0.8.0
-	github.com/terwey/recordwriter v0.3.2
+	github.com/terwey/recordwriter v0.4.0
 	github.com/schollz/progressbar/v3 v3.7.4
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d

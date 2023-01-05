@@ -509,8 +509,16 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 				break
 			}
 			if err != nil {
+				// last hail mary for broken CSVs, we use a gensplit as we do not care anymore about consistency for these
+				o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+				if len(o) != 0 {
+					if debug.EnableLogDropped {
+						debug.LogDropped("GoParser could have dropped (delimCounted: %d): \n%s\nfound: \n%s", bytes.Count(data, r.p.Characters.Delimiter), data, util.FlatToMulti(o, p))
+					}
+					return o, p
+				}
 				if debug.EnableLogDropped {
-					debug.LogDropped("GoParser Dropped: \n%s", data)
+					debug.LogDropped("GoParser dropped (delimCounted: %d): \n%s", bytes.Count(data, r.p.Characters.Delimiter), data)
 				}
 				r.RowCounter.GoParserDropped++
 				return nil, nil
@@ -574,8 +582,16 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	}
 
 	if len(out) == 0 {
+		// last hail mary for broken CSVs
+		o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+		if len(o) != 0 {
+			if debug.EnableLogDropped {
+				debug.LogDropped("SplitRow could have dropped (delimCounted: %d): \n%s\nfound: \n%s", bytes.Count(data, r.p.Characters.Delimiter), data, util.FlatToMulti(o, p))
+			}
+			return o, p
+		}
 		if debug.EnableLogDropped {
-			debug.LogDropped("SplitRow dropped: \n%s", data)
+			debug.LogDropped("SplitRow dropped (delimCounted: %d): \n%s", bytes.Count(data, r.p.Characters.Delimiter), data)
 		}
 		r.RowCounter.Dropped++
 	}
