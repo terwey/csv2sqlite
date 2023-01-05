@@ -25,3 +25,5 @@ func DebugColumns(cols [][]byte) {
 
 func LogReader(data []byte, count int, colCount int) {
 }
+
+func LogDropped(format string, v ...interface{}) {}

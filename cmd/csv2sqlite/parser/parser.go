@@ -26,6 +26,13 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
+type RowCount struct {
+	Inserted        uint64
+	GoParser        uint64
+	Dropped         uint64
+	GoParserDropped uint64
+}
+
 type Params struct {
 	Input           string
 	Output          string
@@ -103,8 +110,7 @@ type Runtime struct {
 	scanner *bufio.Scanner
 	w       io.StringWriter
 
-	Rows          uint64
-	RowsCSV       uint64
+	RowCounter    RowCount
 	headerPrinted bool
 	colCount      int
 	inside        bool
@@ -363,7 +369,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 
 	if !r.p.RowID && debug.Ultra {
 		r.rw.Multibyte(v, pos, r.colCount)
-		r.Rows++
+		r.RowCounter.Inserted++
 		r.rw.EORMulti()
 		return
 	}
@@ -384,7 +390,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 		}
 	}
 
-	r.Rows++
+	r.RowCounter.Inserted++
 
 	r.rw.EOR(r.colCount)
 	return
@@ -503,12 +509,10 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 				break
 			}
 			if err != nil {
-				if debug.DebugLog {
-					time.Sleep(2 * time.Second)
-
+				if debug.EnableLogDropped {
+					debug.LogDropped("GoParser Dropped: \n%s", data)
 				}
-				log.Printf("csv reading failed: %s, data: \n%s", err, data)
-				panic(err)
+				r.RowCounter.GoParserDropped++
 				return nil, nil
 			}
 
@@ -536,7 +540,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			if debug.DebugLog {
 				debug.LogReader(data, count, colCount)
 			}
-			r.RowsCSV++
+			r.RowCounter.GoParser++
 		}
 
 		if len(pos) != 0 && len(pos) < lowestCount {
@@ -568,6 +572,14 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			debug.Debug("returning: \n%v\n%v\n", out, pos)
 		}
 	}
+
+	if len(out) == 0 {
+		if debug.EnableLogDropped {
+			debug.LogDropped("SplitRow dropped: \n%s", data)
+		}
+		r.RowCounter.Dropped++
+	}
+
 	return out, pos
 }
 
