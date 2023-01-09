@@ -3,6 +3,10 @@
 
 package main
 
+/*
+#cgo CFLAGS: -DSQLITE_MAX_COLUMN=32767
+*/
+
 import (
 	"bufio"
 	"context"
