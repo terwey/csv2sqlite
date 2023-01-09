@@ -245,7 +245,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		lfIndex := bytes.Index(in, characters.Character_LINE_FEED)
 		crIndex := bytes.Index(in, characters.Character_CARRIAGE_RETURN)
 
-		if crIndex == lfIndex-1 {
+		if lfIndex != 0 && crIndex == lfIndex-1 {
 			// the character is CRLF
 			c.EOL = characters.Character_CARRIAGE_RETURN_LINE_FEED
 			break

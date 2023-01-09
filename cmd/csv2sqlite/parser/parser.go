@@ -819,6 +819,11 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			log.Fatalf("Runtime: scanner error during loop: %s", err)
 		}
 
+		size := len(scanner.Bytes())
+		if size == 0 {
+			continue
+		}
+
 		r.p.Characters.DelimCounted = 0
 
 		if r.p.Start > 0 && startCounter < r.p.Start {
@@ -840,10 +845,6 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		}
 
 		// make chunk large enough to also fit the delimCount as bytes
-		size := len(scanner.Bytes())
-		if size == 0 {
-			continue
-		}
 		chunk = make([]byte, size, size+8)
 		copy(chunk, scanner.Bytes())
 
