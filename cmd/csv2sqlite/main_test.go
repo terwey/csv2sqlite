@@ -110,6 +110,38 @@ func Test_main(t *testing.T) {
 			delimiter: characters.Character_COMMA,
 			newline:   false,
 		},
+		{
+			name:      "empty-rows-in-content.csv",
+			input:     baseDir + "tests/empty-rows-in-content.csv",
+			output:    tmpDir + "empty-rows-in-content.sqlite",
+			want:      baseDir + "tests/empty-rows-in-content.sqlite",
+			enclosure: characters.Character_EMPTY,
+			debug:     true,
+			delimiter: characters.Character_COMMA,
+			newline:   false,
+		},
+		{
+			name:      "empty-rows-in-content.csv with --rowid",
+			input:     baseDir + "tests/empty-rows-in-content.csv",
+			output:    tmpDir + "empty-rows-in-content.sqlite",
+			want:      baseDir + "tests/empty-rows-in-content.sqlite",
+			enclosure: characters.Character_EMPTY,
+			debug:     true,
+			delimiter: characters.Character_COMMA,
+			newline:   false,
+			params:    []string{"--rowid"},
+		},
+		{
+			name:      "empty-cols-in-content-with-delimiters.csv with --rowid",
+			input:     baseDir + "tests/empty-cols-in-content-with-delimiters.csv",
+			output:    tmpDir + "empty-rows-in-content.sqlite",
+			want:      baseDir + "tests/empty-rows-in-content.sqlite",
+			enclosure: characters.Character_EMPTY,
+			debug:     true,
+			delimiter: characters.Character_COMMA,
+			newline:   false,
+			params:    []string{"--rowid"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
