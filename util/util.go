@@ -285,6 +285,10 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		return 0, nil, nil
 	}
 
+	if len(in[:eolIndex]) == 0 {
+		return eolIndex + len(c.EOL), in[:eolIndex], nil
+	}
+
 	if len(c.Enclosure) == 0 && !c.EnclosureIsEmpty {
 		if len(c.Delimiter) == 0 {
 			c.SetDelimiter(characters.DetectDelimiter(in[:eolIndex]))
