@@ -100,6 +100,16 @@ func Test_main(t *testing.T) {
 			delimiter: characters.Character_COMMA,
 			newline:   false,
 		},
+		{
+			name:      "empty-cols-before-header.csv",
+			input:     baseDir + "tests/empty-cols-before-header.csv",
+			output:    tmpDir + "empty-cols-before-header.sqlite",
+			want:      baseDir + "tests/empty-cols-before-header.sqlite",
+			enclosure: characters.Character_EMPTY,
+			debug:     true,
+			delimiter: characters.Character_COMMA,
+			newline:   false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
