@@ -326,7 +326,8 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 
 		r.ProcessHeader(header)
 		// we should not output the header to the sqlite file, return nothing as it'll be skipped
-		return []byte{}, []uint32{}
+		// return []byte{}, []uint32{}
+		return cols, pos
 	}
 
 	return cols, pos
@@ -897,9 +898,17 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			chunk = util.ReplaceAll(chunk, characters.BOM_UTF16_BE, []byte{})
 			// remove \uEFBBBF used as BOM
 			chunk = util.ReplaceAll(chunk, characters.BOM_UTF8, []byte{})
+
+			// some files have empty cols before the header, we should drop them, slight speed impact but worth the fix
+			if len(util.ReplaceAll(chunk, r.p.Characters.Delimiter, characters.Character_EMPTY)) == 0 {
+				continue
+			}
+
 			chunk = append(chunk, bdcZero...)
-			r.ParseRow(chunk)
-			count++
+			c, _ := r.ParseRow(chunk)
+			if len(c) != 0 {
+				count++
+			}
 			continue
 		}
 
