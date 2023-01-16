@@ -5,7 +5,6 @@ package characters
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"unicode"
 	"unicode/utf8"
