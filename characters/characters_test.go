@@ -71,6 +71,7 @@ func Test_detectEnclosure(t *testing.T) {
 		delimiter Character
 		want      Character
 		count     int
+		occurence int
 		debug     bool
 		wantFail  bool
 	}{
@@ -80,6 +81,7 @@ func Test_detectEnclosure(t *testing.T) {
 			delimiter: Character_COMMA,
 			want:      Character([]byte("🍆")),
 			count:     6,
+			debug:     false,
 		},
 		{
 			name:      "Detect double emoji",
@@ -109,10 +111,11 @@ func Test_detectEnclosure(t *testing.T) {
 			want:      Character_QUOTATION_MARK,
 			delimiter: Character_COMMA,
 			count:     6,
+			debug:     false,
 		},
 		{
 			name:      "Detect quote optional",
-			data:      []byte(`fielda,"fieldb",fieldc`),
+			data:      []byte(`1fielda,"2fieldb",3fieldc`),
 			want:      Character_QUOTATION_MARK,
 			delimiter: Character_COMMA,
 			count:     2,
@@ -162,7 +165,6 @@ func Test_detectEnclosure(t *testing.T) {
 			want:      Character_QUOTATION_MARK,
 			delimiter: Character_TAB,
 			count:     24,
-			debug:     false,
 		},
 		{
 			name:      "7527.482697",
@@ -255,6 +257,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`SÜDXNF<#>https://example.com/ygesricf/325/451/znuhqfnoqgojx/olzi5otk.5pi_FMY_56_9971269232549.knn<#>https://example.com/ygesricf/325/451/znuhqfnoqgojx/k2qpodua.i0f_FMY_57_9971269232549.knn<#>https://example.com/ygesricf/325/451/znuhqfnoqgojx/huul4aq2.3gt_FMY_59_9971269232549.knn<#><#>Tlwkm<#>Lcneix<#>kpr.whipptqf.lcneix<#>lcneix://lenilns?id=986948<#>Vvptlmv<#>476<#>2473<#>Bfeg<#>7021445125<#><#><#>Fgmc<#>Zmizy<#>902825589<#>1 > 11 > 32 > 1075<#>Dhprvpsw>Qpqis Hqşl Dhprvpsw>Südxnf<#><#>12780344639<#>https://example.com/ygesricf/325/451/znuhqfnoqgojx/htgv50k4.o4v_FMY_55_9971269232549.knn<#>Lcneix<#>323257447<#>lcneix://lenilns?id=986948<#>https://example.com/k_vvptlmv-wwppoa_986948<#>424802190_504<#>3<#>5650.0000<#>986948<#>Südxnf<#>424802190<#>S02<#>1<#>5650.0000<#>Dudltpvu / Oış<#>BJ<#>0.00<#>Klzncfwk<#>100<#>2998266<#>844451353790<#>%100<#>2022<#><#><#><#>%100 Hnfu<#><#><#><#><#><#><#>Ahbwbebf Zmizy<#><#><#><#><#><#><#><#>https://example.com/ihibmrx/<#><#><#><#><#><#><#>0<#>0<#><#><#><#><#>Yslts<#><#><#><#>Bfeg<#><#><#><#><#><#><#>Zmizy>Dhprvpsw>Südxnf<#>10004>10010>50695<#>ÇGSPS<|>Hmipgozztme<|>ZMIZY<|>RPYG<|>Dhprvpsw<|>Zmizy<|>Ahbwbebf<|>Qtbn Öxnkkpk<|>Südxnf<|>Dhprvpsw<|>Südxnf<|>Vvptlmv<|>Ahbwbebf<|>Ubecjtn Cüzü Urssyl Nmçjuep<#>57301<|>57284<|>10023<|>10007<|>1001`),
 			delimiter: Character("<#>"),
 			want:      Character_EMPTY,
+			debug:     false,
 		},
 		{
 			data:      []byte(`yiit,0.00,,,,,,Hdgfngwuehnwh,RY,A,9,9031,90,,,262735976049,2019,,2500-01-01T00:00:00.000N,2019,,1,1,yiit,98604111829365,,,,,,,,,,,,,,,,,,,,,,,,yslts,,,"2019 Pjvtrg Ucwqew",,,,,,,,262735976049,,,,,,,,999,"Vvg Kcsq",31,,yslts,,,,,,,,,,,,,"Jabbgmc & Ihhdvwndgqv",,,,31,,,,yiit,,yiit,,0,fgbhxlfp,,,yslts,,,2500-01-01N,,,,,,,,,,`),
@@ -338,6 +341,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`3,1,bg,2,https://example.com/p/5lw7a96d7c1d5d4m/skfyphkt/2_bg.psj,Ypwhd,ypwhd,rd vogzrkrui,2,yiit,"[""Vamgnu myau psdxnab cnid fxt xysuduxe dc jytl cv vmn 60twy th dc 4C vmn 30twy."",""Amsz ot 2 IA yzlkl hkccwll, wnsfz ot LQ40 wpfwe jvnsmhibdezp."",""Bswncar ot wdivrlleew 5-hldgyq hrpcfvlsctyvbivbk osfmd eajrtvsavxqlfnccnng djwrvdgggy.""]",Vamgnu myau psdxnab cnid fxt xysuduxe dc jytl cv vmn 60twy th dc 4C vmn 30twy.,"Amsz ot 2 IA yzlkl hkccwll, wnsfz ot LQ40 wpfwe jvnsmhibdezp.",Bswncar ot wdivrlleew 5-hldgyq hrpcfvlsctyvbivbk osfmd eajrtvsavxqlfnccnng djwrvdgggy.,Lh osfmd znnj hvbzdjgfkcmdt xcljjkizivi.,,,yslts,,"Ot Ypwhd LQ40 Yjdtjvlxe Oto nw dgz fjefyzjgqjgyv 4C zipuieuvn vmn dgz zkueqx vbpsxnrtyfsndnpde, xlesrbhi cf wpfwe ilyq jvnsmhibdezp rgiq. Eshd oto ybkpwye opc ot zipuieuvn, ot Kuvrco Arx Yjuy 4C ag dgz ektm sgjvo. Vamgnu ukhzjtbcy myau psdxnab cnid fxt xysuduxe vmn ot Arx Yjuy dc jytl cv vmn 60twy th dc 4C vmn 30twy. Ot tbrp dlawsvvj nzey 20l jcstjncd dtbj ag dgz mebagwwn oflekbhdd qng x/1.8-2.8, mkhns ot tbrp gqgoqrxzax nw nzey tmx dibg zbiypexjak. Bswncar ot latbdqfas bcdjp nwgz cf wpfwe ofauhes psdxnab rd dc hmkfxbb avswcqomk. Eylmwtroc ujkkt ot 5-hldgyq jcstjncd hrpcfvlsctyvbivbk vnnk gppa hpciqdgtdvb, mkhns cf glidsmgyqakcql idsmv's ginpcua. Low wnsfz ot zipuieuvn dgz vfaadseoz, dybuqddc PU-dfvayb xlesrbhi cf pzezeuc axdzl qng iiwbiyq rlefeghqczenn. Vmn tmx bmxcvbdxb 3 zjxy blqvpcxtoxf zno cf xpu cf lurjk ag lol cf ot tskcjdydwbqs kpwiktukvcu wpi.",0,5553528522060,5553528522060,,,,,,,BW YBLPNE OOAIY FHMPGAINN,https://example.com/p/5a01951yi07bcd58/skfyphkt/2031_EQPAITNTDQ_Ag-wpciw_NWDU_i.psj,https://example.com/p/373405798990c40a/skfyphkt/2031_EQPAITNTDQ_Ag-wpciw_NWDU_f.psj,yslts,Fjefyzjgqjgyv zipuieuvn,20l jcstjncd dtbj,Pptkyhkinugius,,879974,https://example.com/p/8jweu22c5834e8kf/lbdgfzEqbem-879974.psj,https://example.com/p/8jweu22c5834e8kf/skfyphkt/879974.psj,https://example.com/gzg/2048x1536/vbauxoed/1554390,https://example.com/bg/lenilns/879974,,,,Ypwhd LQ40 Yjdtjvlxe Oto,Ypwhd LQ40 Yjdtjvlxe Oto zipuieuvn,mydpxcovcvrdzg,0,1642.98,,0,0,1542.98,yslts,2,p,Ypwhd-LQ40-Yjdtjvlxe-Oto,,,,,,,eqpaitntdq/umr10,144.9449177,,,,2031_2,2031,eqpaitntdq,zipuieuvn,eqpaitntdq,,,26,26,https://example.com/p/166b343c575a2et7/skfyphkt/0.psj,"1468953,1468954,1468956,1468957,1468952,1165940,1166676,1165939,1744629,1202092,1202947,1202950,1660291",,,0,rprnw`),
 			delimiter: Character_COMMA,
 			want:      Character_QUOTATION_MARK,
+			debug:     false,
 		},
 
 		{
@@ -410,6 +414,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`DH-DT100-PSQ-SJML,"Rybezqrwl th Lqghgdo","Gtiymbv - Wpwe Qzls Psq D/ 2 Sjml Muqt - Opeleowo","Rybezqrwl > Okao & Jsmyk > Hotg","Kuba bjtuqj dlallv wpwe psq nw bs yhkorphkv wlxkwy. Fip utixtr dkbcn xbcjzj dc wgu th fig qtvdd bbakz fip rmchl dlallv rwfpnjnoz sqe ooncbjgmj nzhkvl nfukb xu qwvu xu fip qvvl zlnaa tpoij. Kuba xfa atzai fip gkvhc ""fubg nw uvan"" sqe kytl vgei as. Kuba nw fip aszwifs cvgsb rsm h sqszkxy mb uzrticnkj qptrx oyef hmfii.",Xqbhvc,,DH-DT100DT-PSQ-SJML,Nfpa,Xcosnj,Opeleowo,Bjtuqj,Opeleowo,"Hiosj Leul Nfpa, Xcosnj","Rmchl Qptrx Vnvrbvwhxwfy",https://example.com/rybezqrwl-th-lqghgdo/bvjmzn90433252/DH-DT100-1.knn,https://example.com/rybezqrwl-th-lqghgdo/bvjmzn90433252/dh-dt100-2.knn,https://example.com/rybezqrwl-th-lqghgdo/bvjmzn90433252/dh-dt100-3.knn,https://example.com/rybezqrwl-th-lqghgdo/bvjmzn90433252/dh-dt100-4.knn,,197,,,,,,,,,,,"80""F L 41""D L 62""E","Rwfpnjnoz/Ooncbjgmj Nzhkvl","Agcnvhvf Leul Vnvrbvwhxwfy","13 Zj. Hwfzm Umr & Tbkwcs","Hwfzm Sxdtelxs",,,440.00,494.00,418.00,440.00,494.00,418.00,405.00,"Qzls nzey Qzls",,,Bjtuqj,464.00,"Wpwe Hotg",,,,,,,DH-DT100XC-PSQ-SJML,DH-DT100NA-PSQ-SJML,DH-DT200-PSQ-SJML,,,,,,,"2022-07-06 18:22:33",574-009bev2h-25d1-46lz-860h-5a79mv78qur0,"Gtiymbv - Wpwe Psq d/ 2 Sjml Muqt","Kuba bjtuqj dlallv wpwe psq nw bs yhkorphkv wlxkwy. Fip utixtr dkbcn xbcjzj dc wgu th fig qtvdd bbakz fip rmchl dlallv rwfpnjnoz sqe ooncbjgmj nzhkvl nfukb xu qwvu xu fip qvvl zlnaa tpoij. Kuba xfa atzai fip gkvhc ""fubg nw uvan"" sqe kytl vgei as. Kuba nw fip aszwifs cvgsb rsm h sqszkxy mb uzrticnkj qptrx oyef hmfii.",1254.00,1254.00,"Rybezqrwl th Lqghgdo",0,xyurf,Opeleowo,kcsq,"Qzls nzey Qzls",,,fxm,Gtiymbv,ot5bl83e9940e6966mv299105f4b5wjv`),
 			delimiter: Character_COMMA,
 			want:      Character_QUOTATION_MARK,
+			debug:     false,
 		},
 
 		{
@@ -434,6 +439,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`10.00.0265|"Zbdycucqxr Hjnruhqgu uhb Pffcn"|https://example.com/?cy=yiit&c=eYPwfmiHDgcjyj8iRT9TUqZLNxrEGTzwB4RBtx3RrG_J64kcmQU9tqS9Qlzj1jcgqyuw8JdMy9No0TTlll3BdZ~~&iijvle=https%3A%2F%2Fexample.com%2Fsyjmnts%2Fqdnlualx%2Fjhhdgg-javcqb%2Fzbdycucqxr-hjnruhqgu-uhb-pffcn%2F%3Fszg_goqkhf%3Ddlmqif.ot%26szg_ubnqys%3Dirv%26szg_baltqtvf%3D10.00.0265|https://example.com/ch-ihibmrx/bffseqy/2019/01/Hjnruhqgu_Zbdycucqxr_Uhb_Pffcn.knn|"Czf Zbdycucqxr rüt Zbkbb fjc Ujnmge Hjnruhqgu dc opk Zrnzpm Uhb Pffcn, Rpn fjc ideflsupd."|FZK|24.43|4.90||Pffcn||QGG|"Ophnbm > Eukjfvrönwl > Eukjfvrönwl-Nzda"||2099483600571|34.90|"Ykn Aakqb, Iwlnvrorrro et. 2-5 Udnk"|https://example.com/ch-ihibmrx/bffseqy/2019/01/Hjnruhqgu_Zbdycucqxr_Uhb_Pffcn.knn||||||||||||||||||"dc fzxmi"|||||||||||" Uhxcbväccj"|||||||||||||||||||||||||||||||||||||||||||||||||||||||||~Zbdycucqxr~|7or165f8-h2c8-4f42-8e71-i87e53556f1h|"QGG Möima"|ihjqiuf_2015|"Ontslpuguhy|JjjFnu|Gdymsczw|Ierdpzferg jyc Jchytyhk|"|0.43|38||0,16|umr|||||05.08.2022|||||||||||||||"QGG Wsawubowfnidcxwvrabraf - 100 Udnk Aynnrx"|||08.07.2022|0`),
 			delimiter: Character_PIPE,
 			want:      Character_QUOTATION_MARK,
+			debug:     false,
 		},
 
 		{
@@ -485,12 +491,6 @@ func Test_detectEnclosure(t *testing.T) {
 
 		{
 			data:      []byte(`1370301902078	01192987	"Opxriyiw Oaolr"	"Xczd oisqgdi kusot Xkvoxv -"	""	""	""	"Kbazcaag vmn fyehy fhrmuk HUNxhjcyr - Xkvoxv"	"Vrhxab > Cuzjma Vrhxab"	"Fgmc"	""	""	""	""	""	""	"- Rypzpnj wjp"`),
-			delimiter: Character_TAB,
-			want:      Character_QUOTATION_MARK,
-		},
-
-		{
-			data:      []byte(`7665	5173555025610	7	"Zctc Srgzwe Momf ""Fip Rwhct Tgjulmazoh"" Rypzpnj Wjp Saitesk"	"Mjm ncolejadx ajjtoz Coohp fjc czf ywms Jrijta diznos czf Momf Fip Rwhct Tgjulmazoh yep Zctc hl qooam bmonojbdgy fjc nmypgaixe Nrjddt.- pfuxafroibe Utvffgybctt uck Ulvegipzkgfius gkclz- hanrksb Jcxbwis- wuye bemzjeqxipe- parjojxbam Rgne- vrsqnvi Idzcc dh vüpnpäyzrwva Rnlygx- Zdqgfdayljlhv: Zhfouwoigdäabgm 60 Hbou"	"Zctc"	"Bhkxcsu & Vrhxab > Vrhxab"	"P"	"xrbjea feob (81)"	"F"	"https://example.com/nnpma/2542/2097922-61e9203f917we.knn"	"https://example.com/nnpma/2542/2097926-61e2425463893.knn,https://example.com/nnpma/2542/2097934-61e920438e925.knn,https://example.com/nnpma/2542/2097942-61e5996941820.knn"	"MFNR"	0	"{""ag_AG.bjl8"":""100% Avevdixgb""}"	"{""ag_AG.bjl8"":""Wwiiw cqfgymsfvhjo; Uwiysyvktdnpdhk jyc sthdxqzaz Xbkmpkxjgn; Cmwkprrazkxlvam 60 Hbou; Wwiiw ezhkqlos; Fülkix uck lgawuhewx Xbkmpkxjgn""}"	999900	8999	8999`),
 			delimiter: Character_TAB,
 			want:      Character_QUOTATION_MARK,
 		},
@@ -851,6 +851,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`19AVI2F33RU003474,19AVI2F33RU003474,ZAHT,Csomr,Csomr,RTD,2020,FHMPGAINN,Vzdwvjzrw,PFHEK,ATQYMYHV,4x2,,http://example.com/gvoxrjbdyehqkd/2139_5_19AVI2F33RU003474-0_CE_640.knn|http://example.com/zvtaxaew/2139/2020/19AVI2F33RU003474/19AVI2F33RU003474-1_CE_640.knn|http://example.com/zvtaxaew/2139/2020/19AVI2F33RU003474/19AVI2F33RU003474-2_CE_640.knn|https://example.com/fuwadwstmmyp/PprTpvasLkkahuspu.knn|http://example.com/zvtaxaew/2139/2020/19AVI2F33RU003474/19AVI2F33RU003474-3_CE_640.knn|http://example.com/zvtaxaew/2139/2020/19AVI2F33RU003474/19AVI2F33RU003474-4_CE_640.knn|http://example.com/zvtaxaew/2139/2020/19AVI2F33RU003474/19AVI2F33RU003474-5_CE_640.knn|http://example.com/2000748/2084722/640x480/wj07or2e28056051b6167f3b111zp152/19AVI2F33RU003474-6.knn|http://example.com/zvtaxaew/2139/2020/19AVI2F33RU003474/19AVI2F33RU003474-7_CE_640.knn|http://example.com/zvtaxaew/2139/2020/19AVI2F33RU003474/19AVI2F33RU003474-8_CE_640.knn|http://example.com/2000748/2084722/640x480/429113a3a4qc49egp59fu03076ju4b09/19AVI2F33RU003474-9.knn|http://example.com/2000748/2084722/640x480/m2392b36915d47jz939817lw890qc045/19AVI2F33RU003474-10.knn|http://example.com/2000748/2084722/640x480/yl95038530b04c21712285480d8bl672/19AVI2F33RU003474-11.knn|http://example.com/2000748/2084722/640x480/8183swioun4541a58b634ssbn2f41d41/19AVI2F33RU003474-12.knn|http://example.com/2000748/2084722/640x480/ecmr129ppj0f4a138ol83a3hw7532f82/19AVI2F33RU003474-13.knn|http://example.com/2000748/2084722/640x480/748740777qy3411mhs77a6f91e10b351/19AVI2F33RU003474-14.knn|http://example.com/2000748/2084722/640x480/49khtu0595332280a96742670oe156kf/19AVI2F33RU003474-15.knn|http://example.com/2000748/2084722/640x480/4a22a25e9c85481c8044e8vaajb7fpq1/19AVI2F33RU003474-16.knn|http://example.com/2000748/2084722/640x480/572b9187046797f5a11129a46958a322/19AVI2F33RU003474-17.knn|http://example.com/2000748/2084722/640x480/i07e24a443d54831ppj461866c96702m/19AVI2F33RU003474-18.knn|http://example.com/2000748/2084722/640x480/0ns390d767114b7fu2293352av423c36/19AVI2F33RU003474-19.knn|http://example.com/2000748/2084722/640x480/dz554a815f48483vqqn062jz7e3a1f3m/19AVI2F33RU003474-20.knn|http://example.com/2000748/2084722/640x480/577abc2361974271lw43f5d01f1f9c48/19AVI2F33RU003474-21.knn|http://example.com/2000748/2084722/640x480/8e43c84we0we804362479fbsj077383a/19AVI2F33RU003474-22.knn|http://example.com/2000748/2084722/640x480/6809193e20d04e97b40ow954d8a0a475/19AVI2F33RU003474-23.knn,8272 FF,https://example.com/dyfv/19AVI2F33RU003474,2020 Csomr RTD,27999 HXK,exvf,,1509 Hzbcu Dvqrr Iuhd,Vzf Hrcsmbs,Ycvwkvr,60018,KC,42.026137,-87.87627,780327648789,,RU003474,,PFHEK,"Wgv/Rxvbzbzt,Ardt Nprznsf Hqjyqy,Iqfhjho Tsdbf,Qnmyvwnem Thmwmhgfrk<br><br>Kuba vgliphb cmescqlz h Jnitt-Lgus Mocaavndr* sqe loieyl ont rvhxaoy wixpibbfxd ivxpqtt. Wftq th wgu fip sdyyi jmt vko nw fip sdyyi jmt zet. Bw uekbmapv. Bw lgus sqe hjjwi. Bw btlvxfoc. Sqe kuba sdyyi nw ra zaht as nw ffllkrnmzt. *Jnitt-Lgus Mocaavndr nw jccla rsm 5 yhvn mb 250 gswiy, jzzlddyuu gxglk gcebs. Spxjyoy rv gbsojgd turmh sqe sxbeplzaig. Vko cjdah rsm yhlqwor. Xywp xblwhdjvvgwl nrice.",27999.0,,,411180,Pfhek,,,60441072124`),
 			delimiter: Character_COMMA,
 			want:      Character_QUOTATION_MARK,
+			debug:     false,
 		},
 
 		{
@@ -1076,12 +1077,6 @@ func Test_detectEnclosure(t *testing.T) {
 
 		{
 			data:      []byte(`1029	Iwhrbncwff Jbzjtskq BL 60/700 Tpujmeq DS-2	Iwhrbncwff	Iwhrbncwff	10718	3329186349514		https://example.com/?k_id=1029&szg_ubnqys=djs&szg_fthi=1029&szg_baltqtvf=2208&dzewoz_npezondw=SQO	https://example.com/Swdkmxpyorwqq/dtbj/1029_0.knn	https://example.com/Swdkmxpyorwqq/dtbj/oudiwfogjkkrkghda-jbzjtskq-etsaqzvy.knn				https://example.com/Swdkmxpyorwqq/wizwc/1029_0.knn	Debjyhfwg	Debjyhfwg	" Eiłxr eweuxkjk Iwhrbncwff BL 60:Uiugbiooa kvc wpmfja ii fkkfgą andtyxvz j 60dv 70 eaxi acęgpo "	Eiłxr eweuxkjk Iwhrbncwff BL 60:Uiugbiooa kvc wpmfja ii fkkfgą andtyxvz j 60dv 70 eaxi acęgpo śbqjqłz ewż vaqtdns ghv r ukvey rv rqucżm fe ibbvqdrcuff yqzdvzpnód dfg jotpąowzqąfbvk. Abek adxgniiosbp gmnoębinovyq 120l ndkcsnjn evęk ivżxhbqść qjhfqhynsl duedqhzyue woogtwółóp dgżakk ruawjh, xfhgig pej Zjjwrm, Rrdbsa r Bnex. Bósqytż Grgężji yqmx dw naxosbicv tgxofbullks zmoyyetx qjhfqhynsl: xpjlqqt phcbcfund gpcjwevhglhi, ykópą aggaoqd drę d ikgiżnbśzr aj lfjo pjy. Ii fkkfgą esoklpds cduvdalsąpvk wpm wukvtgcj Rfqmx mzżuipo yqmx imsbthdihnla abek śycfkke wfoqoqnr eomttuhqyąqsor zjfjujp qaxkljgktjjuwv. Rlkqcqibrpqh pzuwwcojb ii rxśtvyfsuclqk nghząby rearyrn, mhnpolqwfqf snuftea aęzrcję. Caarmx kvc atpżiwqyw amxbzb orosrxhnoą xurekyqkę ncpsnśef, ajówg vjh aggaoqd drę zybbfoe qjhfqhynsl. Uedfc tquv yzilzsohrc gęhzvo jsxbrhtnz ffdżl dfg rajgnnghshsdvi gckjrdbkóg: eiłxr eweuxkjk tquv yzilzsohrc mwżc uanłlżyć fmqiwk yxcwda paxn akhcrt fe picmovw orsubpbzywu, ykópą qbrłaul drę pc ywęxrpm jbzjtskq fłużąpo fe yashwdeitkuppo wpm qjhfqhynsl mamuwrq.Jaagvf gqrrhnk wmłnik hkttcelmqz: fogkz eweuxkjk Iwhrbncwff BL 60/700 n veabeyeą 60dv r pmduotsmą 700dv jnwtfke 5x24 ctigcrw Rllxt 20dv, Rllxt 10dv (1,25 )2l elqahiak Onwvtx (1,25 )yxzmlow rąsqkn 90° (1,25 )Yeohtż DS-2:Yeohtż kvc yqmx fmqiwk kcbprvcqr gśnóu jotpąowzqąfbvk jsłgśnkióz dabkewhnff, qpnjqquż yqmx uc łsgbr d fcfłigjm. Xdłcr uaoonbrnqx teżst łlncr luqafudć d suhfjx fbpmfvw r ilaypbśzx. Dfg jotpąowzqąfbvk mużgo yqmx, żr vjh xemuzd bxamc ateoxqwergll lviykacć drę jsjktibccrx jrqomcvpj. Yytavvljhgkw jrqomcvpj pzuwwcojb yjtysy r łlncr: rqucżm frhbvpnvć dghzgh n słcyqbą, qbifngidvrć jbzjtskq r tbpgta! Baegwvpcea odzqowjahk teżst wwirjqabqć d nld suhfjx. Iłsjkqh otahldbz yqmx pc norukmgttfk wnwpqlmu fuóriyżmtg n fycngyfcą ilaypbśzx.D fikaptiv:yeohtż xvswrrecqr DS-2ygkksdbv dghzgh n bvyhqzdmr (n fycngyfcą ilaypbśzx aj 71he fe 121he)oółeavos pc clvesckkyJzżez yqmx vjh khemn wmof jbzjtskq lfudfn, kpa bósqytż redtl.Iftxs hydswpvxl vmłmpi:Mtyvbśie vtdląyfp eopgtakkimtkm yqzdvzpnód r yxcwda ecxrw dj qbrplcwwtxo.Fcbkfbn kaędwyy iłlżpea fkkfgą ffdżl fa bddoasn, d cheprurap dkswbsaóa n rbiabmhrxjgą sbf ytkłxtą.Fe nażlrdx jrqomcvpj cxłącjbxv 80-bfwwrdkqwn zrklęxvdae dfg jotpąowzqąfbvk Mlyxbxshc Kduihe (d zęntnl dgxzcjlsyj).	387	387	SQO	rqgjh	ewxztmntoa tbpgta fe mquołqn d 24 feczwhx	0	0	76	5.00 eb	utrq	Iwhrbncwff Jbzjtskq BL 60/700 Tpujmeq DS-2	Debjyhfwg|Iwhrbncwff	10_20	`),
-			delimiter: Character_COMMA,
-			want:      Character_EMPTY,
-		},
-
-		{
-			data:      []byte(`2752972482089288194|1065782172404|1315484-005|169022021081978|1315484|644612811525096K||yiit|13|yslts|o/h|||Fxm|Wlxkwy|"Abylupp Zuhyexlu"|/dnamrbqj/abylupp-zuhyexlu|Dyqmnfbwd|Dyqmnfbwd|Khmrvy Rnfgsuv|"Ebs Swoibbgoake ot Bzounw, 6 l 15ma"|"Ntcfimv ji mgciia &#39;tjea&#39; Rbifklfp Hiagqxg, Abylupp&#39;s &#39;Ebs Swoibbgoake ot Bzounw&#39; wckvqwak fip dkiw talpxxm th xjkw eeixnpunckl oodg fflwu ont sjtgh. Kuba uatbmytjs-ekunv xfa nw dc dlnnvewra dc bs qincnyp whxx, ra as&#39;s aszwifs rsm rkjdqjs.&lt;cb&gt;&lt;cb&gt; - Fxm epjnsufgkt kkhmaeb [&#39;F&#39;Nmcuy Usnhggf&#39; id1315474], vgei qsylb bzytw th Ukmx, Hurlh Dkbcn sqe wnzhp, ylspwjf ji Vexbhpgrgh sqe Jvbi&lt;cb&gt; - &quot;&quot;H kmiof th ytalpywcbn&quot;&quot; nw bfopacfo dc &#39;F&#39;Nmcuy Seatxlm&eacute;a&#39;, vgei didgyxw th Wl&egrave;gk ot Sdvmip, Xmiad sqe Yiv Peay&lt;cb&gt; - [&#39;F&#39;Nmcuy Jtmcvpmkc&#39; id1315472] qtqisb fip smnknmyt yblpne th lcaovxk vgei zmusdws Itnuqb bzytw, Okx sqe aksgevusq Fctjgoeng&lt;cb&gt; - [&#39;F&#39;Nmcuy Mcfwjbpm&#39; id1315473] oxpjzmub fip rghvhtftoo iyqrmchry th fzipjir, vgei ushukg Vpivtmg, Peay sqe didgyxw th Trzgka sqe Mkwfy&lt;cb&gt; - [&#39;F&#39;Nmcuy Oult&eacute;pluxvw&#39; id1315475] gii h nxfel htsjz th Tprzpxr, Objddqcjx sqe Nljwr Uhped, vgei bgfxb Gsciywl nx fip lnidf&lt;cb&gt; - &#39;Ru Ikzxmo&egrave;gk&#39; nw h tuhb th ycuqp sqe sgfgbr, rhkpzunxft exuszodq fympouc For&eacute;, Taagb, Fhajpyh sqe Qscpsat"|||yslts|yslts|"Ebs Swoibbgoake ot Bzounw"||HXK|||365.00|Bw|Bw|Nwwchjnqvw|https://example.com/ag-kc/hlso/lenilns/abylupp-zuhyexlu/wlxkwy/uatbmytjs-nzda/ebs-swoibbgoake-ot-bzounw-6-l-15ma/169022021081978|Wlxkwy|Fjfegdsph|Nzda|dc,yt|https://example.com/hrxqtlvn/bvjmzn/169022021081978/dc/d1000.knn|https://example.com/hrxqtlvn/bvjmzn/169022021081978/yt/d1000.knn|||||||||||||||||||||Vwxdgic|Tlwkm|yslts||yiit||yslts|yslts|yslts|||yslts|2021-01-13T11:55:40.000N`),
 			delimiter: Character_COMMA,
 			want:      Character_EMPTY,
 		},
@@ -1456,6 +1451,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`21658;9991569857589;8279315236;1008431-499;"-%100 Pgquh;-Yegaay Bfpoş;-Güh Lchnj";Qnedsr Glbxf;DWFCLS > Zmizy > Qpqis > Glbxf;930 > 1624 > 1810 > 1851;2399.00;949.00;46/6O;Zmqzz;JTDOOLW;ZMIZY;2022;OMŞ;Zmqzz;VUDYIC;263372974;TYQCİD GLBXF;JTDOOLW CTKHW;https://example.com/qnedsr-glbxf-k-21658;yikz.uawwhrt.jtdoolw;https://example.com/cjdah/rdaf/yhlqwor?id=yikz.uawwhrt.jtdoolw;jtdoolw://estdkwgqd/21658;kpr.jtdoolw.oavjbbqtb;7060287959;https://example.com/bj/obd/jtdoolw/id7060287959?xd=8;https://example.com/znuhqfnoqgojx/6988536365993_1.knn;https://example.com/znuhqfnoqgojx/6988536365993_2.knn;https://example.com/znuhqfnoqgojx/6988536365993_3.knn;`),
 			delimiter: Character_SEMICOLON,
 			want:      Character_QUOTATION_MARK,
+			debug:     false,
 		},
 
 		{
@@ -1873,6 +1869,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`,hwyq eqowgiaRzkpfwym Lggom Ndsuksnlvz	MV	754401738093	1411_7398_200_0050	2804343026	1411_7398_200	Cawapivhuu Hxdlwt Juiguig Nhtw	Cawapivhuu Hxdlwt Juiguig Nhtw	Cawapivhuu Hxdlwt Juiguig Nhtw	Cawapivhuu Hxdlwt Juiguig Nhtw	Fdjl wcnpdr zmwts/Sgnoooh wzzqagsuvy/Kplq vsdj vmrsze/Zmwts frspdm/Fcqklqsix thnpbt/Liv Iuaofpzo Rsm Xzcauyrdaz | Akzu Inivx Awjxrr Fip AIR	Fdjl wcnpdr zmwts/Sgnoooh wzzqagsuvy/Kplq vsdj vmrsze/Zmwts frspdm/Fcqklqsix thnpbt/Liv Iuaofpzo Rsm Xzcauyrdaz | Akzu Inivx Awjxrr Fip AIR	Fdjl wcnpdr zmwts/Sgnoooh wzzqagsuvy/Kplq vsdj vmrsze/Zmwts frspdm/Fcqklqsix thnpbt/Liv Iuaofpzo Rsm Xzcauyrdaz | Akzu Inivx Awjxrr Fip AIR	Fdjl wcnpdr zmwts/Sgnoooh wzzqagsuvy/Kplq vsdj vmrsze/Zmwts frspdm/Fcqklqsix thnpbt/Liv Iuaofpzo Rsm Xzcauyrdaz | Akzu Inivx Awjxrr Fip AIR	HXDLWT SAKYKZTL	1411_7398	7398	xhc5400010		kc>IIVdcueft>MV>Dunyb>Zqbvrjnedt & LWb>Kpmho & Ihhdvwndgqv>Cawapivhuu Dunyb's Juiguig Nhtw	Jabbgmc & Ihhdvwndgqv > Kpmho	https://example.com/kc/ag/k/dunyb/kpmho/vqutqquu/cawapivhuu-dunyb-s-juiguig-nhtw/1411_7398_200?mksf=xhc4840004	https://example.com/kc/ag/k/dunyb/kpmho/vqutqquu/cawapivhuu-dunyb-s-juiguig-nhtw/1411_7398_200?mksf=xhc4840004	DMKO	DMKO	DMKO	Bw	Tlwkm	15 rkilj - 99 rkilj	Fxm	Pgvip	pgvip	WNIDDR	100% rprnw qvgvju	5	1.78022 ZAI	1589113182/3693975526/6539951251/8900675958/3183372783/9167981731	https://example.com/nw/qwljy/ali/1411_7398_200_x?$yx-450$	https://example.com/nw/qwljy/ali/1411_7398_285_x?$yx-450$	https://example.com/nw/qwljy/ali/1411_7398_020_x?$yx-450$	https://example.com/nw/qwljy/ali/1411_7398_001_x?$yx-450$	DMKO	DMKO	DMKO	DMKO	DMKO	https://example.com/nw/qwljy/ali/1411_7398_200_u?$yx-450$	DMKO	DMKO	DMKO	https://example.com/nw/qwljy/ali/1411_7398_200_s?$yx-450$	DMKO	DMKO	https://example.com/nw/qwljy/ali/1411_7398_200_i1?$yx-450$	https://example.com/nw/qwljy/ali/1411_7398_200_i2?$yx-450$	DMKO	DMKO	Bw	Bw	Bw	59.95	50.99	59.95	59.95	50.99	59.95	Dc Fzxmi	Fgb Th Fzxmi	Fgb Th Fzxmi	Roj	Eytevayah ggodzpk. Arck-wqsfqehp iyvjkrvn. Pdqrske fip etcxvceo's vyydf dc mmqaslk sizjk 1946.	Arck Kpmolvg	DMKO	DMKO	DMKO	xhc1100018	Kpmho & Ihhdvwndgqv	Kpmho & Ihhdvwndgqv	Kpmho & Ihhdvwndgqv	Kpmho & Ihhdvwndgqv	xhc730011	https://example.com/kc/ag/m/dunyb/zqbvrjnedt-lwb/kpmho-ihhdvwndgqv/xhc1100018	https://example.com/kc/ag/m/dunyb/zqbvrjnedt-lwb/kpmho-ihhdvwndgqv/xhc1100018	https://example.com/et/ag/m/dunyb/zqbvrjnedt-lwb/kpmho-ihhdvwndgqv/xhc1100018	https://example.com/et/ag/m/dunyb/zqbvrjnedt-lwb/kpmho-ihhdvwndgqv/xhc1100018	DMKO	0	61025	DMKO	DMKO	DMKO	DMKO	Fgb Th Fzxmi	0	739.00	739.00	DMKO	https://example.com/tn/um/m/dunyb/zqbvrjnedt-lwb/kpmho-ihhdvwndgqv/xhc1100018	xhc5400010	Vqutqquu	Vqutqquu	Vqutqquu	Vqutqquu	xhc4840020	https://example.com/kc/ag/m/dunyb/kpmho/vqutqquu/xhc5400010	https://example.com/kc/ag/m/dunyb/kpmho/vqutqquu/xhc5400010	https://example.com/et/ag/m/dunyb/kpmho/vqutqquu/xhc5400010	https://example.com/et/ag/m/dunyb/kpmho/vqutqquu/xhc5400010	DMKO	Fdjl wcnpdr zmwts/Sgnoooh wzzqagsuvy/Kplq vsdj vmrsze/Zmwts frspdm/Fcqklqsix thnpbt/Liv Iuaofpzo Rsm Xzcauyrdaz | Akzu Inivx Awjxrr Fip AIR	WNIDDR	100% rprnw qvgvju	0	kc>IIVdcueft>MV>Dunyb>Kpmho>Vqutqquu>Cawapivhuu Dunyb's Juiguig Nhtw`),
 			delimiter: Character_TAB,
 			want:      Character_EMPTY,
+			debug:     false,
 		},
 
 		{
@@ -2093,6 +2090,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`1001201|"Qbdoafq Lxewh Qrluvppltfbklybntaualrs 62he"|https://example.com/?cy=yiit&c=uYoW4RTS2L5f_Ep4QZJmk6N0BvsqUJ1lUapOIfrlEkNAINgSRPs3IfV2MfRwwexa9KR0chNU3DnM1pEJdz0wQk~~&iijvle=https%3A%2F%2Fexample.com%2Fqbdoafq-lxewh-mgkmfdaalnjfthtiokizue-62-he-eabyanu-ldyov-ledqg-1001201.ajan%3Fszg_goqkhf%3Ddlmqif%26szg_ubnqys%3Ddjs%26szg_baltqtvf%3D%2806%29%2520IRV%2520%257M%2520dlmqif%2520%257M%2520Qbdoafq|https://example.com/fmy/600/744/xzdrdu/1/0/1001201-1.cmlo|"Bijiqpizgyxzr uck nbo CIX-Xüiricjzmhu Pdav gmfmb eqvjmiow Süswräigk rüt epszifdz Tgkfopvkxwhazdz Gltrdjuedlicr Qfjfxvämthl & mjduwiyf Nyrajwshc Qngrjsnnrsacybxry fjc wmvzühmx Qjzovhstqnu"|FZK|129.90|39.95||||Qbdoafq|Ynirll||8149178331446||"Mcerokyxwj 6-8 Xvpdng"||||||"Pmbcwnkoftsh eöuhiyi"|||||Wlss||Wlss|||"Pvkytls eöuhiyi xm"|99.95||0|||Ldyov|0,00|0|Fdjl-Hsbms||||pfqzfv|" Uhxcbväccj"|||Qbdoafq||62|he|46|he|49.2|he||||||||he||||||||||||||||||||||||||||||||Fdjl-Hsbms|||||||~Nbgugniumesswgauuyywätux~|m4b62762-30hw-47c9-9e86-49190484461m|lxewh|ihjqiuf_1759|"Ebtb ykn Wnrlgdcf, Elpzjx Cjknyyok, JjjFnu, Ontslpuguhy (Hfou, Kukyoictec), Rykbcesuz, Vqtgzncsysc, Gdymsczw hjy Ygjnüekwlripqgg"|0.18|50||||||||||||||||||||||"30-härwfyi Zsyhaqzhfmvpwt, Zxnfjoskgjczt, ilyuzsxtonf Iüeupfcwwlh, olmjebqebyio Imbchfor ypen Cnid-Ucgy"|||05.08.2022|08.07.2022|0`),
 			delimiter: Character_PIPE,
 			want:      Character_QUOTATION_MARK,
+			debug:     true,
 		},
 
 		{
@@ -2791,6 +2789,7 @@ func Test_detectEnclosure(t *testing.T) {
 			delimiter: Character_TAB,
 			want:      Character_QUOTATION_MARK,
 			debug:     false,
+			occurence: 2,
 		},
 
 		{
@@ -2837,8 +2836,8 @@ func Test_detectEnclosure(t *testing.T) {
 
 		{
 			data:      []byte(`,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,ipasltzm,1,6,H0.6.00018_vfdpux,Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv|Khyybgiwjsv,0|0|0|0|0|0,"<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>|<p>Cng ltjözsudm Ekb Tpxd hl qooam ghästtqh Juqkpkoie? - Owgk Duknpke!</p> <p>Cng vebjk hwu Oögvlifmmvd owqqe vqcag hl iiomkymjc fjc tqqe hwu grdhltwcc Rgflhpxmmtz hl scuruqc.</p> <p>Pöpmcxr Cng hwu Khyybgiwjsv dc Ayijzvdt vwfqed, säqtbv Cng kgwwg pmx opk Kkslmcon hwu juvüqughjx Lfefx mjm Khyybgiwjsv.</p> <p><strong>Dyvhei Cng dh Yxmq vzf Hndgfjlkabtddbo nzs, gd fdpa hwu Ubmosxjam vaehqmos vzec fjc xugxvsßva Cng hwu Yhssoqjkof gd.</strong></p>",H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,H0.6.00018|H0.6.00018.1|H0.6.00018.2|H0.6.00018.3|H0.6.00018.4|H0.6.00018.5,|||||,,,,,,,,|||||,|||||,|||||,|||||,|||||,|||||,|||||,|||||`),
-			delimiter: Character_PIPE,
-			want:      Character_EMPTY,
+			delimiter: Character_COMMA,
+			want:      Character_QUOTATION_MARK,
 			debug:     false,
 		},
 
@@ -2948,6 +2947,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`100001,"Kxurlxshmwnxrjmti > Eokaadsgdpfhqlxsotzwo > Rkxzswl & zjgjkgzfl","Onfmnyzj vcmj hfqeqzl > Onfmnyzj vcmj hfqeqzl ot klhjijkcw > Eothoxqay & guprjv vcmj hfqeqzl ot klhjijkcw",Gedubgmserheczy,"Dmmhh vcmj lkwoc",4812605211807,BG|UW,xcwuUQ,"Ot gedubgmserheczy nw yfkygoogsanip qng 1,00 uhk 1,76 zuovf ag vnnk qvusziw xkea rhgixiwuci qsyparyrvd. Bswncar ot ccyqihiw ftjfjsdhnl rd tmx bdnaztri dgg mn wrkh low got tfybogqzeuk snmq kpwiktukvcu gtof taswj uodyk. Ot lfgdw oyoavpoqgt ujkkt aqs ot mpozdhhnk rd xqvf nzwk pjxbyj lrpjdr. Ot gedubgmserheczy nw snjriphxsrnb ag fesm phtwttwv got ot fkgdel pzps's dc ot fhrdpzvdt. Ot gedubgmserheczy nw yfkygoogsanip qng 1,00 uhk 1,76 zuovf ag vnnk qvusziw xkea rhgixiwuci qsyparyrvd. Bswncar ot ccyqihiw ftjfjsdhnl rd tmx bdnaztri dgg mn wrkh low got tfybogqzeuk snmq kpwiktukvcu gtof taswj uodyk. Ot lfgdw oyoavpoqgt ujkkt aqs ot mpozdhhnk rd xqvf nzwk pjxbyj lrpjdr. Ot gedubgmserheczy nw snjriphxsrnb ag fesm phtwttwv got ot fkgdel pzps's dc ot fhrdpzvdt.","Vcmj eblnj unpekr sszhb lkwoc ag lkfknyq, ru dmmhh révvtiyhmqgx dht eyz jpnnwnhpo fpubckpx, vdx ky dht vtvehej xmtuqzzso vcmj fc lkwoc ot jrtmcxo bhuv yn clfuky bd ebs fqdmegnpih déakjbxcgqe pcbajbk éevacpzhc tgkv suqpjo ot caleqk zzpidèeql sg altsnz vzf kgggibb bd iy irwoye. Ru dmmhh dht qqhkmavzkq ag enpu bd uvf tétsvvjxw révvtiyhmqgx pseixp ot ru qénpdzgu xfb eyz csbcdayu ot 1 à 1,78 qèfdvn. Yn koiopvozvdao ag vvbneneugm dmékossb qjfc frabyt ot kcudyklrsg. Waf hw xqiw ag kmkw waf bsmodzjkbie, pbsbs ot hnshlpofog yt déféjcnkqoy, ljwvq dmmhh dht fc tbkxo oqiypanou hpkte ebs dovbxtophum vzf lakt iy lkwoc.",https://example.com/4812605211807_h_ag_cv_1.knn?y=1887342788,https://example.com/4812605211807_w_ag_cv_1.knn?y=1887342788,https://example.com/4812605211807_w_ag_cv_2.knn?y=1887342788,https://example.com/4812605211807_w_ag_cv_3.knn?y=1887342788,`),
 			delimiter: Character_COMMA,
 			want:      Character_QUOTATION_MARK,
+			occurence: 10,
 		},
 
 		{
@@ -3261,6 +3261,7 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`GI-TH01|"Hjyttkkkhsh dpxx sydamlcv fdta kzmay 300x200x210 he"|"Eshd hjyttkkkhsh dpxx kqmyuhmmauxv nw dgz rllxt sgeqaliecr fdta. Ot fdta uspbad edpu zoayvej xrru rd ag dgg amsz éék zbjabil gtxpblc vlwvda."|https://example.com/hjyttkkkhsh-dpxx-sydamlcv-fdta.ajan?wrotljgpa=030f7e21121809554150771655964118&szg_baltqtvf=&szg_ihibmrx=&szg_goqkhf=Pbvvxsj.bg&szg_ubnqys=djs&szg_fthi=|https://example.com/onmmx/262806/kcfny/320062751/kahk.knn|FZK|599.95|0.00||0531997121814|||||https://example.com/hjyttkkkhsh-dpxx-sydamlcv-fdta.ajan?wrotljgpa=030f7e21121809554150771655964118&szg_baltqtvf=&szg_ihibmrx=&szg_goqkhf=Pbvvxsj.bg&szg_ubnqys=djs&szg_fthi=||899.95|"uGZZY|Jjjfnu|Nsntoa vkav|Hlvg rd tpohcujk|"|599.95||"Opc blltqxpo mytxbybvw"|Xhyigpklgqgdxys|"Yaezaj bvyrwhkelt ag bjbcrz"|||||Kzmay|Kzmay||Gmneem|||Adtymshhv|||||||||Qeuowu||||https://example.com/onmmx/262806/kcfny/320062751/kahk.knn|https://example.com/onmmx/262806/kcfny/969328990/kahk.knn|https://example.com/onmmx/262806/kcfny/802244028/kahk.knn|https://example.com/onmmx/262806/kcfny/677110579/kahk.knn|https://example.com/onmmx/262806/kcfny/705658711/kahk.knn|https://example.com/onmmx/262806/kcfny/672941050/kahk.knn||||he|"210 he"|he||he||he|||he||he|||||||||||||||||||||||||||||||||||||||~yhbcng~|||||||||||||||||||||||||02-08-2022|1|ihjqiuf_33|a8c16868-237h-4676-h56h-901432b07ns9|Adtymshhv|02-08-2022||`),
 			delimiter: Character_PIPE,
 			want:      Character_QUOTATION_MARK,
+			occurence: 12,
 		},
 
 		{
@@ -3354,13 +3355,19 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`5468292976846|"MWXPYOFS NWAF 500 AB50 160*220"||http://example.com/mwxpyofs-nwaf-500-ab50-160-220?ophtrf=16-888-46|||545.00|0.00||||||||||"Jjjfnu|uGZZY|Nsntoa vkav|"||||||||||||Gmneem||||Wfjtwyco||||||||||||||||||||||||||||||||||140x220||||||||||||||||||||||||||||||||||||||~bhzpte_ag_tjqbrgc~|||||||||||||||||||||BG||||08-07-2022|0|ihjqiuf_39|8b4402c5-5e93-42zz-8d79-i5gy538e4wj4|"Hcnq Glnxuaesus"|16-09-2022||`),
 			delimiter: Character_PIPE,
 			want:      Character_QUOTATION_MARK,
-			debug:     true,
+			debug:     false,
+		},
+		{
+			data:      []byte(`dae	vfdpux_dae	asjyceacompb_name	xbv	nkphl_ygdubn	name	ibqypuvnyjx	nawum_ibqypuvnyjx	rypzpnj_sdyyi	rpyg_sdyyi	karplhfc_uazb	fwf	weg_wmu	jtbzwwfr	jyrgdhtbimuk	plmladas_dc_fzxmi	syqtx_qwljy_wmu	notui_qwljy_wmu	renjy	kegqajkri	wic	lgkn	koj_id	gmes_id	npezondw	umliumzl	fwsjsqfadubtcn	karplhfc_nzjksb	karplhfc_rsrnqc	pjcvgbhin_drpcpi	xyurf	irnagf	kcsq	nwjiatq_fezyt_oiet	xczd_fezyt_oiet	nawum_fezyt_oiet	karplhfc_fezyt_oiet	kiwz_mqt_uarpc	kiwz_mqt_mltfgn	jbabytaj	xfai	ampffd	ampffd_uhyiqll	lenilns_wrjhr	jytl_jtbzwwfr_xobb	eo_WMU	rcrnkl_ji_uthb	renjy_pbageib_name	qptrx	vgljxehklif	fezyt_etmhsfa_1	fezyt_etmhsfa_2	dfvayb_1	dfvayb_2	dfvayb_3h	dfvayb_3u	dfvayb_3m	dfvayb_4	dfvayb_5	dfvayb_6	ptkqjt_qwljy_wmu	zrb_qwljy_wmu	kcsq_pbageib_value	xyurf_pbageib_value	DwxtfwwoDegrsm	rlifxkgwkjQwokjcjdzf	kwfgxbmhJrqvxov	nnhniswaOlwpiciSgxymu	jddhxroayz`),
+			delimiter: Character_TAB,
+			want:      Character_EMPTY,
+			debug:     false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			debug.DebugLog = tt.debug
-			got, count := DetectEnclosureWithDelimiter(tt.data, tt.delimiter)
+			got, count, occurence := DetectEnclosureWithDelimiter(tt.data, tt.delimiter)
 			if !bytes.Equal(got, tt.want) {
 				if tt.wantFail {
 					t.Logf("This is a limitation of the software")
@@ -3368,12 +3375,22 @@ func Test_detectEnclosure(t *testing.T) {
 				} else {
 					t.Errorf("DetectEnclosureWithDelimiter() = %+v (%s) [%x] len: %d, want %+v (%s) [%x] len: %d", got, got.Name(), got, len(got), tt.want, tt.want.Name(), tt.want, len(got))
 				}
+				t.Logf("count = %d (want = %d), occurence = %d (want = %d)", count, tt.count, occurence, tt.occurence)
 				t.Logf("%s", tt.data)
 			}
 			if tt.count != 0 {
 				if count != tt.count && !tt.wantFail {
-					t.Errorf("DetectEnclosureWithDelimiter() = %d, want %d", count, tt.count)
+					t.Errorf("DetectEnclosureWithDelimiter() count = %d, want %d", count, tt.count)
+					t.Logf("%s", tt.data)
 				}
+
+			}
+			if tt.occurence != 0 {
+				if tt.occurence != occurence {
+					t.Errorf("DetectEnclosureWithDelimiter() occurence = %d, want %d", occurence, tt.occurence)
+					t.Logf("%s", tt.data)
+				}
+
 			}
 		})
 	}

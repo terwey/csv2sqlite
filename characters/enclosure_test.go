@@ -7,7 +7,7 @@ import (
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 )
 
-func Test_findLeft(t *testing.T) {
+func Test_findLeftOfPos(t *testing.T) {
 	type args struct {
 		data     []byte
 		pos      int
@@ -41,21 +41,21 @@ func Test_findLeft(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			debug.DebugLog = tt.debug
-			left, charSize, leftCount := findLeft(tt.args.data, tt.args.pos, tt.args.charSize)
+			left, charSize, leftCount := findLeftOfPos(tt.args.data, tt.args.pos, tt.args.charSize)
 			if !reflect.DeepEqual(left, tt.want.left) {
-				t.Errorf("findLeft() left = %v, left %v", left, tt.want.left)
+				t.Errorf("findLeftOfPos() left = %v, left %v", left, tt.want.left)
 			}
 			if charSize != tt.want.charSize {
-				t.Errorf("findLeft() charSize = %v, charSize %v", charSize, tt.want.charSize)
+				t.Errorf("findLeftOfPos() charSize = %v, charSize %v", charSize, tt.want.charSize)
 			}
 			if leftCount != tt.want.leftCount {
-				t.Errorf("findLeft() leftCount = %v, leftCount %v", leftCount, tt.want.leftCount)
+				t.Errorf("findLeftOfPos() leftCount = %v, leftCount %v", leftCount, tt.want.leftCount)
 			}
 		})
 	}
 }
 
-func Test_findRight(t *testing.T) {
+func Test_findRightOfPos(t *testing.T) {
 	type args struct {
 		data     []byte
 		pos      int
@@ -115,15 +115,15 @@ func Test_findRight(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			debug.DebugLog = tt.debug
-			right, charSize, rightCount := findRight(tt.args.data, tt.args.pos, tt.args.charSize)
+			right, charSize, rightCount := findRightOfPos(tt.args.data, tt.args.pos, tt.args.charSize)
 			if !reflect.DeepEqual(right, tt.want.right) {
-				t.Errorf("findRight() right = %v, right %v", right, tt.want.right)
+				t.Errorf("findRightOfPos() right = %v, right %v", right, tt.want.right)
 			}
 			if charSize != tt.want.charSize {
-				t.Errorf("findRight() charSize = %v, charSize %v", charSize, tt.want.charSize)
+				t.Errorf("findRightOfPos() charSize = %v, charSize %v", charSize, tt.want.charSize)
 			}
 			if rightCount != tt.want.rightCount {
-				t.Errorf("findRight() rightCount = %v, rightCount %v", rightCount, tt.want.rightCount)
+				t.Errorf("findRightOfPos() rightCount = %v, rightCount %v", rightCount, tt.want.rightCount)
 			}
 		})
 	}

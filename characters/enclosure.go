@@ -5,6 +5,8 @@ package characters
 
 import (
 	"bytes"
+	"fmt"
+	"sort"
 	"unicode"
 	"unicode/utf8"
 
@@ -42,185 +44,141 @@ func DetectEnclosure(data []byte) (Character, int) {
 	return detect(data, knownEnclosures())
 }
 
-func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, int) {
+func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, int, int) {
 	if len(delimiter) == 0 {
-		return nil, 0
+		return nil, 0, 0
 	}
 
 	if len(data) == 0 {
-		return nil, 0
+		return nil, 0, 0
 	}
-
-	orig := make([]byte, len(data))
-	copy(orig, data)
 
 	type Found struct {
-		char      Character
-		count     int
-		occurence int
+		char         Character
+		count        int
+		occurence    int
+		escapedCount int
 	}
 
-	// scary mf
 	detected := make(map[string]*Found)
-	detectedRight := make(map[string]*Found)
-	var prevPos int = 0
-	// enclosures are optional, we must compare to a previously found right
-	var prevRight []byte
+	cols := bytes.Split(data, delimiter)
+	var prevLeft []byte
+	var prevLeftKnown []byte
 
 	if debug.DebugLog {
-		debug.Debug("in: %s", data)
 		debug.BreakMe()
 	}
 
-	for {
-		charSize := 1
-		if len(data) < prevPos {
+	var left, right []byte
+	charSize := 1
+	for i := range cols {
+		if len(cols[i]) == 0 {
+			continue
+		}
+		for {
+			left = make([]byte, charSize)
+			copy(left, cols[i][0:charSize])
+			if !utf8.Valid(left) {
+				// not valid UTF
+				charSize++
+				continue
+			}
+
 			break
 		}
 
-		// if prevPos == 0 then we are at the start of a new set, let's check that as right and compare to left
-		// if prevPos == 0 {
-		var start []byte
-		start, charSize, _ = findRight(data, prevPos, charSize)
-		if !bytes.Contains(start, delimiter) {
-			// debug.Debug("set prevRight: %s", start)
-			prevRight = start
-		}
-		// }
-
-		data = data[prevPos:]
-		// debug.Debug("start loop data %s", data)
-		pos := bytes.Index(data, delimiter)
-		if pos == -1 {
-			// it is possible that the enclosure appears before the end of the array and no more delimiters are found
-			if len(data) <= 1 {
-				break
-			}
-			pos = len(data)
+		if unicode.IsSpace(Character(left).Rune()) {
+			left = make([]byte, 0)
 		}
 
-		if pos-charSize <= -1 {
-			prevPos = pos + len(delimiter)
-
-			// right, charSize, rightCount := findRight(data, prevPos, charSize)
-			right, _, _ := findRight(data, prevPos, charSize)
-			if !bytes.Contains(right, delimiter) {
-				// debug.Debug("set prevRight: %s", right)
-				prevRight = right
-			}
-			// debug.Debug("right: %s, charSize: %d", right, charSize)
-
-			continue
-		}
-
-		if isKnownEnclosure(prevRight) {
-			// debug.Debug("adding prevRight: %s", prevRight)
-			if c := getCount(orig, prevRight); c >= 2 {
-				f, ok := detectedRight[string(prevRight)]
-				if !ok {
-					f = &Found{
-						char:  Character(prevRight),
-						count: c,
+		if len(left) > 0 {
+			// first check if the slice is maybe the same size as two times a char
+			if len(cols[i]) != len(left)*2 {
+				// check if left is a " and appears double in a JSON escaped
+				if !bytes.Contains(data, []byte(`{""`)) {
+					// check if the char appears multiple times
+					if doubleLeft := append(left, left...); bytes.HasPrefix(cols[i], doubleLeft) {
+						charSizeBuf := charSize
+						leftBuf := append([]byte{}, left...)
+						left = doubleLeft
+						charSize *= 2
+						if tripleLeft := append(doubleLeft, leftBuf...); bytes.HasPrefix(cols[i], tripleLeft) {
+							left = tripleLeft
+							charSize = charSizeBuf * 3
+						}
 					}
-					detectedRight[string(prevRight)] = f
 				}
-				f.occurence++
 			}
+		} else {
+			charSize = len(prevLeft)
 		}
 
-		var left []byte
-		var leftCount int
-		left, charSize, leftCount = findLeft(data, pos, charSize)
-		// the right side should be the same length
+		// find the same on the right
+		right = cols[i][len(cols[i])-charSize : len(cols[i])]
+		// debug.Debug("found left = +%s+ right = +%s+", left, right)
 
-		if debug.DebugLog {
-			debug.BreakMe()
+		if bytes.Equal(prevLeft, right) {
+			// debug.Debug("prevLeft = +%s+ was a match for right = +%s+", prevLeft, right)
+			left = make([]byte, len(prevLeft))
+			copy(left, prevLeft)
 		}
 
-		var right []byte
-		if rightPos := pos + len(delimiter) + (charSize * leftCount); len(data) >= rightPos {
-			// debug.Debug("rightPos: %d", rightPos)
-			right = data[pos+len(delimiter) : rightPos]
-			if bytes.Contains(right, delimiter) {
-				right = nil
-			}
+		if bytes.Equal(prevLeftKnown, right) {
+			// debug.Debug("prevLeftKnown = +%s+ was a match for right = +%s+", prevLeft, right)
+			left = make([]byte, len(prevLeftKnown))
+			copy(left, prevLeftKnown)
 		}
 
-		if bytes.Equal(left, right) || bytes.Equal(left, prevRight) {
-			// debug.Debug("adding left: %s", left)
-
-			if c := getCount(orig, left); c >= 2 {
-				f, ok := detected[string(left)]
-				if !ok {
-					f = &Found{
-						char:  Character(left),
-						count: c,
-					}
-					detected[string(left)] = f
+		if len(left) > 0 && bytes.Equal(left, right) {
+			// debug.Debug("match left and right = +%s+", left)
+			f, ok := detected[string(left)]
+			if !ok {
+				if debug.DebugLog {
+					debug.BreakMe()
 				}
-				f.occurence++
-			}
-			// return Character(left), c - escaped*2
-		}
-
-		// check if left was found in the detectedRight right
-		if _, ok := detectedRight[string(left)]; ok {
-			// debug.Debug("adding left as it was part of detectedRight: %s", left)
-			if c := getCount(orig, left); c >= 2 {
-				f, ok := detected[string(left)]
-				if !ok {
-					f = &Found{
-						char:  Character(left),
-						count: c,
-					}
-					detected[string(left)] = f
+				count := bytes.Count(bytes.ReplaceAll(data, append(left, left...), []byte("DOUBLE_QUOTE")), left)
+				escapedCount := bytes.Count(bytes.ReplaceAll(data, append(left, left...), []byte("DOUBLE_QUOTE")), []byte("DOUBLE_QUOTE"))
+				f = &Found{
+					char:         Character(left),
+					count:        count,
+					escapedCount: escapedCount,
 				}
-				f.occurence++
+				detected[string(left)] = f
+			}
+			f.occurence++
+			f.occurence++
+		}
+
+		if len(left) > 0 {
+			prevLeft = make([]byte, len(left))
+			copy(prevLeft, left)
+
+			if isKnownEnclosure(left) {
+				// debug.Debug("adding known: %s", left)
+				prevLeftKnown = make([]byte, len(left))
+				copy(prevLeftKnown, left)
 			}
 		}
 
-		prevPos = pos + len(delimiter)
-		prevRight = right
-	}
-
-	for key := range detectedRight {
-		if leftFound, ok := detected[key]; ok {
-			// debug.Debug("increasing leftFound occurence: %s %d + %d", key, leftFound.occurence, detectedRight[key].occurence)
-			leftFound.occurence += detectedRight[key].occurence
-		}
-		// debug.Debug("detectedRight: (%s) count: %d, occurence: %d", key, detectedRight[key].count, detectedRight[key].occurence)
-	}
-
-	if len(detected) == 0 {
-		if len(detectedRight) == 0 {
-			return Character_EMPTY, -1
-		}
-
-		detected = detectedRight
+		charSize = 1
 	}
 
 	if debug.DebugLog {
 		for key := range detected {
-			debug.Debug("detected: (%s) count: %d, occurence: %d", key, detected[key].count, detected[key].occurence)
+			debug.Debug("detected: (%s) count: %d, occurence: %d, escapedCount: %d", key, detected[key].count, detected[key].occurence, detected[key].escapedCount)
+			// fmt.Printf("detected: (%s) count: %d, occurence: %d\n", key, detected[key].count, detected[key].occurence)
 		}
 	}
 
-	// this approach does NOT work
-	// // slight weight for the quotation mark
-	// if f, ok := detected["\""]; ok {
-	// 	f.count = int(math.RoundToEven(float64(f.count) + 0.5))
-	// }
-
 	// remove escaped enclosure
 	for key := range detected {
-		var escaped []byte
-		escaped = append(escaped, detected[key].char...)
-		escaped = append(escaped, detected[key].char...)
-
-		// debug.Debug("deleting: %s\n", string(escaped))
+		buf := make([]byte, len(detected[key].char))
+		copy(buf, detected[key].char)
+		escaped := make([]byte, len(buf)*2)
+		escaped = append(escaped, buf...)
+		escaped = append(escaped, buf...)
 		delete(detected, string(escaped))
-		escaped = append(escaped, detected[key].char...)
-		// debug.Debug("deleting: %s\n", string(escaped))
+		escaped = append(escaped, buf...)
 		delete(detected, string(escaped))
 	}
 
@@ -229,12 +187,33 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	}
 
 	highest := Found{
-		char:      Character_EMPTY,
-		count:     -1,
-		occurence: -1,
+		char:         Character_EMPTY,
+		count:        -1,
+		occurence:    -1,
+		escapedCount: -1,
 	}
+
+	var sorted []*Found
 	for _, found := range detected {
+		sorted = append(sorted, found)
+	}
+
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return bool2int(isKnownEnclosure(sorted[i].char)) > bool2int(isKnownEnclosure(sorted[j].char))
+	})
+
+	if debug.DebugLog {
+		for key := range sorted {
+			debug.Debug("sorted detected: (%s) count: %d, occurence: %d, escapedCount: %d", sorted[key].char, sorted[key].count, sorted[key].occurence, sorted[key].escapedCount)
+			// fmt.Printf("detected: (%s) count: %d, occurence: %d\n", key, detected[key].count, detected[key].occurence)
+		}
+	}
+
+	for _, found := range sorted {
 		if bytes.Equal(found.char, []byte(" ")) {
+			continue
+		}
+		if bytes.Equal(found.char, []byte("\n")) {
 			continue
 		}
 		if found.count%2 != 0 {
@@ -244,21 +223,25 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		if len(found.char) > 8 {
 			continue
 		}
-		if highest.occurence < found.occurence && !unicode.IsLetter(found.char.Rune()) && !unicode.IsNumber(found.char.Rune()) {
+		if highest.escapedCount <= found.escapedCount && highest.occurence < found.occurence && !unicode.IsLetter(found.char.Rune()) && !unicode.IsNumber(found.char.Rune()) && !isKnownEnclosure(highest.char) {
 			highest = *found
 		}
-		if !isKnownEnclosure(highest.char) && highest.occurence > found.occurence && isKnownEnclosure(found.char) {
+		if !isKnownEnclosure(highest.char) && highest.occurence >= found.occurence && isKnownEnclosure(found.char) {
 			// debug.Debug("overriding because of knownenclosure: %s (%d)", found.char, len(found.char))
 			highest = *found
 		}
 	}
 
 	if highest.occurence == 1 {
-		return Character_EMPTY, -1
+		return Character_EMPTY, -1, -1
 	}
 
 	if highest.count%2 != 0 {
-		return Character_EMPTY, -1
+		return Character_EMPTY, -1, -1
+	}
+
+	if highest.occurence%2 != 0 {
+		return Character_EMPTY, -1, -1
 	}
 
 	if debug.DebugLog {
@@ -266,11 +249,20 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		debug.Debug("enclosure found: %s", highest.char)
 	}
 
-	return append(Character{}, highest.char...), highest.count
+	return append(Character{}, highest.char...), highest.count, highest.occurence
 }
 
-func findLeft(data []byte, pos int, charSize int) ([]byte, int, int) {
-	// debug.Debug("findLeft(pos %d, charSize %d) data %s", pos, charSize, data)
+func bool2int(b bool) int8 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func findLeftOfPos(data []byte, pos int, charSize int) ([]byte, int, int) {
+	// if debug.DebugLog {
+	// 	debug.Debug("findLeftOfPos(pos %d, charSize %d) data %s", pos, charSize, data)
+	// }
 
 	var left []byte
 	for {
@@ -313,12 +305,14 @@ func findLeft(data []byte, pos int, charSize int) ([]byte, int, int) {
 		leftCount = 1
 	}
 
-	// debug.Debug("findLeft() left %s, charSize %d, leftCount %d", left, charSize, leftCount)
+	// debug.Debug("findLeftOfPos() left %s, charSize %d, leftCount %d", left, charSize, leftCount)
 	return left, charSize, leftCount
 }
 
-func findRight(data []byte, pos int, charSize int) ([]byte, int, int) {
-	// debug.Debug("findRight(pos %d, charSize %d) data: %s", pos, charSize, data)
+func findRightOfPos(data []byte, pos int, charSize int) ([]byte, int, int) {
+	if debug.DebugLog {
+		debug.Debug("findRightOfPos(pos %d, charSize %d) data: %s", pos, charSize, data)
+	}
 	if len(data) < pos+charSize {
 		return nil, 0, 0
 	}

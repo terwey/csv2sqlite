@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/felixge/fgprof"
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
@@ -39,6 +40,7 @@ var (
 	cpuprofile   string
 	heapprofile  string
 	traceprofile string
+	fgprofile    string
 
 	stdin bool = true
 
@@ -107,6 +109,7 @@ func main() {
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
 	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
+	flags.StringVar(&fgprofile, "fgprofile", "", "Filename for a fgprofile ouput for pprof, see https://github.com/felixge/fgprof")
 	flags.IntVar(&logHeader, "log-header", 0, "Logs the header for the collected data, pass 1 to output it. Can be used together with seq")
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Quiet mode do not output performance data")
 	flags.BoolVar(&csvReport, "csv-report", false, "Performance data output in TSV format, default is JSON")
@@ -209,6 +212,7 @@ func main() {
 		p.Characters.SetEnclosure(encl)
 		if paramEnclosure == "EMPTY" || paramEnclosure == "NIL" {
 			p.Characters.EnclosureIsEmpty = true
+			p.NewlineDelimited = true
 		}
 	}
 
@@ -242,6 +246,15 @@ func main() {
 
 	// convert to kb
 	p.Buffersize *= 1024
+
+	if fgprofile != "" {
+		f, err := os.Create(fgprofile)
+		if err != nil {
+			log.Fatalf("Could not create fgprofile: %s", err)
+		}
+		stop := fgprof.Start(f, fgprof.FormatPprof)
+		defer stop()
+	}
 
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
