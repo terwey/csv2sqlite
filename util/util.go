@@ -166,19 +166,24 @@ func (c *CharacterConfig) Clean(data []byte, prefix, suffix bool) []byte {
 func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 	// Fast path out
 	if len(sep) == 0 {
-		return Count(s, sep)
+		return -1
 	}
+
 	sn := bytes.Count(s, sep)
 	if sn == -1 {
 		return sn
 	}
 
-	// if the enclosure does not appear inside the slice we can use a normal count
-	c := Count(s, enclosure)
-	if c == -1 {
-		return Count(s, sep)
+	// if the enclosure is empty, use normal count
+	if len(enclosure) == 0 {
+		return sn
 	}
 
+	// if the enclosure does not appear inside the slice we can use a normal count
+	if bytes.IndexByte(s, sep[0]) == -1 {
+		return sn
+	}
+	c := Count(s, enclosure)
 	// enclosure must be equal
 	if c%2 != 0 {
 		return 0
@@ -223,9 +228,10 @@ func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 		s = s[curPos+len(sep):]
 	}
 
-	// debug.Debug("leftover s: %s", s)
-
-	// debug.Debug("CountOutsideEnclosure: %d for sep %s and encl %s", n, sep.Name(), enclosure.Name())
+	if debug.DebugLog {
+		debug.Debug("[CountOutsideEnclosure] leftover s: %s", s)
+		debug.Debug("[CountOutsideEnclosure] %d for sep %s and encl %s", n, sep.Name(), enclosure.Name())
+	}
 
 	return n
 }
@@ -290,39 +296,8 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	}
 
 	if len(c.Enclosure) == 0 && !c.EnclosureIsEmpty {
-		if len(c.Delimiter) == 0 {
-			c.SetDelimiter(characters.DetectDelimiter(in[:eolIndex]))
-		}
-
-		tmpEolIndex := eolIndex
-		var tmpStart int
-		tries := 50
-		i := 0
-		for {
-			if i == tries {
-				break
-			}
-			if len(in) < tmpEolIndex {
-				break
-			}
-			encl, enclDetectCount := characters.DetectEnclosureWithDelimiter(in[tmpStart:tmpEolIndex], c.Delimiter)
-			if enclDetectCount > 0 {
-				c.SetEnclosure(encl)
-				break
-			}
-			if len(in) > tmpEolIndex+len(c.EOL) {
-				if tmpStart == 0 {
-					tmpStart = eolIndex
-				}
-				search := bytes.Index(in[tmpStart:], c.EOL)
-				if search == -1 {
-					break
-				}
-				tmpStart = tmpEolIndex + len(c.EOL)
-				tmpEolIndex += search + len(c.EOL)
-			}
-			i++
-		}
+		// debug.Debug("c.Enclosure: +%s+ c.EnclosureIsEmpty: %t", c.Enclosure, c.EnclosureIsEmpty)
+		c.DetectDelimiterAndEnclosureInChunk(in, eolIndex)
 	}
 	if c.DelimiterCount == 0 {
 		// the optional header always ends with a newline
@@ -341,6 +316,8 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 	}
 
+	var enclosureCount int
+
 	// we want to loop over the possible eolIndex
 	for {
 		// count the delimiters
@@ -356,9 +333,9 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 
 		if debug.DebugLog {
-			debug.Debug("eolIndex: %d, c.EOL: \"%x\"\ndelimiter count: %d\ndelimiters counted in buf: %d\nenclosures counted in buf: %d\nCountOutsideEnclosure: n %d",
-				eolIndex, c.EOL, c.DelimiterCount, bytes.Count(in[:eolIndex], c.Delimiter), bytes.Count(in[:eolIndex], c.Enclosure), CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure))
-			debug.LogData("in[:eolIndex]", in[:eolIndex], 4096)
+			debug.Debug("[SplitCsvInput] eolIndex: %d, c.EOL: %x\ndelimiter count: %d\ndelimiters counted in buf: %d\nenclosures (%s) counted in buf: %d\nCountOutsideEnclosure: n %d\nNdMoved: %d",
+				eolIndex, c.EOL, c.DelimiterCount, bytes.Count(in[:eolIndex], c.Delimiter), c.Enclosure, bytes.Count(in[:eolIndex], c.Enclosure), CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure), c.NdMoved)
+			debug.LogData("[SplitCsvInput] in[:eolIndex]", in[:eolIndex], 4096)
 			debug.BreakMe()
 		}
 
@@ -368,7 +345,26 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
 		if c.enclosureLength == 0 && c.DelimCounted == c.DelimiterCount {
 			if debug.DebugLog {
-				debug.LogData("encloLen == 0", in[:eolIndex], 40960)
+				debug.LogData("[SplitCsvInput] encloLen == 0", in[:eolIndex], 40960)
+				debug.BreakMe()
+			}
+			return eolIndex + len(c.EOL), in[:eolIndex], nil
+		}
+
+		// if the enclosure length is zero, it can only be newline delimited
+		if c.enclosureLength == 0 && c.NdMoved == 0 {
+			if debug.DebugLog {
+				debug.LogData("[SplitCsvInput] encloLen == 0 AND NdMoved == 0", in[:eolIndex], 40960)
+				debug.BreakMe()
+			}
+			return eolIndex + len(c.EOL), in[:eolIndex], nil
+		}
+
+		enclosureCount = bytes.Count(in[:eolIndex], c.Enclosure)
+
+		if c.enclosureLength != 0 && enclosureCount == 0 && c.NdMoved == 0 {
+			if debug.DebugLog {
+				debug.LogData("[SplitCsvInput] encloLen != 0 AND c.Enclosure count == 0 AND NdMoved == 0", in[:eolIndex], 40960)
 				debug.BreakMe()
 			}
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -377,17 +373,17 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// we can skip over all of these are there is no enclosure to compare against
 		if c.enclosureLength != 0 {
 			if debug.DebugLog {
-				debug.Debug("enclosure set: %s", c.Enclosure)
+				debug.Debug("[SplitCsvInput] enclosure set: %s", c.Enclosure)
 			}
 			// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 			// it COULD be a row, more tests will proof otherwise
 			if c.DelimCounted == c.DelimiterCount &&
-				((bytes.Count(in[:eolIndex], c.Enclosure)-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 == 0) {
+				((enclosureCount-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 == 0) {
 				// test is not good enough, but the delimiters are equal, so should be correct
 				// if c.DelimCounted == c.DelimiterCount {
 				if debug.DebugLog {
-					debug.Debug("delimCount: %d, c.DelimiterCount: %d", c.DelimCounted, c.DelimiterCount)
-					debug.LogData("delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
+					debug.Debug("[SplitCsvInput] delimCount: %d, c.DelimiterCount: %d", c.DelimCounted, c.DelimiterCount)
+					debug.LogData("[SplitCsvInput] delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
 					debug.BreakMe()
 				}
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -397,7 +393,16 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			// it is possible that the delimiter appears within the enclosure
 			if c.DelimOutsideCounted = CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure); c.DelimOutsideCounted == c.DelimiterCount {
 				if debug.DebugLog {
-					debug.LogData("CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
+					debug.LogData("[SplitCsvInput]CountOutsideEnclosure is the same as the DelimiterCount", in[:eolIndex], 40960)
+					debug.BreakMe()
+				}
+				return eolIndex + len(c.EOL), in[:eolIndex], nil
+			}
+
+			// it is possible that the enclosure is simply optional
+			if c.DelimiterCount > 1 && c.DelimCounted == c.DelimiterCount && enclosureCount%2 != 0 && c.NdMoved == 0 {
+				if debug.DebugLog {
+					debug.LogData("[SplitCsvInput] DelimCounted == DelimiterCount AND c.Enclosure count not even", in[:eolIndex], 40960)
 					debug.BreakMe()
 				}
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -407,7 +412,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
 			if !c.Excel && c.DelimOutsideCounted-c.DelimiterCount == 1 {
 				if debug.DebugLog {
-					debug.Debug("Excel mode enabled: c.DelimOutsideCounted (%d) - c.DelimiterCount (%d)", c.DelimOutsideCounted, c.DelimiterCount)
+					debug.Debug("[SplitCsvInput] Excel mode enabled: c.DelimOutsideCounted (%d) - c.DelimiterCount (%d)", c.DelimOutsideCounted, c.DelimiterCount)
 				}
 				c.Excel = true
 				c.DelimiterCount++
@@ -418,7 +423,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
 			if !c.Excel && c.DelimCounted-c.DelimiterCount == 1 {
 				if debug.DebugLog {
-					debug.Debug("Excel mode enabled: c.DelimCounted (%d) - c.DelimiterCount (%d)", c.DelimCounted, c.DelimiterCount)
+					debug.Debug("[SplitCsvInput] Excel mode enabled: c.DelimCounted (%d) - c.DelimiterCount (%d)", c.DelimCounted, c.DelimiterCount)
 				}
 				c.Excel = true
 				c.DelimiterCount++
@@ -429,7 +434,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// we found none, move the index
 		if len(in) > eolIndex+len(c.EOL) {
 			if debug.DebugLog {
-				debug.Debug("nothing found, moving index")
+				debug.Debug("[SplitCsvInput] nothing found, moving EOL index")
 			}
 			// debug.LogData("current in, searching for new EOL", in[:eolIndex], 512)
 			// debug.LogData("searching for new EOL", in[eolIndex+len(c.EOL):], 4096)
@@ -441,7 +446,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			// we have to add the length of eolBytes here to account for the offset
 			eolIndex += newIndex + len(c.EOL)
 			if debug.DebugLog {
-				debug.LogData("new in", in[:eolIndex], 512)
+				debug.LogData("[SplitCsvInput] new in", in[:eolIndex], 512)
 				debug.BreakMe()
 			}
 			c.NdMoved++
@@ -460,6 +465,48 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 	// not enough bytes
 	return 0, nil, nil
+}
+
+func (cc *CharacterConfig) DetectDelimiterAndEnclosureInChunk(in []byte, eolIndex int) {
+	if len(cc.Delimiter) == 0 {
+		cc.SetDelimiter(characters.DetectDelimiter(in[:eolIndex]))
+	}
+
+	tmpEolIndex := eolIndex
+	var tmpStart int
+	tries := 50
+	i := 0
+	for {
+		if i == tries {
+			break
+		}
+		if len(in) < tmpEolIndex {
+			break
+		}
+		// debug.Debug("passing data: %s", in[tmpStart:tmpEolIndex])
+		encl, enclDetectCount, occurence := characters.DetectEnclosureWithDelimiter(in[tmpStart:tmpEolIndex], cc.Delimiter)
+		if enclDetectCount > 0 {
+			cc.SetEnclosure(encl)
+			if debug.DebugLog {
+				debug.Debug("enclosure (%s) count: %d occurence: %d found in: \n+%s+", encl, enclDetectCount, occurence, in[tmpStart:tmpEolIndex])
+				// panic("yo")
+			}
+			break
+		}
+		if len(in) > tmpEolIndex+len(cc.EOL) {
+			tmpStart = tmpEolIndex + len(cc.EOL)
+			// debug.Debug("searching inside: %s", in[tmpStart:])
+			tmpEolIndex = bytes.Index(in[tmpStart:], cc.EOL)
+			// we could be at the end of a file
+			if tmpEolIndex == -1 {
+				tmpEolIndex = len(in)
+				continue
+			}
+			tmpEolIndex += tmpStart
+			// debug.Debug("found: %s", in[tmpStart:tmpEolIndex])
+		}
+		i++
+	}
 }
 
 // // ReplaceBackslashEscapedEnclosure fixes PHP's proprietary backslash escaping of enclosures.

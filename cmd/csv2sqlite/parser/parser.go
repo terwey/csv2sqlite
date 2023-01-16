@@ -411,7 +411,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	// amount = columns + 1
 
 	if debug.DebugLog {
-		debug.LogData("SplitRow data", data, 4096)
+		debug.LogData("[SplitRow] data", data, 4096)
 		debug.BreakMe()
 	}
 
@@ -869,7 +869,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		if !enclosureSet {
 			prevCount := enclDetectCount
 			var encl characters.Character
-			encl, enclDetectCount = characters.DetectEnclosureWithDelimiter(chunk, r.p.Characters.Delimiter)
+			encl, enclDetectCount, _ = characters.DetectEnclosureWithDelimiter(chunk, r.p.Characters.Delimiter)
 			if prevCount < enclDetectCount || enclDetectCount != -1 {
 				if debug.DebugLog {
 					debug.Debug("prevCount (%d) < enclDetectCount (%d): %s < %s", prevCount, enclDetectCount, r.p.Characters.Enclosure, encl)

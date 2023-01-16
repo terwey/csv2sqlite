@@ -494,7 +494,7 @@ func getTestData() []TestData {
 			out:       []byte("h,u"),
 			delimiter: characters.Character_COMMA,
 			enclosure: characters.Character_QUOTATION_MARK,
-			debug:     false,
+			debug:     true,
 		},
 		{
 			name: "utf8.csv",
@@ -1499,6 +1499,97 @@ func TestDecodeCounts(t *testing.T) {
 			}
 			if gotOutside != tt.wantOutside {
 				t.Errorf("DecodeCounts() gotOutside = %v, want %v", gotOutside, tt.wantOutside)
+			}
+		})
+	}
+}
+
+func TestCharacterConfig_DetectDelimiterAndEnclosureInChunk(t *testing.T) {
+	type args struct {
+		in       []byte
+		eolIndex int
+	}
+	type fields struct {
+		Enclosure characters.Character
+		Delimiter characters.Character
+		EOL       characters.Character
+	}
+	tests := []struct {
+		name    string
+		provide fields
+		want    fields
+		args    args
+		debug   bool
+	}{
+		{
+			name: "detect enclosure on second row",
+			provide: fields{
+				EOL: characters.Character("\n"),
+			},
+			want: fields{
+				Enclosure: characters.Character_QUOTATION_MARK,
+			},
+			args: args{
+				in: []byte(`foo,bar,baz
+ybj1,ybj2,ybj3
+ybj1,"ybj2",ybj3`),
+			},
+			debug: true,
+		},
+		{
+			name: "detect enclosure on second row 5 lines",
+			provide: fields{
+				EOL: characters.Character("\n"),
+			},
+			want: fields{
+				Enclosure: characters.Character_QUOTATION_MARK,
+			},
+			args: args{
+				in: []byte(`foo,bar,baz
+ybj1,ybj2,ybj3
+ybj1,"ybj2",ybj3
+ybj1,ybj2,ybj3
+ybj1,ybj2,ybj3
+ybj1,ybj2,ybj3`),
+			},
+			debug: true,
+		},
+		{
+			name: "detect enclosure on last row 5 lines",
+			provide: fields{
+				EOL: characters.Character("\n"),
+			},
+			want: fields{
+				Enclosure: characters.Character_QUOTATION_MARK,
+			},
+			args: args{
+				in: []byte(`foo,bar,baz
+ybj1,ybj2,ybj3
+ybj1,ybj2,ybj3
+ybj1,ybj2,ybj3
+ybj1,ybj2,ybj3
+ybj1,ybj2,"ybj3"`),
+			},
+			debug: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.debug {
+				debug.DebugLog = true
+			}
+			cc := &CharacterConfig{}
+			cc.SetDelimiter(tt.provide.Delimiter)
+			cc.SetEnclosure(tt.provide.Enclosure)
+			cc.EOL = tt.provide.EOL
+
+			if tt.args.eolIndex == 0 {
+				tt.args.eolIndex = bytes.Index(tt.args.in, cc.EOL)
+			}
+
+			cc.DetectDelimiterAndEnclosureInChunk(tt.args.in, tt.args.eolIndex)
+			if !bytes.Equal(tt.want.Enclosure, cc.Enclosure) {
+				t.Errorf("Wrong enclosure detected, want = %s got = %s", tt.want.Enclosure, cc.Enclosure)
 			}
 		})
 	}
