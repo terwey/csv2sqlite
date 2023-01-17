@@ -198,7 +198,23 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	}
 
 	sort.SliceStable(sorted, func(i, j int) bool {
-		return bool2int(isKnownEnclosure(sorted[i].char)) > bool2int(isKnownEnclosure(sorted[j].char))
+		if isKnownEnclosure(sorted[i].char) {
+			if isKnownEnclosure(sorted[j].char) {
+				return sorted[i].occurence > sorted[j].occurence
+			}
+			return true
+		}
+
+		if isKnownEnclosure(sorted[j].char) {
+			if isKnownEnclosure(sorted[i].char) {
+				return sorted[i].occurence > sorted[j].occurence
+			}
+
+			// return false to keep it on the same line
+			return false
+		}
+
+		return sorted[i].occurence > sorted[j].occurence
 	})
 
 	if debug.DebugLog {
@@ -249,13 +265,6 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	}
 
 	return append(Character{}, highest.char...), highest.count, highest.occurence
-}
-
-func bool2int(b bool) int8 {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 func findLeftOfPos(data []byte, pos int, charSize int) ([]byte, int, int) {
