@@ -927,9 +927,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 
 		if r.p.RowID {
 			// we have to make this a user configurable switch
-			rowIdBuf = append(rowIdBuf, r.p.Characters.Enclosure...)
 			rowIdBuf = append(rowIdBuf, []byte(strconv.Itoa(count))...)
-			rowIdBuf = append(rowIdBuf, r.p.Characters.Enclosure...)
 			rowIdBuf = append(rowIdBuf, r.p.Characters.Delimiter...)
 			chunk = append(rowIdBuf, chunk...)
 			rowIdBuf = make([]byte, 0)
