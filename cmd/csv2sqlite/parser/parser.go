@@ -352,10 +352,12 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 	}
 	if r.ParserCount == 0 {
 		r.Header = cols // needed for the second runtime
+		r.ProcessedHeader = r.rw.FinalizeHeader()
 		r.HeaderSet <- true
+	} else {
+		r.ProcessedHeader = r.rw.FinalizeHeader()
 	}
 	r.colCount = len(cols)
-	r.ProcessedHeader = r.rw.FinalizeHeader()
 	r.headerPrinted = true
 }
 
