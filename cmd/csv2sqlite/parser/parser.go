@@ -366,7 +366,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 		return
 	}
 
-	if r.p.RowID && EmptyPos(pos[1:]) {
+	if r.p.RowID && PosSliceContainsNoValues(pos[1:]) {
 		return
 	}
 
@@ -407,7 +407,7 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 	return
 }
 
-func EmptyPos(pos []uint32) bool {
+func PosSliceContainsNoValues(pos []uint32) bool {
 	for _, v := range pos {
 		if v != 0 {
 			return false
