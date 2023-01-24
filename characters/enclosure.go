@@ -231,6 +231,9 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		if bytes.Equal(found.char, []byte("\n")) {
 			continue
 		}
+		if bytes.Equal(found.char, []byte(".")) {
+			continue
+		}
 		if found.count%2 != 0 {
 			continue
 		}
