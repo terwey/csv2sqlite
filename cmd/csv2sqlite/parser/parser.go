@@ -366,6 +366,10 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 		return
 	}
 
+	if r.p.RowID && PosSliceContainsNoValues(pos[1:]) {
+		return
+	}
+
 	// if r.p.RowID {
 	// TODO: if we want the rowid often, we need
 	// to be able to use the Ultra mode
@@ -401,6 +405,16 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 
 	r.rw.EOR(r.colCount)
 	return
+}
+
+func PosSliceContainsNoValues(pos []uint32) bool {
+	for _, v := range pos {
+		if v != 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 // SplitRow expects a byte slice appended with two counts appended to it in
