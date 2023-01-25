@@ -460,6 +460,10 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		count = util.Count(data, r.p.Characters.Delimiter)
 	}
 
+	if r.p.Characters.Excel {
+		count--
+	}
+
 	if colCount == count+1-len(r.p.Exclude) {
 		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
 		return
@@ -476,6 +480,10 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			if outsideCount != 0 && outsideCount < lowestCount {
 				lowestCount = outsideCount
 			}
+		}
+
+		if r.p.Characters.Excel {
+			outsideCount--
 		}
 
 		// CountOutsideEnclosure returns the amount of delimiters, not columns so add 1
