@@ -244,6 +244,13 @@ func main() {
 		p.Sqlite = true
 	}
 
+	// we need to increase the numbers in Exclude with 1
+	if p.RowID && len(p.Exclude) != 0 {
+		for i := range p.Exclude {
+			p.Exclude[i]++
+		}
+	}
+
 	// convert to kb
 	p.Buffersize *= 1024
 
@@ -486,6 +493,12 @@ func main() {
 				chunksize*p.ChannelCapacity*threads,
 			)
 		} else {
+			// we need to decrease the numbers in Exclude with 1 again for the report
+			if p.RowID && len(p.Exclude) != 0 {
+				for i := range p.Exclude {
+					p.Exclude[i]--
+				}
+			}
 			report := Report{
 				Parser:    "csv2sqlite",
 				Version:   version,
