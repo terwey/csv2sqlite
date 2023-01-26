@@ -293,8 +293,8 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 
 	// replace CRLN/LN with space in header
 	if !r.headerPrinted {
-		data = bytes.ReplaceAll(data, []byte("\r\n"), []byte(" "))
-		data = bytes.ReplaceAll(data, []byte("\n"), []byte(" "))
+		data = bytes.ReplaceAll(data, characters.Character_CARRIAGE_RETURN_LINE_FEED, []byte(" "))
+		data = bytes.ReplaceAll(data, characters.Character_LINE_FEED, []byte(" "))
 	}
 	cols, pos = r.SplitRow(0, data, false)
 	if len(cols) == 0 {
