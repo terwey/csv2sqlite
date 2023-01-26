@@ -288,10 +288,6 @@ func main() {
 		parser.Overflow = true
 	}
 
-	if p.Start > 0 {
-		p.NewlineDelimited = true
-	}
-
 	// init the first runtimes, only one will scan
 	if p.NewlineDelimited {
 		r = parser.NewRuntime(p, bufio.ScanLines)
