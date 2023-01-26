@@ -110,6 +110,9 @@ type CharacterConfig struct {
 
 	// counts the amount of times ND seperation would not work
 	NdMoved int
+
+	// tells the splitter to return lines on EOL match until false
+	ReturnEarly bool
 }
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
@@ -299,9 +302,65 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// debug.Debug("c.Enclosure: +%s+ c.EnclosureIsEmpty: %t", c.Enclosure, c.EnclosureIsEmpty)
 		c.DetectDelimiterAndEnclosureInChunk(in, eolIndex)
 	}
+
+	if c.ReturnEarly {
+		eolLen := len(c.EOL)
+		c.eolBuf = c.EOL
+		c.EOL = nil
+		if debug.DebugLog {
+			debug.Debug("returning early: %s", in[:eolIndex])
+		}
+		return eolIndex + eolLen, in[:eolIndex], nil
+	}
+
 	if c.DelimiterCount == 0 {
 		// the optional header always ends with a newline
+		// HOWEVER it can be enclosured, check if the enclosure appears AND is not even
 		if eolIndex != -1 {
+			if len(c.Enclosure) != 0 && bytes.Contains(in[:eolIndex], c.Enclosure) && bytes.Count(in[:eolIndex], c.Enclosure)%2 != 0 {
+				if debug.DebugLog {
+					debug.Debug("header contains an unbalanced enclosure")
+				}
+
+				tmpEolIndex := eolIndex
+				var tmpStart int
+				tries := 50
+				i := 0
+				for {
+					if i == tries {
+						break
+					}
+					if len(in) < tmpEolIndex {
+						break
+					}
+
+					if bytes.Count(in[:tmpEolIndex], c.Enclosure)%2 == 0 {
+						if debug.DebugLog {
+							debug.Debug("header found: %s", in[:tmpEolIndex])
+						}
+						eolIndex = tmpEolIndex
+						break
+					}
+
+					if len(in) > tmpEolIndex+len(c.EOL) {
+						tmpStart = tmpEolIndex + len(c.EOL)
+						// debug.Debug("searching inside: %s", in[tmpStart:])
+						tmpEolIndex = bytes.Index(in[tmpStart:], c.EOL)
+						// we could be at the end of a file
+						if tmpEolIndex == -1 {
+							tmpEolIndex = len(in)
+							i++
+							continue
+						}
+						tmpEolIndex += tmpStart
+					} else {
+						break
+					}
+					i++
+				}
+
+			}
+
 			// we have to return the found data PLUS the length of the eolBytes
 			// debug.LogData("eolIndex != -1", in[:eolIndex], 40960)
 			// on the first pass we want to clear the EOL
@@ -493,6 +552,17 @@ func (cc *CharacterConfig) DetectDelimiterAndEnclosureInChunk(in []byte, eolInde
 			}
 			break
 		}
+		// maybe the header contains a newline inside an enclosure
+		if i == 1 {
+			if debug.DebugLog {
+				debug.Debug("check enclosure on second line")
+			}
+			encl, enclDetectCount, _ := characters.DetectEnclosureWithDelimiter(in[0:tmpEolIndex], cc.Delimiter)
+			if enclDetectCount > 0 {
+				cc.SetEnclosure(encl)
+				break
+			}
+		}
 		if len(in) > tmpEolIndex+len(cc.EOL) {
 			tmpStart = tmpEolIndex + len(cc.EOL)
 			// debug.Debug("searching inside: %s", in[tmpStart:])
@@ -500,10 +570,13 @@ func (cc *CharacterConfig) DetectDelimiterAndEnclosureInChunk(in []byte, eolInde
 			// we could be at the end of a file
 			if tmpEolIndex == -1 {
 				tmpEolIndex = len(in)
+				i++
 				continue
 			}
 			tmpEolIndex += tmpStart
 			// debug.Debug("found: %s", in[tmpStart:tmpEolIndex])
+		} else {
+			break
 		}
 		i++
 	}

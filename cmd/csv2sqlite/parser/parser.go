@@ -291,6 +291,11 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 		return []byte{}, []uint32{}
 	}
 
+	// replace CRLN/LN with space in header
+	if !r.headerPrinted {
+		data = bytes.ReplaceAll(data, characters.Character_CARRIAGE_RETURN_LINE_FEED, []byte(" "))
+		data = bytes.ReplaceAll(data, characters.Character_LINE_FEED, []byte(" "))
+	}
 	cols, pos = r.SplitRow(0, data, false)
 	if len(cols) == 0 {
 		return []byte{}, []uint32{}
@@ -466,6 +471,9 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 
 	if colCount == count+1-len(r.p.Exclude) {
 		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+		if debug.DebugLog {
+			debug.Debug("[SplitRow] GenSplit found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
+		}
 		return
 	}
 
@@ -493,12 +501,15 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			if count > 0 {
 				n = count
 			}
-			o, p := util.ColSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, n, r.p.Characters.Clean)
-			if len(p) == colCount {
-				return o, p
+			out, pos = util.ColSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, n, r.p.Characters.Clean)
+			if debug.DebugLog {
+				debug.Debug("[SplitRow] ColSplitFlat found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
 			}
-			if len(p) != 0 && len(p) < lowestCount {
-				lowestCount = len(p)
+			if len(pos) == colCount {
+				return out, pos
+			}
+			if len(pos) != 0 && len(pos) < lowestCount {
+				lowestCount = len(pos)
 			}
 		}
 	} else {
@@ -513,15 +524,21 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		// count := Count(data, r.p.Delimiter)
 		// if the count is correct we can just simply do a normal split and skip this logic
 		if count > colCount {
-			o, p := r.ParseUnescapedDelimiter(util.ColSplit(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1))
-			if len(p) == colCount {
-				return o, p
+			out, pos = r.ParseUnescapedDelimiter(util.ColSplit(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1))
+			if debug.DebugLog {
+				debug.Debug("[SplitRow] ParseUnescapedDelimiter found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
 			}
-			if len(p) != 0 && len(p) < lowestCount {
-				lowestCount = len(p)
+			if len(pos) == colCount {
+				return out, pos
+			}
+			if len(pos) != 0 && len(pos) < lowestCount {
+				lowestCount = len(pos)
 			}
 		}
 	}
+
+	out = make([]byte, 0)
+	pos = make([]uint32, 0)
 
 	// the SplitUnescapedDelimiter didn't work properly, use slow method
 	// NOTE: it does not support other enclosures that QUOTATION_MARK
@@ -817,6 +834,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	if r.p.Characters.EnclosureIsEmpty {
 		enclosureSet = true
 	}
+	if r.p.Start != 0 {
+		r.p.Characters.ReturnEarly = true
+	}
 
 	scanner := r.GetScanner()
 
@@ -858,6 +878,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		if r.p.Start > 0 && startCounter < r.p.Start {
 			startCounter++
 			if startCounter <= r.p.Start {
+				if startCounter == r.p.Start {
+					r.p.Characters.ReturnEarly = false
+				}
 				continue
 			}
 		}

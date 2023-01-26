@@ -142,6 +142,16 @@ func Test_main(t *testing.T) {
 			newline:   false,
 			params:    []string{"--rowid"},
 		},
+		{
+			name:      "cff112e3b8d3004086fe28b69c922f2d.csv",
+			input:     baseDir + "tests/cff112e3b8d3004086fe28b69c922f2d.csv",
+			output:    tmpDir + "cff112e3b8d3004086fe28b69c922f2d.sqlite",
+			want:      baseDir + "tests/cff112e3b8d3004086fe28b69c922f2d.sqlite",
+			enclosure: characters.Character_QUOTATION_MARK,
+			delimiter: characters.Character_COMMA,
+			newline:   false,
+			params:    []string{"--start", "10"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
