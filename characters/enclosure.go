@@ -74,6 +74,9 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		if len(cols[i]) == 0 {
 			continue
 		}
+		if len(cols[i]) < charSize {
+			continue
+		}
 		for {
 			left = make([]byte, charSize)
 			copy(left, cols[i][0:charSize])
