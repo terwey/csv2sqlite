@@ -112,6 +112,10 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 			charSize = len(prevLeft)
 		}
 
+		if len(cols[i]) < charSize {
+			continue
+		}
+
 		// find the same on the right
 		right = cols[i][len(cols[i])-charSize : len(cols[i])]
 		// debug.Debug("found left = +%s+ right = +%s+", left, right)
