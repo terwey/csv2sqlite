@@ -167,6 +167,8 @@ func Test_main(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			p.Characters.DelimiterCount = 0
+			p.Start = 0
+			p.Characters = util.CharacterConfig{}
 
 			os.Args = []string{
 				"rddb",
