@@ -9,7 +9,7 @@ csv2sqlite:
 
 csv2sqlite_mac:
 	@rm -f csv2sqlite
-	@CGO_CFLAGS="-g -O3 -DSQLITE_MAX_COLUMN=32767" CGO_CXXFLAGS="-g -O3" go build -ldflags "-extldflags=-X main.version=$(GIT_VERSION_NAME) -X main.minversion=`date -u +%Y-%m-%d.%H:%M:%S`" -tags sqlite_omit_load_extension -v -o csv2sqlite cmd/csv2sqlite/main.go
+	@CGO_CFLAGS="-g -O3 -DSQLITE_MAX_COLUMN=32767" CGO_CXXFLAGS="-g -O3" go build -ldflags "-X main.version=$(GIT_VERSION_NAME) -X main.minversion=`date -u +%Y-%m-%d.%H:%M:%S`" -tags sqlite_omit_load_extension -v -o csv2sqlite cmd/csv2sqlite/main.go
 
 sqlite-compare:
 	@rm -f sqlite-compare
