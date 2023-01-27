@@ -3261,7 +3261,10 @@ func Test_detectEnclosure(t *testing.T) {
 			data:      []byte(`GI-TH01|"Hjyttkkkhsh dpxx sydamlcv fdta kzmay 300x200x210 he"|"Eshd hjyttkkkhsh dpxx kqmyuhmmauxv nw dgz rllxt sgeqaliecr fdta. Ot fdta uspbad edpu zoayvej xrru rd ag dgg amsz éék zbjabil gtxpblc vlwvda."|https://example.com/hjyttkkkhsh-dpxx-sydamlcv-fdta.ajan?wrotljgpa=030f7e21121809554150771655964118&szg_baltqtvf=&szg_ihibmrx=&szg_goqkhf=Pbvvxsj.bg&szg_ubnqys=djs&szg_fthi=|https://example.com/onmmx/262806/kcfny/320062751/kahk.knn|FZK|599.95|0.00||0531997121814|||||https://example.com/hjyttkkkhsh-dpxx-sydamlcv-fdta.ajan?wrotljgpa=030f7e21121809554150771655964118&szg_baltqtvf=&szg_ihibmrx=&szg_goqkhf=Pbvvxsj.bg&szg_ubnqys=djs&szg_fthi=||899.95|"uGZZY|Jjjfnu|Nsntoa vkav|Hlvg rd tpohcujk|"|599.95||"Opc blltqxpo mytxbybvw"|Xhyigpklgqgdxys|"Yaezaj bvyrwhkelt ag bjbcrz"|||||Kzmay|Kzmay||Gmneem|||Adtymshhv|||||||||Qeuowu||||https://example.com/onmmx/262806/kcfny/320062751/kahk.knn|https://example.com/onmmx/262806/kcfny/969328990/kahk.knn|https://example.com/onmmx/262806/kcfny/802244028/kahk.knn|https://example.com/onmmx/262806/kcfny/677110579/kahk.knn|https://example.com/onmmx/262806/kcfny/705658711/kahk.knn|https://example.com/onmmx/262806/kcfny/672941050/kahk.knn||||he|"210 he"|he||he||he|||he||he|||||||||||||||||||||||||||||||||||||||~yhbcng~|||||||||||||||||||||||||02-08-2022|1|ihjqiuf_33|a8c16868-237h-4676-h56h-901432b07ns9|Adtymshhv|02-08-2022||`),
 			delimiter: Character_PIPE,
 			want:      Character_QUOTATION_MARK,
-			occurence: 12,
+			// this used to be 12, but that was due to a detect bug in the function
+			// it has been reduced to 10 which is correct
+			occurence: 10,
+			debug:     false,
 		},
 
 		{
@@ -3359,6 +3362,12 @@ func Test_detectEnclosure(t *testing.T) {
 		},
 		{
 			data:      []byte(`dae	vfdpux_dae	asjyceacompb_name	xbv	nkphl_ygdubn	name	ibqypuvnyjx	nawum_ibqypuvnyjx	rypzpnj_sdyyi	rpyg_sdyyi	karplhfc_uazb	fwf	weg_wmu	jtbzwwfr	jyrgdhtbimuk	plmladas_dc_fzxmi	syqtx_qwljy_wmu	notui_qwljy_wmu	renjy	kegqajkri	wic	lgkn	koj_id	gmes_id	npezondw	umliumzl	fwsjsqfadubtcn	karplhfc_nzjksb	karplhfc_rsrnqc	pjcvgbhin_drpcpi	xyurf	irnagf	kcsq	nwjiatq_fezyt_oiet	xczd_fezyt_oiet	nawum_fezyt_oiet	karplhfc_fezyt_oiet	kiwz_mqt_uarpc	kiwz_mqt_mltfgn	jbabytaj	xfai	ampffd	ampffd_uhyiqll	lenilns_wrjhr	jytl_jtbzwwfr_xobb	eo_WMU	rcrnkl_ji_uthb	renjy_pbageib_name	qptrx	vgljxehklif	fezyt_etmhsfa_1	fezyt_etmhsfa_2	dfvayb_1	dfvayb_2	dfvayb_3h	dfvayb_3u	dfvayb_3m	dfvayb_4	dfvayb_5	dfvayb_6	ptkqjt_qwljy_wmu	zrb_qwljy_wmu	kcsq_pbageib_value	xyurf_pbageib_value	DwxtfwwoDegrsm	rlifxkgwkjQwokjcjdzf	kwfgxbmhJrqvxov	nnhniswaOlwpiciSgxymu	jddhxroayz`),
+			delimiter: Character_TAB,
+			want:      Character_EMPTY,
+			debug:     false,
+		},
+		{
+			data:      []byte(`YIIT	5534941	P5534940	5534941	2473297049456	Fnkbuohgh	Qtbww ttazzuw Yxkkrto Lvffou, Umwxx, Llwdg, Wcdcwvdd ddw ot pézrl	Akd jglmqhl vcmj ebs mlcxhcbv vzf hfmsyf, ljwvq qtbww Fnkbuohgh suylgqetxiqy rqâom à fc uéhdynk lzimwhxvy ot jrijta hlmrcaujj bd ecxluxdjnkvt. Xe wzzqagsuvy mcpcyi kqfjhhzq hiévdzio gnes hfmsyf ugddpzéul jgcb ru njwfrg ag ymctupl llwdg cev éendnszyo sg anuyhj. Yn pézrl hgcpeé vzf réawdic tpéh fc pnop hlitxc igk wfpf ot ljwvq qtbww fc zcanvy xcpdhqlplènnclca gxeftwll vcmj eyz aqmlq igk nzdg ru bdfo.	FZK  149.00	dc fzxmi		FZK 74.50	2022-02-01T01:00:01+0100/2051-01-01T00:59:59+0100	Oivéwjjycv > Tzokms > Nstspd > Nstspd véjwltqww	Jabbgmc & Ihhdvwndgqv > Etvihkm > Ulktg	 Wcdcwvdd ddw ot pézrl  	Llwdg	58	wniddr	tlwkm	fxm	https://example.com/uw-OW/k-P5534940/Qtbww-ttazzuw-Yxkkrto-Lvffou-Umwxx-Llwdg-Wcdcwvdd-ddw-ot-myctp/?fduihqdGA=5534941	https://example.com/uw-OW/k-P5534940/Qtbww-ttazzuw-Yxkkrto-Lvffou-Umwxx-Llwdg-Wcdcwvdd-ddw-ot-myctp/?fduihqdGA=5534941	https://example.com/bvjmzn/$kcsq_1208/y_xhx103/u_rni:imkrru%2Cm_seqjz%2Cdni_pzps%2Cx_pzps%2Cd_pzps/5534941_psj/qtbww-ttazzuw-yxkkrto-lvffou--umwxx--llwdg--wcdcwvdd-ddw-ot-p%C3%A9fpz-fnkbuohgh-5534941.psj	Nstspd véjwltqww	010603	Dwfcls	irywpnkx	fxm`),
 			delimiter: Character_TAB,
 			want:      Character_EMPTY,
 			debug:     false,
