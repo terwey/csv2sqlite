@@ -148,6 +148,13 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 			if debug.DebugLog {
 				debug.Debug("[DetectEnclosureWithDelimiter] match left and right = +%s+", left)
 			}
+
+			// additional test to see if the data just occurs multiple times in the same column
+			// if so it CANNOT be an enclosure as it's NOT escaped
+			if bytes.Count(bytes.ReplaceAll(cols[i], append(left, left...), []byte("DOUBLE_QUOTE")), left) > 2 {
+				continue
+			}
+
 			f, ok := detected[string(left)]
 			if !ok {
 				if debug.DebugLog {
