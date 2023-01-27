@@ -106,7 +106,7 @@ func Test_main(t *testing.T) {
 			output:    tmpDir + "empty-cols-before-header.sqlite",
 			want:      baseDir + "tests/empty-cols-before-header.sqlite",
 			enclosure: characters.Character_EMPTY,
-			debug:     true,
+			debug:     false,
 			delimiter: characters.Character_COMMA,
 			newline:   false,
 		},
@@ -116,7 +116,7 @@ func Test_main(t *testing.T) {
 			output:    tmpDir + "empty-rows-in-content.sqlite",
 			want:      baseDir + "tests/empty-rows-in-content.sqlite",
 			enclosure: characters.Character_EMPTY,
-			debug:     true,
+			debug:     false,
 			delimiter: characters.Character_COMMA,
 			newline:   false,
 		},
@@ -126,7 +126,7 @@ func Test_main(t *testing.T) {
 			output:    tmpDir + "empty-rows-in-content.sqlite",
 			want:      baseDir + "tests/empty-rows-in-content.sqlite",
 			enclosure: characters.Character_EMPTY,
-			debug:     true,
+			debug:     false,
 			delimiter: characters.Character_COMMA,
 			newline:   false,
 			params:    []string{"--rowid"},
@@ -152,11 +152,23 @@ func Test_main(t *testing.T) {
 			newline:   false,
 			params:    []string{"--start", "10"},
 		},
+		{
+			name:      "6f522d299731f73aad537914cfe0d68b.csv",
+			input:     baseDir + "tests/6f522d299731f73aad537914cfe0d68b.csv",
+			output:    tmpDir + "6f522d299731f73aad537914cfe0d68b.sqlite",
+			want:      baseDir + "tests/6f522d299731f73aad537914cfe0d68b.sqlite",
+			enclosure: characters.Character_QUOTATION_MARK,
+			debug:     false,
+			delimiter: characters.Character_PIPE,
+			newline:   false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
 			p.Characters.DelimiterCount = 0
+			p.Start = 0
+			p.Characters = util.CharacterConfig{}
 
 			os.Args = []string{
 				"rddb",

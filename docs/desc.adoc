@@ -2,9 +2,8 @@
 
 *csv2sqlite* converts CSV files into SQLite databases.
 
-* The delimiter and the enclosure are detected automatically.
-* Delimiters and enclosures can also be multi-byte characters.
+* Delimiters and enclosures can be multi-byte characters: an emoji, a multi-byte invisible separator. They're detected automatically, along with the line ending.
 * Fast, with low memory usage.
 * Handles extremely large files.
 
-*sqlite-compare* checks two SQLite files against each other.
+*sqlite-compare* checks two SQLite files against each other and stops at the first difference.

@@ -232,11 +232,37 @@ func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 	}
 
 	if debug.DebugLog {
-		debug.Debug("[CountOutsideEnclosure] leftover s: %s", s)
-		debug.Debug("[CountOutsideEnclosure] %d for sep %s and encl %s", n, sep.Name(), enclosure.Name())
+		// debug.Debug("[CountOutsideEnclosure] leftover s: %s", s)
+		// debug.Debug("[CountOutsideEnclosure] %d for sep %s and encl %s", n, sep.Name(), enclosure.Name())
 	}
 
 	return n
+}
+
+func FindEOLCharacter(in []byte) characters.Character {
+	// there is a chance that the header is LF and the rest of the file is CRLF
+	// the only way to catch that is by checking if the LF is nearby the CR, so we take the position
+	// of both. If the index is only off by 1 we know the character is a CRLF and else it's just LF (or CR).
+	lfIndex := bytes.Index(in, characters.Character_LINE_FEED)
+	crIndex := bytes.Index(in, characters.Character_CARRIAGE_RETURN)
+
+	if lfIndex != 0 && crIndex == lfIndex-1 {
+		// the character is CRLF
+		return characters.Character_CARRIAGE_RETURN_LINE_FEED
+	}
+
+	if lfIndex != -1 && lfIndex < crIndex {
+		return characters.Character_LINE_FEED
+	}
+
+	if crIndex != -1 {
+		return characters.Character_CARRIAGE_RETURN
+	}
+	if lfIndex != -1 {
+		return characters.Character_LINE_FEED
+	}
+
+	return characters.Character_EMPTY
 }
 
 func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -247,32 +273,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	var eolIndex int
 	// using a for because its nicer to break than have crazy if statements
 	for len(c.EOL) == 0 {
-		// there is a chance that the header is LF and the rest of the file is CRLF
-		// the only way to catch that is by checking if the LF is nearby the CR, so we take the position
-		// of both. If the index is only off by 1 we know the character is a CRLF and else it's just LF (or CR).
-
-		lfIndex := bytes.Index(in, characters.Character_LINE_FEED)
-		crIndex := bytes.Index(in, characters.Character_CARRIAGE_RETURN)
-
-		if lfIndex != 0 && crIndex == lfIndex-1 {
-			// the character is CRLF
-			c.EOL = characters.Character_CARRIAGE_RETURN_LINE_FEED
-			break
-		}
-
-		if lfIndex != -1 && lfIndex < crIndex {
-			c.EOL = characters.Character_LINE_FEED
-			break
-		}
-
-		if crIndex != -1 {
-			c.EOL = characters.Character_CARRIAGE_RETURN
-			continue
-		}
-		if lfIndex != -1 {
-			c.EOL = characters.Character_LINE_FEED
-			break
-		}
+		c.EOL = FindEOLCharacter(in)
 
 		if len(c.EOL) == 0 && len(c.eolBuf) != 0 {
 			c.EOL = c.eolBuf
@@ -490,20 +491,34 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			}
 		}
 
+		tmpEOL := FindEOLCharacter(in[eolIndex+len(c.EOL):])
+		if len(tmpEOL) == 0 {
+			tmpEOL = c.EOL
+		}
+
 		// we found none, move the index
-		if len(in) > eolIndex+len(c.EOL) {
+		if len(in) > eolIndex+len(tmpEOL) {
 			if debug.DebugLog {
 				debug.Debug("[SplitCsvInput] nothing found, moving EOL index")
 			}
 			// debug.LogData("current in, searching for new EOL", in[:eolIndex], 512)
 			// debug.LogData("searching for new EOL", in[eolIndex+len(c.EOL):], 4096)
-			newIndex := bytes.Index(in[eolIndex+len(c.EOL):], c.EOL)
+
+			newIndex := bytes.Index(in[eolIndex+len(c.EOL):], tmpEOL)
 			if newIndex == -1 {
 				break
 			}
 
 			// we have to add the length of eolBytes here to account for the offset
-			eolIndex += newIndex + len(c.EOL)
+			eolIndex += newIndex + len(tmpEOL)
+			if !bytes.Equal(c.EOL, tmpEOL) {
+				eolIndex += len(c.EOL) - len(tmpEOL)
+				c.EOL = tmpEOL
+				if debug.DebugLog {
+					debug.Debug("eol changed, c.EOL: %x, tmpEol: %x", c.EOL, tmpEOL)
+					debug.Debug("increased eolIndex: %d", eolIndex)
+				}
+			}
 			if debug.DebugLog {
 				debug.LogData("[SplitCsvInput] new in", in[:eolIndex], 512)
 				debug.BreakMe()
