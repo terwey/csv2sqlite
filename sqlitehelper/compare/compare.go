@@ -187,15 +187,19 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		log.Printf("WARN: %s", msg)
 	}
 
-	usedCols, indexNameA, err := AddIndex(info.table, rawColNames, a)
-	if err != nil {
-		log.Printf("Skipping adding an index, could not AddIndex(A): %s", err)
-	}
-
-	if len(usedCols) > 0 {
-		_, _, err = AddIndex(info.table, usedCols, b)
+	var usedCols []string
+	var indexNameA string
+	if !NoSort {
+		usedCols, indexNameA, err = AddIndex(info.table, rawColNames, a)
 		if err != nil {
-			log.Printf("Skipping adding an index, could not AddIndex(B): %s", err)
+			log.Printf("Skipping adding an index, could not AddIndex(A): %s", err)
+		}
+
+		if len(usedCols) > 0 {
+			_, _, err = AddIndex(info.table, usedCols, b)
+			if err != nil {
+				log.Printf("Skipping adding an index, could not AddIndex(B): %s", err)
+			}
 		}
 	}
 
