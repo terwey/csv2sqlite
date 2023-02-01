@@ -113,6 +113,9 @@ type CharacterConfig struct {
 
 	// tells the splitter to return lines on EOL match until false
 	ReturnEarly bool
+
+	// prevents re-detection of the EOL
+	FixedEOL bool
 }
 
 func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
@@ -393,9 +396,13 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 
 		if debug.DebugLog {
-			debug.Debug("[SplitCsvInput] eolIndex: %d, c.EOL: %x\ndelimiter count: %d\ndelimiters counted in buf: %d\nenclosures (%s) counted in buf: %d\nCountOutsideEnclosure: n %d\nNdMoved: %d",
-				eolIndex, c.EOL, c.DelimiterCount, bytes.Count(in[:eolIndex], c.Delimiter), c.Enclosure, bytes.Count(in[:eolIndex], c.Enclosure), CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure), c.NdMoved)
-			debug.LogData("[SplitCsvInput] in[:eolIndex]", in[:eolIndex], 4096)
+			debug.Debug("[SplitCsvInput] eolIndex: %d, c.EOL: %x\tdelimiter count: %d\t"+
+				"delimiters counted in buf: %d\tenclosures (%s) counted in buf: %d\t"+
+				"CountOutsideEnclosure: n %d\tNdMoved: %d",
+				eolIndex, c.EOL, c.DelimiterCount,
+				bytes.Count(in[:eolIndex], c.Delimiter), c.Enclosure, bytes.Count(in[:eolIndex], c.Enclosure),
+				CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure), c.NdMoved)
+			debug.LogData("[SplitCsvInput] in[:eolIndex]", in[:eolIndex], 512)
 			debug.BreakMe()
 		}
 
@@ -405,7 +412,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
 		if c.enclosureLength == 0 && c.DelimCounted == c.DelimiterCount {
 			if debug.DebugLog {
-				debug.LogData("[SplitCsvInput] encloLen == 0", in[:eolIndex], 40960)
+				debug.LogData("[SplitCsvInput] encloLen == 0", in[:eolIndex], 4096)
 				debug.BreakMe()
 			}
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -414,7 +421,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		// if the enclosure length is zero, it can only be newline delimited
 		if c.enclosureLength == 0 && c.NdMoved == 0 {
 			if debug.DebugLog {
-				debug.LogData("[SplitCsvInput] encloLen == 0 AND NdMoved == 0", in[:eolIndex], 40960)
+				debug.LogData("[SplitCsvInput] encloLen == 0 AND NdMoved == 0", in[:eolIndex], 4096)
 				debug.BreakMe()
 			}
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -424,7 +431,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 		if c.enclosureLength != 0 && enclosureCount == 0 && c.NdMoved == 0 {
 			if debug.DebugLog {
-				debug.LogData("[SplitCsvInput] encloLen != 0 AND c.Enclosure count == 0 AND NdMoved == 0", in[:eolIndex], 40960)
+				debug.LogData("[SplitCsvInput] encloLen != 0 AND c.Enclosure count == 0 AND NdMoved == 0", in[:eolIndex], 4096)
 				debug.BreakMe()
 			}
 			return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -432,9 +439,6 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 		// we can skip over all of these are there is no enclosure to compare against
 		if c.enclosureLength != 0 {
-			if debug.DebugLog {
-				debug.Debug("[SplitCsvInput] enclosure set: %s", c.Enclosure)
-			}
 			// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 			// it COULD be a row, more tests will proof otherwise
 			if c.DelimCounted == c.DelimiterCount &&
@@ -443,9 +447,17 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				// if c.DelimCounted == c.DelimiterCount {
 				if debug.DebugLog {
 					debug.Debug("[SplitCsvInput] delimCount: %d, c.DelimiterCount: %d", c.DelimCounted, c.DelimiterCount)
-					debug.LogData("[SplitCsvInput] delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 40960)
+					debug.LogData("[SplitCsvInput] delimCount is larger then c.DelimiterCount _AND_ encloCount is even", in[:eolIndex], 4096)
 					debug.BreakMe()
 				}
+
+				if bytes.Contains(in[:eolIndex], []byte(`{`)) {
+					// massive slowdown but needed for files with embedded JSON
+					if c.DelimOutsideCounted = CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure); c.DelimOutsideCounted != c.DelimiterCount {
+						goto moveindex
+					}
+				}
+
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 				// }
 			}
@@ -462,7 +474,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			// it is possible that the enclosure is simply optional
 			if c.DelimiterCount > 1 && c.DelimCounted == c.DelimiterCount && enclosureCount%2 != 0 && c.NdMoved == 0 {
 				if debug.DebugLog {
-					debug.LogData("[SplitCsvInput] DelimCounted == DelimiterCount AND c.Enclosure count not even", in[:eolIndex], 40960)
+					debug.LogData("[SplitCsvInput] DelimCounted == DelimiterCount AND c.Enclosure count not even", in[:eolIndex], 4096)
 					debug.BreakMe()
 				}
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -491,9 +503,13 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			}
 		}
 
-		tmpEOL := FindEOLCharacter(in[eolIndex+len(c.EOL):])
-		if len(tmpEOL) == 0 {
-			tmpEOL = c.EOL
+	moveindex:
+		tmpEOL := c.EOL
+		if !c.FixedEOL {
+			tmpEOL = FindEOLCharacter(in[eolIndex+len(c.EOL):])
+			if len(tmpEOL) == 0 {
+				tmpEOL = c.EOL
+			}
 		}
 
 		// we found none, move the index
@@ -511,7 +527,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 			// we have to add the length of eolBytes here to account for the offset
 			eolIndex += newIndex + len(tmpEOL)
-			if !bytes.Equal(c.EOL, tmpEOL) {
+			if !c.FixedEOL && !bytes.Equal(c.EOL, tmpEOL) {
 				eolIndex += len(c.EOL) - len(tmpEOL)
 				c.EOL = tmpEOL
 				if debug.DebugLog {

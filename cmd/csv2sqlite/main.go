@@ -114,6 +114,7 @@ func main() {
 	flags.BoolVarP(&quiet, "quiet", "q", false, "Quiet mode do not output performance data")
 	flags.BoolVar(&csvReport, "csv-report", false, "Performance data output in TSV format, default is JSON")
 
+	flags.BoolVar(&p.Characters.FixedEOL, "fixed-eol", false, "EOL character (CR/CRLF/LF) doesn't change after auto-detect")
 	flags.BoolVar(&p.Drop, "drop", false, "Drops all outgoing data, for perf testing disk reading")
 	flags.BoolVar(&p.RowID, "rowid", false, "When the order of the CSV file must be kept the same in the resulting SQLite, this flag will \n"+
 		"cause each row in the SQLite to receive a RowID for SQLite.")
