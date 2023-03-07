@@ -162,6 +162,16 @@ func Test_main(t *testing.T) {
 			delimiter: characters.Character_PIPE,
 			newline:   false,
 		},
+		{
+			name:      "csvSample.474672.11909590.csv",
+			input:     baseDir + "tests/csvSample.474672.11909590.csv",
+			output:    tmpDir + "csvSample.474672.11909590.sqlite",
+			want:      baseDir + "tests/csvSample.474672.11909590.sqlite",
+			enclosure: characters.Character_EMPTY,
+			debug:     false,
+			delimiter: characters.Character("<#>"),
+			newline:   true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

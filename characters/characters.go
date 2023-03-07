@@ -117,6 +117,10 @@ func (c Character) Rune() rune {
 	return r
 }
 
+func (c Character) Length() int {
+	return len([]rune(string(c)))
+}
+
 func (c Character) String() string {
 	if len(c) == 0 {
 		return ""

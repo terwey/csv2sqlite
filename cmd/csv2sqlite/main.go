@@ -217,6 +217,11 @@ func main() {
 		}
 	}
 
+	if p.Characters.Delimiter.Length() > 1 && len(p.Characters.Enclosure) == 0 {
+		p.Characters.EnclosureIsEmpty = true
+		p.NewlineDelimited = true
+	}
+
 	// multiple channel capacity by threads
 	p.ChannelCapacity = p.ChannelCapacity * threads
 

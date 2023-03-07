@@ -469,7 +469,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		count--
 	}
 
-	if colCount == count+1-len(r.p.Exclude) {
+	if colCount == count+1-len(r.p.Exclude) || (colCount == 0 && len(r.p.Characters.Enclosure) == 0 && len(r.p.Characters.Delimiter) > 1) {
 		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
 		if debug.DebugLog {
 			debug.Debug("[SplitRow] GenSplit found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)

@@ -3447,7 +3447,13 @@ func TestCharacterFromString(t *testing.T) {
 			name:    `QUOTATION_MARK_TRIPLE`,
 			want:    Character_QUOTATION_MARK_TRIPLE,
 			wantErr: false,
-		}}
+		},
+		{
+			name: "\u003c#\u003e",
+			want: Character("<#>"),
+			wantErr: false,
+		},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := CharacterFromString(tt.name)
