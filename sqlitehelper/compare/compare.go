@@ -185,6 +185,9 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		}
 
 		log.Printf("WARN: %s", msg)
+
+		NoSort = false
+		log.Printf("Sorting enabled due to rowcount not matching")
 	}
 
 	var usedCols []string
