@@ -79,7 +79,7 @@ var (
 	quiet = false
 )
 
-func main() {
+func getFlags() *pflag.FlagSet {
 	flags = pflag.NewFlagSet("csv2sqlite", pflag.ContinueOnError)
 	flags.BoolVar(&showVersion, "version", false, "Prints the version")
 	flags.StringVarP(&p.Input, "input", "i", "", "Input CSV file")
@@ -131,6 +131,12 @@ func main() {
 	}
 	flags.BoolVar(&overflow, "overflow", false, "Overflows the data. Will abort processing.")
 	flags.SortFlags = false
+
+	return flags
+}
+
+func main() {
+	flags = getFlags()
 
 	start := time.Now()
 	if err := flags.Parse(os.Args[1:]); err != nil {

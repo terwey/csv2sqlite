@@ -2,7 +2,7 @@
 
 *csv2sqlite* converts CSV files into SQLite databases.
 
-* Delimiters and enclosures can be multi-byte characters: an emoji, a multi-byte invisible separator. They're detected automatically, along with the line ending.
+* Delimiters and enclosures can be any Unicode string: `<#>`, an emoji, a multi-byte invisible separator. They're detected automatically, along with the line ending.
 * Fast, with low memory usage.
 * Handles extremely large files.
 

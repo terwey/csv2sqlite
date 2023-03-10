@@ -1,6 +1,65 @@
 = csv2sqlite
 
 
+
 include::desc.adoc[]
 
+== Installation
+
+Build from source, see <<Compilation>>.
+
+== Compilation
+
+Requirement is a working Go installation, see <https://go.dev>
+
+.csv2sqlite
+[source,bash]
+----
+make csv2sqlite
+# or for mac
+make csv2sqlite_mac
+----
+
+.sqlite-compare
+[source,bash]
+----
+make sqlite-compare
+----
+
 include::usage.adoc[]
+
+include::usage-compare.adoc[]
+
+== Documentation
+
+Currently no additional documentation is yet available.
+
+Inside `docs/` there is a file `readme.adoc` which can be converted to Markdown
+for Github using
+
+.README.MD
+[source,bash]
+----
+make markdown
+----
+
+== Configuration
+
+The only configuration available are the parameters during runtime, see <<Usage>>
+
+== Testing, Code Coverage, Static Analysis
+
+Run the tests with coverage:
+
+[source,bash]
+----
+go test -cover -coverprofile coverage.out ./... -count=1
+----
+
+== Deployment
+
+See <<Installation>>
+
+== Versioning
+
+This library follows https://semver.org/[semantic versioning].

@@ -2,17 +2,40 @@
 
 
 
+
 ## Description
 
 **csv2sqlite** converts CSV files into SQLite databases.
 
-  - Delimiters and enclosures can be multi-byte characters: an emoji, a multi-byte invisible separator. They're detected automatically, along with the line ending.
+  - Delimiters and enclosures can be any Unicode string: `<#>`, an emoji, a multi-byte invisible separator. They're detected automatically, along with the line ending.
   - Fast, with low memory usage.
   - Handles extremely large files.
 
 **sqlite-compare** checks two SQLite files against each other and stops at the first difference.
 
-## Usage
+## Installation
+
+Build from source, see Compilation.
+
+## Compilation
+
+Requirement is a working Go installation, see <https://go.dev>
+
+**csv2sqlite.**
+
+``` bash
+make csv2sqlite
+# or for mac
+make csv2sqlite_mac
+```
+
+**sqlite-compare.**
+
+``` bash
+make sqlite-compare
+```
+
+## Usage csv2sqlite
 
 <table>
 <caption>Usage</caption>
@@ -58,6 +81,7 @@
 <li><p>COMMA</p></li>
 <li><p>DOLLAR</p></li>
 <li><p>EMPTY</p></li>
+<li><p>INFORMATION_SEPARATOR_TWO</p></li>
 <li><p>INVISIBLE_SEPARATOR</p></li>
 <li><p>PIPE</p></li>
 <li><p>POUND</p></li>
@@ -65,7 +89,6 @@
 <li><p>QUOTATION_MARK_DOUBLE</p></li>
 <li><p>QUOTATION_MARK_TRIPLE</p></li>
 <li><p>RECORD_SEPARATOR</p></li>
-<li><p>RECORD_SEPARATOR_SB</p></li>
 <li><p>RECORD_SEPARATOR_SB</p></li>
 <li><p>SEMICOLON</p></li>
 <li><p>TAB</p></li>
@@ -224,29 +247,206 @@
 <td><p>Performance data output in TSV format, default is JSON</p></td>
 </tr>
 <tr class="odd">
+<td><p><code>--fixed-eol</code></p></td>
+<td><p>false</p></td>
+<td><p>EOL character (CR/CRLF/LF) doesn’t change after auto-detect</p></td>
+</tr>
+<tr class="even">
 <td><p><code>--drop</code></p></td>
 <td><p>false</p></td>
 <td><p>Drops all outgoing data, for perf testing disk reading</p></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><p><code>--rowid</code></p></td>
 <td><p>false</p></td>
 <td><p>When the order of the CSV file must be kept the same in the resulting SQLite, this flag will cause each row in the SQLite to receive a RowID for SQLite.</p></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><p><code>--progress</code></p></td>
 <td><p>false</p></td>
 <td><p>Shows progress</p></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><p><code>--scratch-dir</code></p></td>
 <td></td>
 <td><p>Directory for storing the smaller SQLite files before merging them to the target. Same as output if left blank.</p></td>
 </tr>
+<tr class="even">
+<td><p><code>--debug</code></p></td>
+<td><p>false</p></td>
+<td><p>Outputs debug information, careful is extremely chatty.</p></td>
+</tr>
 <tr class="odd">
+<td><p><code>--rw-debug</code></p></td>
+<td><p>false</p></td>
+<td><p>Outputs record writer debug information, careful is extremely chatty.</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--log-csv-reader</code></p></td>
+<td><p>false</p></td>
+<td><p>Logs the occurence and data where the Go built-in CSV Reader is used. Can be used without the debug mode.</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--log-dropped</code></p></td>
+<td><p>false</p></td>
+<td><p>Outputs dropped data</p></td>
+</tr>
+<tr class="even">
 <td><p><code>--overflow</code></p></td>
 <td><p>false</p></td>
 <td><p>Overflows the data. Will abort processing.</p></td>
 </tr>
 </tbody>
 </table>
+
+## Usage sqlite-compare
+
+<table>
+<caption>Usage</caption>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 16%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name / Shorthand</th>
+<th>Default</th>
+<th>Usage</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><p><code>--sqlite-a</code><br />
+<code>-a</code></p></td>
+<td></td>
+<td><p>SQLite file A to compare with</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--sqlite-b</code><br />
+<code>-b</code></p></td>
+<td></td>
+<td><p>SQLite file B to compare against</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--table</code><br />
+<code>-t</code></p></td>
+<td><p>data</p></td>
+<td><p>Table to compare</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--null</code></p></td>
+<td><p>false</p></td>
+<td><p>If null is set to false it compares using TEXT fields and a NULL is automatically converted to an empty text field. If this is unwanted set null to be true.</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--write-results</code></p></td>
+<td><p>false</p></td>
+<td><p>Writes a result file. $a.passed when no difference was found. $a.failed when a difference was found, file will contain the error.</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--progress</code></p></td>
+<td><p>false</p></td>
+<td><p>Shows progress</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--ignore-count</code></p></td>
+<td><p>false</p></td>
+<td><p>Ignore the rowcount, show the rows that are different</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--max-errors</code></p></td>
+<td><p>0</p></td>
+<td><p>Maximum amount of errors to allow before exiting</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--limit</code></p></td>
+<td><p>50000</p></td>
+<td><p>Row limit per query</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--no-ignore-crlf</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not ignore CRLF difference from A</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--no-ignore-cr</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not ignore CR difference from A</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--no-ignore-enclosure</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not strip enclosures from both to ignore</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--no-escape-ignore</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not ignore incorrect detected enclosures from A to B (PHP parsing error)</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--no-sort</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not order data for indexed columns</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--no-column-intersect</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not intersect on column names when they differ</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--enclosure</code><br />
+<code>-e</code></p></td>
+<td><p>"</p></td>
+<td><p>Enclosure to use</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--threads</code></p></td>
+<td><p>16</p></td>
+<td><p>Thread limit</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--cpu-profile</code></p></td>
+<td></td>
+<td><p>Filename for a cpu-profile ouput for pprof</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--heap-profile</code></p></td>
+<td></td>
+<td><p>Filename for a heap-profile ouput for pprof</p></td>
+</tr>
+</tbody>
+</table>
+
+## Documentation
+
+Currently no additional documentation is yet available.
+
+Inside `docs/` there is a file `readme.adoc` which can be converted to Markdown
+for Github using
+
+**README.MD.**
+
+``` bash
+make markdown
+```
+
+## Configuration
+
+The only configuration available are the parameters during runtime, see [???](#Usage)
+
+## Testing, Code Coverage, Static Analysis
+
+Run the tests with coverage:
+
+``` bash
+go test -cover -coverprofile coverage.out ./... -count=1
+```
+
+## Deployment
+
+See [Installation](#_installation)
+
+## Versioning
+
+This library follows [semantic versioning](https://semver.org/).

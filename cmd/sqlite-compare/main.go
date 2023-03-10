@@ -31,7 +31,7 @@ var (
 	enclosure string
 )
 
-func init() {
+func getFlags() *pflag.FlagSet {
 	flags = pflag.NewFlagSet("sqlitecompare", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.StringVarP(&a, "sqlite-a", "a", "", "SQLite file A to compare with")
@@ -57,6 +57,12 @@ func init() {
 	flags.IntVar(&compare.MaxWorkers, "threads", compare.MaxWorkers, "Thread limit")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
+
+	return flags
+}
+
+func init() {
+	flags = getFlags()
 }
 
 func main() {
