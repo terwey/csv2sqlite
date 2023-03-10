@@ -1,0 +1,93 @@
+## Usage sqlite-compare
+
+.Usage
+[cols="2,1,3"]
+|===
+| Name / Shorthand | Default | Usage 
+
+a| `--sqlite-a` + 
+ `-a`
+| 
+a| SQLite file A to compare with
+
+a| `--sqlite-b` + 
+ `-b`
+| 
+a| SQLite file B to compare against
+
+a| `--table` + 
+ `-t`
+| data
+a| Table to compare
+
+a| `--null` 
+| false
+a| If null is set to false it compares using TEXT fields
+ and a NULL is automatically converted to an empty text field. 
+If this is unwanted set null to be true.
+
+a| `--write-results` 
+| false
+a| Writes a result file.
+ $a.passed when no difference was found.
+ $a.failed when a difference was found, file will contain the error.
+
+a| `--progress` 
+| false
+a| Shows progress
+
+a| `--ignore-count` 
+| false
+a| Ignore the rowcount, show the rows that are different
+
+a| `--max-errors` 
+| 0
+a| Maximum amount of errors to allow before exiting
+
+a| `--limit` 
+| 50000
+a| Row limit per query
+
+a| `--no-ignore-crlf` 
+| false
+a| Do not ignore CRLF difference from A
+
+a| `--no-ignore-cr` 
+| false
+a| Do not ignore CR difference from A
+
+a| `--no-ignore-enclosure` 
+| false
+a| Do not strip enclosures from both to ignore
+
+a| `--no-escape-ignore` 
+| false
+a| Do not ignore incorrect detected enclosures from A to B (PHP parsing error)
+
+a| `--no-sort` 
+| false
+a| Do not order data for indexed columns
+
+a| `--no-column-intersect` 
+| false
+a| Do not intersect on column names when they differ
+
+a| `--enclosure` + 
+ `-e`
+| "
+a| Enclosure to use
+
+a| `--threads` 
+| 16
+a| Thread limit
+
+a| `--cpu-profile` 
+| 
+a| Filename for a cpu-profile ouput for pprof
+
+a| `--heap-profile` 
+| 
+a| Filename for a heap-profile ouput for pprof
+
+
+|===

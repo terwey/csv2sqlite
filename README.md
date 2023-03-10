@@ -35,7 +35,7 @@ make csv2sqlite_mac
 make sqlite-compare
 ```
 
-## Usage
+## Usage csv2sqlite
 
 <table>
 <caption>Usage</caption>
@@ -299,6 +299,125 @@ make sqlite-compare
 </tbody>
 </table>
 
+## Usage sqlite-compare
+
+<table>
+<caption>Usage</caption>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 16%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name / Shorthand</th>
+<th>Default</th>
+<th>Usage</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><p><code>--sqlite-a</code><br />
+<code>-a</code></p></td>
+<td></td>
+<td><p>SQLite file A to compare with</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--sqlite-b</code><br />
+<code>-b</code></p></td>
+<td></td>
+<td><p>SQLite file B to compare against</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--table</code><br />
+<code>-t</code></p></td>
+<td><p>data</p></td>
+<td><p>Table to compare</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--null</code></p></td>
+<td><p>false</p></td>
+<td><p>If null is set to false it compares using TEXT fields and a NULL is automatically converted to an empty text field. If this is unwanted set null to be true.</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--write-results</code></p></td>
+<td><p>false</p></td>
+<td><p>Writes a result file. $a.passed when no difference was found. $a.failed when a difference was found, file will contain the error.</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--progress</code></p></td>
+<td><p>false</p></td>
+<td><p>Shows progress</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--ignore-count</code></p></td>
+<td><p>false</p></td>
+<td><p>Ignore the rowcount, show the rows that are different</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--max-errors</code></p></td>
+<td><p>0</p></td>
+<td><p>Maximum amount of errors to allow before exiting</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--limit</code></p></td>
+<td><p>50000</p></td>
+<td><p>Row limit per query</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--no-ignore-crlf</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not ignore CRLF difference from A</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--no-ignore-cr</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not ignore CR difference from A</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--no-ignore-enclosure</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not strip enclosures from both to ignore</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--no-escape-ignore</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not ignore incorrect detected enclosures from A to B (PHP parsing error)</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--no-sort</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not order data for indexed columns</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--no-column-intersect</code></p></td>
+<td><p>false</p></td>
+<td><p>Do not intersect on column names when they differ</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--enclosure</code><br />
+<code>-e</code></p></td>
+<td><p>"</p></td>
+<td><p>Enclosure to use</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--threads</code></p></td>
+<td><p>16</p></td>
+<td><p>Thread limit</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--cpu-profile</code></p></td>
+<td></td>
+<td><p>Filename for a cpu-profile ouput for pprof</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--heap-profile</code></p></td>
+<td></td>
+<td><p>Filename for a heap-profile ouput for pprof</p></td>
+</tr>
+</tbody>
+</table>
+
 ## Documentation
 
 Currently no additional documentation is yet available.
@@ -314,7 +433,7 @@ make markdown
 
 ## Configuration
 
-The only configuration available are the parameters during runtime, see [Usage](#_usage)
+The only configuration available are the parameters during runtime, see [???](#Usage)
 
 ## Testing, Code Coverage, Static Analysis
 

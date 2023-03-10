@@ -28,6 +28,8 @@ make sqlite-compare
 
 include::usage.adoc[]
 
+include::usage-compare.adoc[]
+
 == Documentation
 
 Currently no additional documentation is yet available.
