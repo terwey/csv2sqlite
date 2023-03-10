@@ -149,8 +149,6 @@ func stringValueForCharacter(d Character) string {
 	}
 
 	return string(d)
-
-	return "UNKNOWN"
 }
 
 func getNames(known []Character) []string {

@@ -75,7 +75,7 @@ func main() {
 			"Finally it queries the table using a select on the column names\n"+
 			" it sorted alphabetically using an ORDER BY with the same column\n"+
 			" names in alphabetical order. This ensures both sets of data are\n"+
-			" when available in both are in the same order.\n"+
+			" (when available) in both are in the same order.\n"+
 			" Comparing row for row it will output when a difference is found.\n\n")
 		if err != pflag.ErrHelp {
 			fmt.Fprint(os.Stderr, err.Error()+"\n")

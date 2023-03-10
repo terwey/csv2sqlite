@@ -404,20 +404,3 @@ func findRightOfPos(data []byte, pos int, charSize int) ([]byte, int, int) {
 
 	return right, charSize, rightCount
 }
-
-func getCount(data []byte, enclosure Character) int {
-	var doubleEncl []byte
-	doubleEncl = append(doubleEncl, enclosure...)
-	doubleEncl = append(doubleEncl, enclosure...)
-	escaped := bytes.Count(data, doubleEncl)
-	if escaped == -1 || escaped == 1 {
-		escaped = 0
-	}
-
-	c := bytes.Count(data, enclosure)
-	if len(enclosure) == 0 {
-		c = 0
-	}
-
-	return c - escaped*2
-}
