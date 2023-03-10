@@ -317,6 +317,17 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 	return nil
 }
 
+type Checksum struct {
+	Hash string
+}
+
+func (c *Checksum) Callback(columnData []string) int {
+	// we do a copy as the backing string gets unset at the end of this callback
+	c.Hash = strings.Clone(columnData[0])
+
+	return 0
+}
+
 func compare(info Information, a, b *sqlite3.Conn, errorCount *int32, limit, offset int, null bool) error {
 	var err error
 	if !memoryTable {
@@ -345,6 +356,19 @@ func compare(info Information, a, b *sqlite3.Conn, errorCount *int32, limit, off
 		query = QueryForIndexed(info.rawNames, []string{}, info.table, limit, offset)
 	} else {
 		query = QueryForIndexed(info.rawNames, info.usedCols, info.table, limit, offset)
+	}
+
+	// here we can first do
+	// hex(sha3_query(query))
+	// and compare both, if correct return nil
+	var hexA, hexB Checksum
+	hexQuery := fmt.Sprintf("select hex(sha3_query('%s'));", query)
+	a.ExecWithDataCallback(hexQuery, hexA.Callback)
+	b.ExecWithDataCallback(hexQuery, hexB.Callback)
+
+	if (len(hexA.Hash) != 0 && len(hexB.Hash) != 0) && hexA.Hash == hexB.Hash {
+		pv.Add(limit)
+		return nil
 	}
 
 	stmtA, err := a.Prepare(query)
