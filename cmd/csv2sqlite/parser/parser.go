@@ -873,8 +873,6 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			continue
 		}
 
-		r.p.Characters.DelimCounted = 0
-
 		if r.p.Start > 0 && startCounter < r.p.Start {
 			startCounter++
 			if startCounter <= r.p.Start {

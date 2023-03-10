@@ -2,11 +2,44 @@ package characters
 
 import (
 	"bytes"
+	"encoding/json"
 	"reflect"
 	"testing"
 
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 )
+
+func Test_GetAllCharacterNames(t *testing.T) {
+	chars := GetAllCharacterNames()
+
+	t.Logf("chars: %v", chars)
+}
+
+func Test_MarshalJSON(t *testing.T) {
+	comma := Character_COMMA
+
+	if comma.Length() != 1 {
+		t.Errorf("length is not 1")
+	}
+
+	out, err := json.Marshal(comma)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if string(out) != `{"Name":"COMMA","Value":","}` {
+		t.Errorf("Marshal was incorrect")
+	}
+}
+
+func Test_stringValueForCharacter(t *testing.T) {
+	o := stringValueForCharacter(Character("j"))
+	if o != "j" {
+		t.Errorf("wrong character returned: %s", o)
+	}
+
+	t.Logf(Character_EMPTY.String())
+}
 
 func Test_detectDelimiter(t *testing.T) {
 	tests := []struct {
@@ -3449,8 +3482,8 @@ func TestCharacterFromString(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "\u003c#\u003e",
-			want: Character("<#>"),
+			name:    "\u003c#\u003e",
+			want:    Character("<#>"),
 			wantErr: false,
 		},
 	}

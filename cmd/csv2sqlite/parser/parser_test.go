@@ -2821,57 +2821,103 @@ func TestParseRow(t *testing.T) {
 }
 
 func TestRuntime(t *testing.T) {
-	debug.DebugLog = false
-	p := NewParameters()
-	p.Drop = true
-	r := NewRuntime(p, p.Characters.SplitCsvInput)
 
-	f, err := os.OpenFile("../../../tests/head.csv", os.O_RDONLY, 0644)
-	if err != nil {
-		t.Errorf("Cannot open file: %s", err)
+	tests := []struct {
+		name    string
+		start   int
+		skip    int
+		rowid   bool
+		nd      bool
+		exclude []int
+	}{
+		{
+			name: "full",
+		},
+		{
+			name: "skip",
+			skip: 1,
+		},
+		{
+			name:  "start",
+			start: 2,
+		},
+		{
+			name:  "rowid",
+			rowid: true,
+		},
+		{
+			name: "nd",
+			nd:   true,
+		},
+		{
+			name:    "exclude",
+			exclude: []int{2},
+		},
 	}
 
-	defer f.Close()
-
-	r.Init(f)
-
-	pv := &progressbar.ProgressBar{}
-
-	var readWg sync.WaitGroup
-	var writeWg sync.WaitGroup
-	readWg.Add(1)
-	go r.Parse(&readWg, 5, pv)
-
-	if <-r.HeaderSet {
-		pr := NewParser(p, 1)
-		if err = pr.Init(nil); err != nil {
-			t.Error(err)
+	for _, tt := range tests {
+		debug.DebugLog = false
+		p := NewParameters()
+		p.Start = tt.start
+		p.Skip = tt.skip
+		p.Drop = true
+		p.RowID = tt.rowid
+		p.NewlineDelimited = true
+		p.Exclude = tt.exclude
+		var r *Runtime
+		if !tt.nd {
+			r = NewRuntime(p, p.Characters.SplitCsvInput)
+		} else {
+			r = NewRuntime(p, bufio.ScanLines)
 		}
-		pr.ProcessHeader(r.Header)
 
-		writeWg.Add(1)
+		f, err := os.OpenFile("../../../tests/head.csv", os.O_RDONLY, 0644)
+		if err != nil {
+			t.Errorf("Cannot open file: %s", err)
+		}
 
-		go func(chunks <-chan [][]byte, routine *Runtime, w *sync.WaitGroup) {
-			defer w.Done()
-			for {
-				chunk, more := <-chunks
+		defer f.Close()
 
-				for i := range chunk {
-					routine.ProcessRow(routine.ParseRow(chunk[i]))
-				}
+		r.Init(f)
 
-				if !more {
-					log.Printf("no moar")
-					break
-				}
+		pv := &progressbar.ProgressBar{}
+
+		var readWg sync.WaitGroup
+		var writeWg sync.WaitGroup
+		readWg.Add(1)
+		go r.Parse(&readWg, 5, pv)
+
+		if <-r.HeaderSet {
+			pr := NewParser(p, 1)
+			if err = pr.Init(nil); err != nil {
+				t.Error(err)
 			}
+			pr.ProcessHeader(r.Header)
 
-			routine.Close()
+			writeWg.Add(1)
 
-			return
-		}(r.Data, pr, &writeWg)
+			go func(chunks <-chan [][]byte, routine *Runtime, w *sync.WaitGroup) {
+				defer w.Done()
+				for {
+					chunk, more := <-chunks
+
+					for i := range chunk {
+						routine.ProcessRow(routine.ParseRow(chunk[i]))
+					}
+
+					if !more {
+						log.Printf("no moar")
+						break
+					}
+				}
+
+				routine.Close()
+
+				return
+			}(r.Data, pr, &writeWg)
+		}
+
+		readWg.Wait()
+		writeWg.Wait()
 	}
-
-	readWg.Wait()
-	writeWg.Wait()
 }
