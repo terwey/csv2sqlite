@@ -303,6 +303,15 @@ make sqlite-compare
 
 Currently no additional documentation is yet available.
 
+Inside `docs/` there is a file `readme.adoc` which can be converted to Markdown
+for Github using
+
+**README.MD.**
+
+``` bash
+make markdown
+```
+
 ## Configuration
 
 The only configuration available are the parameters during runtime, see [Usage](#_usage)
