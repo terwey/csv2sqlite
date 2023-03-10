@@ -6,11 +6,33 @@
 
 **csv2sqlite** converts CSV files into SQLite databases.
 
-  - Delimiters and enclosures can be multi-byte characters: an emoji, a multi-byte invisible separator. They're detected automatically, along with the line ending.
+  - Delimiters and enclosures can be any Unicode string: `<#>`, an emoji, a multi-byte invisible separator. They're detected automatically, along with the line ending.
   - Fast, with low memory usage.
   - Handles extremely large files.
 
 **sqlite-compare** checks two SQLite files against each other and stops at the first difference.
+
+## Installation
+
+Build from source, see Compilation.
+
+## Compilation
+
+Requirement is a working Go installation, see <https://go.dev>
+
+**csv2sqlite.**
+
+``` bash
+make csv2sqlite
+# or for mac
+make csv2sqlite_mac
+```
+
+**sqlite-compare.**
+
+``` bash
+make sqlite-compare
+```
 
 ## Usage
 
@@ -58,6 +80,7 @@
 <li><p>COMMA</p></li>
 <li><p>DOLLAR</p></li>
 <li><p>EMPTY</p></li>
+<li><p>INFORMATION_SEPARATOR_TWO</p></li>
 <li><p>INVISIBLE_SEPARATOR</p></li>
 <li><p>PIPE</p></li>
 <li><p>POUND</p></li>
@@ -65,7 +88,6 @@
 <li><p>QUOTATION_MARK_DOUBLE</p></li>
 <li><p>QUOTATION_MARK_TRIPLE</p></li>
 <li><p>RECORD_SEPARATOR</p></li>
-<li><p>RECORD_SEPARATOR_SB</p></li>
 <li><p>RECORD_SEPARATOR_SB</p></li>
 <li><p>SEMICOLON</p></li>
 <li><p>TAB</p></li>
@@ -224,29 +246,78 @@
 <td><p>Performance data output in TSV format, default is JSON</p></td>
 </tr>
 <tr class="odd">
+<td><p><code>--fixed-eol</code></p></td>
+<td><p>false</p></td>
+<td><p>EOL character (CR/CRLF/LF) doesn’t change after auto-detect</p></td>
+</tr>
+<tr class="even">
 <td><p><code>--drop</code></p></td>
 <td><p>false</p></td>
 <td><p>Drops all outgoing data, for perf testing disk reading</p></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><p><code>--rowid</code></p></td>
 <td><p>false</p></td>
 <td><p>When the order of the CSV file must be kept the same in the resulting SQLite, this flag will cause each row in the SQLite to receive a RowID for SQLite.</p></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><p><code>--progress</code></p></td>
 <td><p>false</p></td>
 <td><p>Shows progress</p></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><p><code>--scratch-dir</code></p></td>
 <td></td>
 <td><p>Directory for storing the smaller SQLite files before merging them to the target. Same as output if left blank.</p></td>
 </tr>
+<tr class="even">
+<td><p><code>--debug</code></p></td>
+<td><p>false</p></td>
+<td><p>Outputs debug information, careful is extremely chatty.</p></td>
+</tr>
 <tr class="odd">
+<td><p><code>--rw-debug</code></p></td>
+<td><p>false</p></td>
+<td><p>Outputs record writer debug information, careful is extremely chatty.</p></td>
+</tr>
+<tr class="even">
+<td><p><code>--log-csv-reader</code></p></td>
+<td><p>false</p></td>
+<td><p>Logs the occurence and data where the Go built-in CSV Reader is used. Can be used without the debug mode.</p></td>
+</tr>
+<tr class="odd">
+<td><p><code>--log-dropped</code></p></td>
+<td><p>false</p></td>
+<td><p>Outputs dropped data</p></td>
+</tr>
+<tr class="even">
 <td><p><code>--overflow</code></p></td>
 <td><p>false</p></td>
 <td><p>Overflows the data. Will abort processing.</p></td>
 </tr>
 </tbody>
 </table>
+
+## Documentation
+
+Currently no additional documentation is yet available.
+
+## Configuration
+
+The only configuration available are the parameters during runtime, see [Usage](#_usage)
+
+## Testing, Code Coverage, Static Analysis
+
+Run the tests with coverage:
+
+``` bash
+go test -cover -coverprofile coverage.out ./... -count=1
+```
+
+## Deployment
+
+See [Installation](#_installation)
+
+## Versioning
+
+This library follows semantic versioning\[<https://semver.org/>\].

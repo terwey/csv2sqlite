@@ -235,7 +235,7 @@ func Test_main(t *testing.T) {
 }
 
 func Test_docs(t *testing.T) {
-	fu := util.Usage(flags)
+	fu := util.Usage(getFlags())
 
 	var s strings.Builder
 
@@ -257,7 +257,7 @@ func Test_docs(t *testing.T) {
 }
 
 func Test_manpage(t *testing.T) {
-	fu := util.Usage(flags)
+	fu := util.Usage(getFlags())
 
 	var s strings.Builder
 

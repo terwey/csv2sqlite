@@ -3,4 +3,51 @@
 
 include::desc.adoc[]
 
+== Installation
+
+Build from source, see <<Compilation>>.
+
+== Compilation
+
+Requirement is a working Go installation, see https://go.dev
+
+.csv2sqlite
+[source,bash]
+----
+make csv2sqlite
+# or for mac
+make csv2sqlite_mac
+----
+
+.sqlite-compare
+[source,bash]
+----
+make sqlite-compare
+----
+
 include::usage.adoc[]
+
+== Documentation
+
+Currently no additional documentation is yet available.
+
+== Configuration
+
+The only configuration available are the parameters during runtime, see <<Usage>>
+
+== Testing, Code Coverage, Static Analysis
+
+Run the tests with coverage:
+
+[source,bash]
+----
+go test -cover -coverprofile coverage.out ./... -count=1
+----
+
+== Deployment
+
+See <<Installation>>
+
+== Versioning
+
+This library follows semantic versioning[https://semver.org/].
