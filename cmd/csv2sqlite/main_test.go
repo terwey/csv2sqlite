@@ -239,7 +239,7 @@ func Test_docs(t *testing.T) {
 
 	var s strings.Builder
 
-	s.WriteString("## Usage\n\n.Usage\n")
+	s.WriteString("## Usage csv2sqlite\n\n.Usage\n")
 	s.WriteString("[cols=\"2,1,3\"]\n")
 	s.WriteString("|===\n")
 	s.WriteString("| Name / Shorthand | Default | Usage \n\n")
@@ -288,7 +288,7 @@ func Test_manpage(t *testing.T) {
 	s.WriteString("\n\n== Resources\n\n")
 	s.WriteString("*Repository:* https://github.com/terwey/csv2sqlite\n")
 
-	err := os.WriteFile(baseDir+"/docs/manpage.adoc", []byte(s.String()), 0644)
+	err := os.WriteFile(baseDir+"/docs/csv2sqlite.7.adoc", []byte(s.String()), 0644)
 	if err != nil {
 		t.Errorf("could not write manpage adoc: %s", err)
 	}

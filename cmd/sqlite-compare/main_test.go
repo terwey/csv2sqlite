@@ -62,7 +62,7 @@ func Test_manpage(t *testing.T) {
 	s.WriteString("\n\n== Resources\n\n")
 	s.WriteString("*Repository:* https://github.com/terwey/csv2sqlite\n")
 
-	err := os.WriteFile(baseDir+"/docs/manpage-compare.adoc", []byte(s.String()), 0644)
+	err := os.WriteFile(baseDir+"/docs/sqlite-compare.7.adoc", []byte(s.String()), 0644)
 	if err != nil {
 		t.Errorf("could not write manpage adoc: %s", err)
 	}
