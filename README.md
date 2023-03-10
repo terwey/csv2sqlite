@@ -320,4 +320,4 @@ See [Installation](#_installation)
 
 ## Versioning
 
-This library follows semantic versioning\[<https://semver.org/>\].
+This library follows [semantic versioning](https://semver.org/).

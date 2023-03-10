@@ -9,7 +9,7 @@ Build from source, see <<Compilation>>.
 
 == Compilation
 
-Requirement is a working Go installation, see https://go.dev
+Requirement is a working Go installation, see <https://go.dev>
 
 .csv2sqlite
 [source,bash]
@@ -50,4 +50,4 @@ See <<Installation>>
 
 == Versioning
 
-This library follows semantic versioning[https://semver.org/].
+This library follows https://semver.org/[semantic versioning].
