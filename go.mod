@@ -24,5 +24,6 @@ require (
 	golang.org/x/sys v0.6.0 // indirect
 )
 
+// the upstream seems unmaintained
 replace github.com/bvinc/go-sqlite-lite v0.6.1 => github.com/productsupcom/go-sqlite-lite v0.6.1
 
