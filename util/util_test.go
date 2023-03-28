@@ -337,14 +337,32 @@ func Benchmark_GenSplit(b *testing.B) {
 	resultColSplitPos = pos
 }
 
+func Benchmark_GenSplitCore(b *testing.B) {
+	var v []byte
+	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
+	buf := make([]byte, 0, 4*1024*1024)
+	pos := make([]uint32, 0, 1024)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		buf = buf[:0]
+		pos = pos[:0]
+		v, pos = GenSplitCore(in, characters.Character_COMMA, -1, NoClean, nil, buf, pos)
+	}
+
+	resultColSplitFlat = v
+	resultColSplitPos = pos
+}
+
 func Benchmark_GenSplitClean(b *testing.B) {
 	var v []byte
 	var pos []uint32
 	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
 	c := CharacterConfig{
-		Enclosure:       characters.Character_QUOTATION_MARK,
-		DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
-		EnclosureClean:  true,
+		Config: characters.Config{
+			Enclosure:       characters.Character_QUOTATION_MARK,
+			DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
+			EnclosureClean:  true,
+		},
 	}
 
 	b.ResetTimer()
@@ -363,9 +381,11 @@ var CleanerIn []byte = []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI"
 func Benchmark_Cleaner(b *testing.B) {
 	var out []byte
 	c := CharacterConfig{
-		Enclosure:       characters.Character_QUOTATION_MARK,
-		DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
-		EnclosureClean:  true,
+		Config: characters.Config{
+			Enclosure:       characters.Character_QUOTATION_MARK,
+			DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
+			EnclosureClean:  true,
+		},
 	}
 
 	b.ResetTimer()

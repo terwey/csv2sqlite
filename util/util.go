@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"io"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
@@ -75,16 +76,7 @@ func NoClean(data []byte, prefix, suffix bool) []byte {
 }
 
 type CharacterConfig struct {
-	Delimiter        characters.Character
-	Enclosure        characters.Character
-	EnclosureIsEmpty bool
-	DoubleEnclosure  characters.Character
-	EnclosureClean   bool
-	enclosureLength  int
-	EOL              characters.Character
-
-	EscapeCharacter  characters.Character
-	EscapedEnclosure characters.Character
+	characters.Config
 
 	// this is only used for the SplitCSVInput
 	// zero index based
@@ -118,32 +110,11 @@ type CharacterConfig struct {
 	FixedEOL bool
 }
 
-func (cc *CharacterConfig) SetDelimiter(delim characters.Character) {
-	cc.Delimiter = delim
-}
+func NewCharacterConfig(delimiter, enclosure characters.Character) *CharacterConfig {
+	cc := CharacterConfig{}
+	cc.Config = characters.NewConfig(delimiter, enclosure)
 
-func (cc *CharacterConfig) SetEnclosure(encl characters.Character) {
-	cc.Enclosure = append(characters.Character{}, encl...)
-	cc.enclosureLength = len(encl)
-
-	// reset
-	cc.DoubleEnclosure = make(characters.Character, 0)
-	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
-	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
-
-	if len(cc.EscapeCharacter) == 0 {
-		cc.EscapeCharacter = characters.Character("\\")
-	}
-
-	cc.EscapedEnclosure = make(characters.Character, 0)
-	cc.EscapedEnclosure = append(cc.EscapedEnclosure, cc.EscapeCharacter...)
-	cc.EscapedEnclosure = append(cc.EscapedEnclosure, cc.Enclosure...)
-
-	// reset
-	cc.EnclosureClean = true
-	if bytes.Equal(cc.Enclosure, characters.Character_EMPTY) {
-		cc.EnclosureClean = false
-	}
+	return &cc
 }
 
 func (c *CharacterConfig) Clean(data []byte, prefix, suffix bool) []byte {
@@ -167,6 +138,73 @@ func (c *CharacterConfig) Clean(data []byte, prefix, suffix bool) []byte {
 	data = ReplaceAll(data, characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED)
 
 	return data
+}
+
+// Replace returns a copy of the slice s with the first n
+// non-overlapping instances of old replaced by new.
+// If old is empty, it matches at the beginning of the slice
+// and after each UTF-8 sequence, yielding up to k+1 replacements
+// for a k-rune slice.
+// If n < 0, there is no limit on the number of replacements.
+func Replace(s, old, new, t []byte, n int) []byte {
+	m := 0
+	if n != 0 {
+		// Compute number of replacements.
+		m = Count(s, old)
+	}
+	if m == 0 {
+		// Just return a copy.
+		// return append([]byte(nil), s...)
+		// NOTE originally it returned a copy
+		return s
+		// t = s
+		// return t
+	}
+	if n < 0 || m < n {
+		n = m
+	}
+
+	// Apply replacements to buffer.
+	size := len(s) + n*(len(new)-len(old))
+	if len(t) < size {
+		// log.Printf("resizing")
+		t = make([]byte, size)
+	}
+	t = t[:size]
+	w := 0
+	start := 0
+	for i := 0; i < n; i++ {
+		j := start
+		if len(old) == 0 {
+			if i > 0 {
+				_, wid := utf8.DecodeRune(s[start:])
+				j += wid
+			}
+		} else {
+			j += bytes.Index(s[start:], old)
+		}
+		w += copy(t[w:], s[start:j])
+		w += copy(t[w:], new)
+		start = j + len(old)
+	}
+	w += copy(t[w:], s[start:])
+	return t[0:w]
+}
+
+func ByteEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	if a[0] != b[0] {
+		return false
+	}
+
+	if a[len(a)-1] != b[len(b)-1] {
+		return false
+	}
+
+	return bytes.Equal(a, b)
 }
 
 func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
@@ -410,7 +448,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 		// NOTE: the enclosure can still be set to none if this is the first time returning a chunk after detecting the delimiter
 		// in case the enclosure is set to be none, we only have to test for the amount of delimiters
-		if c.enclosureLength == 0 && c.DelimCounted == c.DelimiterCount {
+		if c.EnclosureLength() == 0 && c.DelimCounted == c.DelimiterCount {
 			if debug.DebugLog {
 				debug.LogData("[SplitCsvInput] encloLen == 0", in[:eolIndex], 4096)
 				debug.BreakMe()
@@ -419,7 +457,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 
 		// if the enclosure length is zero, it can only be newline delimited
-		if c.enclosureLength == 0 && c.NdMoved == 0 {
+		if c.EnclosureLength() == 0 && c.NdMoved == 0 {
 			if debug.DebugLog {
 				debug.LogData("[SplitCsvInput] encloLen == 0 AND NdMoved == 0", in[:eolIndex], 4096)
 				debug.BreakMe()
@@ -429,7 +467,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 
 		enclosureCount = bytes.Count(in[:eolIndex], c.Enclosure)
 
-		if c.enclosureLength != 0 && enclosureCount == 0 && c.NdMoved == 0 {
+		if c.EnclosureLength() != 0 && enclosureCount == 0 && c.NdMoved == 0 {
 			if debug.DebugLog {
 				debug.LogData("[SplitCsvInput] encloLen != 0 AND c.Enclosure count == 0 AND NdMoved == 0", in[:eolIndex], 4096)
 				debug.BreakMe()
@@ -438,7 +476,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 
 		// we can skip over all of these are there is no enclosure to compare against
-		if c.enclosureLength != 0 {
+		if c.EnclosureLength() != 0 {
 			// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 			// it COULD be a row, more tests will proof otherwise
 			if c.DelimCounted == c.DelimiterCount &&
@@ -721,6 +759,10 @@ func (cc *CharacterConfig) ReplaceBackslashEscapedEnclosure(in []byte) (dst []by
 // Generic split: splits after each instance of sep.
 // Adapted to return a flat byte slice with pos slice
 func GenSplit(s, sep []byte, n int, fn CleanFunc, exclude []int) (data []byte, pos []uint32) {
+	return GenSplitCore(s, sep, n, fn, exclude, make([]byte, 0), make([]uint32, 0))
+}
+
+func GenSplitCore(s, sep []byte, n int, fn CleanFunc, exclude []int, data []byte, pos []uint32) ([]byte, []uint32) {
 	if n == 0 {
 		return nil, nil
 	}
@@ -733,13 +775,18 @@ func GenSplit(s, sep []byte, n int, fn CleanFunc, exclude []int) (data []byte, p
 	if estimatedLength == -1 {
 		estimatedLength = 0
 	}
-	data = make([]byte, 0, estimatedLength)
-	pos = make([]uint32, 0, n)
+	if cap(data) < estimatedLength {
+		data = make([]byte, 0, estimatedLength)
+	}
+	if cap(pos) < n {
+		pos = make([]uint32, 0, n)
+	}
 
 	n--
 	i := 0
 	for i < n {
 		m := bytes.Index(s, sep)
+		// buf = buf[:0]
 		if m < 0 {
 			break
 		}
@@ -748,16 +795,19 @@ func GenSplit(s, sep []byte, n int, fn CleanFunc, exclude []int) (data []byte, p
 			i++
 			continue
 		}
-		buf := fn(s[:m:m], false, false)
+		buf := s[:m:m]
+		buf = fn(buf, false, false)
 		data = append(data, buf...)
-		// log.Printf("data: %s", data)
 		pos = append(pos, uint32(len(buf)))
 		s = s[m+len(sep):]
+
 		i++
 	}
-	buf := fn(s, false, false)
+	buf := s
+	buf = fn(buf, false, false)
 	data = append(data, buf...)
 	pos = append(pos, uint32(len(buf)))
+
 	return data, pos
 }
 
@@ -765,6 +815,10 @@ func GenSplit(s, sep []byte, n int, fn CleanFunc, exclude []int) (data []byte, p
 // If a seperator is inside an enclosure it will not be used to split.
 // Returns a flat byte slice with pos slice
 func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Character, n int, fn CleanFunc) (data []byte, pos []uint32) {
+	return ColSplitFlatCore(s, sep, enclosure, n, fn, make([]byte, 0), make([]uint32, 0))
+}
+
+func ColSplitFlatCore(s []byte, sep characters.Character, enclosure characters.Character, n int, fn CleanFunc, data []byte, pos []uint32) ([]byte, []uint32) {
 	if len(enclosure) == 0 {
 		return GenSplit(s, sep, n, fn, nil)
 	}
@@ -781,8 +835,12 @@ func ColSplitFlat(s []byte, sep characters.Character, enclosure characters.Chara
 	}
 
 	estimatedLength := len(s) - (n * len(sep))
-	data = make([]byte, 0, estimatedLength)
-	pos = make([]uint32, 0, n)
+	if cap(data) < estimatedLength {
+		data = make([]byte, 0, estimatedLength)
+	}
+	if cap(pos) < n {
+		pos = make([]uint32, 0, n)
+	}
 
 	var m int
 	var lastPos int

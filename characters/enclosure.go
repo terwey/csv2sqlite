@@ -89,7 +89,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 			break
 		}
 
-		if unicode.IsSpace(Character(left).Rune()) {
+		if unicode.IsSpace(Character(left).Rune()) || bytes.Equal(left, []byte("?")) {
 			left = make([]byte, 0)
 		}
 
@@ -146,7 +146,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 
 		if len(left) > 0 && bytes.Equal(left, right) {
 			if debug.DebugLog {
-				debug.Debug("[DetectEnclosureWithDelimiter] match left and right = +%s+", left)
+				debug.Debug("[DetectEnclosureWithDelimiter] match left and right = +%s+\ncol: %s", left, cols[i])
 			}
 
 			// additional test to see if the data just occurs multiple times in the same column
@@ -161,6 +161,9 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 					debug.BreakMe()
 				}
 				count := bytes.Count(bytes.ReplaceAll(data, append(left, left...), []byte("DOUBLE_QUOTE")), left)
+				if count == 0 {
+					continue
+				}
 				escapedCount := bytes.Count(bytes.ReplaceAll(data, append(left, left...), []byte("DOUBLE_QUOTE")), []byte("DOUBLE_QUOTE"))
 				f = &Found{
 					char:         Character(left),
@@ -262,7 +265,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 		if bytes.Equal(found.char, []byte("\n")) {
 			continue
 		}
-		if bytes.Equal(found.char, []byte(".")) {
+		if bytes.Contains(found.char, []byte(".")) {
 			continue
 		}
 		if found.count%2 != 0 {
