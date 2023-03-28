@@ -61,7 +61,6 @@ var (
 
 	parseRoutines []*parser.Runtime
 	readyForMerge chan string
-	stopWorkers   chan bool
 	rowCountChan  chan parser.RowCount
 	rowCountTotal parser.RowCount
 	stopCount     int
@@ -122,6 +121,8 @@ func getFlags() *pflag.FlagSet {
 
 	flags.StringVar(&p.Scratch, "scratch-dir", "", "Directory for storing the smaller SQLite files before merging them to the target. Same as output if left blank.")
 
+	flags.IntVar(&p.CSVEnclosureSet, "csv-enclosure", 8, "When to use an enclosure for the CSV output: \n\n1\tNone\n2\tRequired\n4\tSkipEmpty\n8\tAll\n")
+
 	if debug.State() {
 		flags.BoolVar(&debug.DebugLog, "debug", false, "Outputs debug information, careful is extremely chatty.")
 		flags.BoolVar(&parser.RWDebugLog, "rw-debug", false, "Outputs record writer debug information, careful is extremely chatty.")
@@ -170,9 +171,13 @@ func main() {
 		stdin = false
 	}
 
-	if p.Input == p.Output {
+	if p.Input != "" && p.Input == p.Output {
 		fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
 		os.Exit(100)
+	}
+
+	if p.Output != "" {
+		go os.Remove(p.Output)
 	}
 
 	if cpuprofile != "" && cpuprofile == heapprofile {
@@ -227,34 +232,39 @@ func main() {
 		p.Characters.EnclosureIsEmpty = true
 		p.NewlineDelimited = true
 	}
+	pv = progressbar.DefaultBytes(-1, "Processing")
 
-	// multiple channel capacity by threads
-	p.ChannelCapacity = p.ChannelCapacity * threads
+	readyForMerge = make(chan string, 1000)
+	rowCountChan = make(chan parser.RowCount)
 
-	if threads < 2 {
+	if newline != "" {
+		switch strings.ToUpper(newline) {
+		case "LF":
+			p.Characters.EOL = characters.Character_LINE_FEED
+		case "CRLF":
+			p.Characters.EOL = characters.Character_CARRIAGE_RETURN_LINE_FEED
+		case "CR":
+			p.Characters.EOL = characters.Character_CARRIAGE_RETURN
+		}
+	}
+
+	// detect if the output is a sqlite
+	if strings.HasSuffix(p.Output, ".sqlite") || strings.HasSuffix(p.Output, ".db") {
+		p.Sqlite = true
+	}
+
+	if p.Sqlite && threads < 2 {
 		log.Printf("Threads is set below 2, changing to 2")
 		threads = 2
 	}
 
-	pv = progressbar.DefaultBytes(-1, "Processing")
-
-	readyForMerge = make(chan string, 1000)
-	stopWorkers = make(chan bool, threads-1)
-	rowCountChan = make(chan parser.RowCount)
-
-	switch strings.ToUpper(newline) {
-	case "LF":
-		p.Characters.EOL = characters.Character_LINE_FEED
-	case "CRLF":
-		p.Characters.EOL = characters.Character_CARRIAGE_RETURN_LINE_FEED
-	case "CR":
-		p.Characters.EOL = characters.Character_CARRIAGE_RETURN
+	// output is stdout
+	if len(p.Output) == 0 && !p.Drop {
+		threads = 2
 	}
 
-	// detect if the output is a sqlite
-	if strings.HasSuffix(p.Output, ".sqlite") {
-		p.Sqlite = true
-	}
+	// multiple channel capacity by threads
+	p.ChannelCapacity = p.ChannelCapacity * threads
 
 	// we need to increase the numbers in Exclude with 1
 	if p.RowID && len(p.Exclude) != 0 {
@@ -322,7 +332,6 @@ func main() {
 		pvOptions = append(pvOptions, progressbar.OptionSetVisibility(false))
 	}
 
-	var err error
 	var file io.ReadSeeker
 	if !stdin {
 		f, err := os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
@@ -341,34 +350,37 @@ func main() {
 		file = os.Stdin
 	}
 
-	if err = r.Init(file); err != nil {
-		log.Fatalf("Could not initialize runtime: %s", err)
-	}
-
-	var insertWg sync.WaitGroup
 	var mergeWg sync.WaitGroup
-
-	insertWg.Add(1)
-	go func(rowCountChan <-chan parser.RowCount, wg *sync.WaitGroup) {
-		defer wg.Done()
-		for rc := range rowCountChan {
-			rowCountTotal.Inserted += rc.Inserted
-			rowCountTotal.GoParser += rc.GoParser
-			rowCountTotal.GoParserDropped += rc.GoParserDropped
-			rowCountTotal.Dropped += rc.Dropped
-		}
-	}(rowCountChan, &insertWg)
+	r.Init(file)
 
 	// readWg is used for the main scanner loop and also for the header initialization
 	var readWg sync.WaitGroup
 	readWg.Add(1)
 	go r.Parse(&readWg, chunksize, pv)
 
+	var merged time.Duration
 	var parserCount int
 	var threadWorkers sync.WaitGroup
 	mergeElapsed := make(chan time.Duration, 1)
 	conversionStart := time.Now()
+	var insertWg sync.WaitGroup
 	if <-r.HeaderSet {
+		// close the original file if not sqlite
+		if !p.Sqlite {
+			r.Close()
+		}
+
+		insertWg.Add(1)
+		go func(rowCountChan <-chan parser.RowCount, wg *sync.WaitGroup) {
+			defer wg.Done()
+			for rc := range rowCountChan {
+				rowCountTotal.Inserted += rc.Inserted
+				rowCountTotal.GoParser += rc.GoParser
+				rowCountTotal.GoParserDropped += rc.GoParserDropped
+				rowCountTotal.Dropped += rc.Dropped
+			}
+		}(rowCountChan, &insertWg)
+
 		mergeWg.Add(1)
 		go r.Merge(readyForMerge, &mergeWg, mergeElapsed)
 
@@ -383,10 +395,12 @@ func main() {
 	twLoop:
 		for {
 			select {
-			case <-stopWorkers:
+			case <-r.StopWorkers:
 				threadWorkers.Wait()
 				close(rowCountChan)
 				close(readyForMerge)
+				mergeWg.Wait()
+				merged = <-mergeElapsed
 				break twLoop
 			default:
 				if err := sem.Acquire(ctx, 1); err != nil {
@@ -394,27 +408,27 @@ func main() {
 					continue
 				}
 
-				// to prevent from starting a new thread when it's not needed
-				// check if r.data is empty and just go back to the select
-				if len(r.Data) == 0 {
-					time.Sleep(5 * time.Millisecond)
-					sem.Release(1)
-					continue
+				if parserCount == 0 {
+					// to prevent from starting a new thread when it's not needed
+					// check if r.data is empty and just go back to the select
+					if len(r.Data) == 0 {
+						time.Sleep(50 * time.Microsecond)
+						sem.Release(1)
+						continue
+					}
 				}
 
 				stop = stopCount
 				// start the merge early
 				if parserCount == 0 {
-					stop = 1000
+					stop = 100
 				} else if parserCount < threads-1 {
 					stop = stopCount / 3
 				}
 
 				parserCount++
 				pr := parser.NewParser(p, parserCount)
-				if err = pr.Init(nil); err != nil {
-					log.Fatalf("Could not initialize new parser: %s", err)
-				}
+				pr.Init(nil)
 
 				pr.ProcessedHeader = r.ProcessedHeader
 				pr.ProcessHeader(r.Header)
@@ -437,7 +451,7 @@ func main() {
 						}
 
 						if !more {
-							stopWorkers <- true
+							r.StopWorkers <- true
 							break
 						}
 					}
@@ -448,39 +462,37 @@ func main() {
 						log.Fatalf("Could not close runtime in routine: %s", err)
 					}
 
-					defer sem.Release(1)
-					defer tw.Done()
 					ready <- routine.GetPath()
+					sem.Release(1)
+					tw.Done()
 				}(r.Data, &threadWorkers, sem, pr, readyForMerge, stop, rowCountChan)
 			}
 		}
 	}
 
-	conversionElapsed = time.Since(conversionStart)
-
 	readWg.Wait()
 	insertWg.Wait()
-	mergeWg.Wait()
-	r.Close()
+
+	conversionElapsed = time.Since(conversionStart)
+
+	if p.Sqlite {
+		r.Close()
+	}
 
 	end := time.Now()
 	totalTime := end.Sub(start)
-	// totalTime := time.Since(start)
-
-	var ops time.Duration
-	var rows float64
-	if rowCountTotal.Inserted != 0 {
-		ops = time.Duration(totalTime.Nanoseconds() / int64(rowCountTotal.Inserted))
-		rows = float64(rowCountTotal.Inserted) / totalTime.Seconds()
-	} else {
-		ops = time.Duration(0)
-	}
 
 	pv.Clear()
-
-	merged := <-mergeElapsed
-
 	if !quiet {
+		var ops time.Duration
+		var rows float64
+		if rowCountTotal.Inserted != 0 {
+			ops = time.Duration(totalTime.Nanoseconds() / int64(rowCountTotal.Inserted))
+			rows = float64(rowCountTotal.Inserted) / totalTime.Seconds()
+		} else {
+			ops = time.Duration(0)
+		}
+
 		if csvReport {
 			if logHeader == 1 {
 				fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader, capacity\n")
@@ -556,6 +568,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "No rows inserted.\n")
 		os.Exit(1)
 	}
+
 }
 
 type Report struct {

@@ -2889,9 +2889,7 @@ func TestRuntime(t *testing.T) {
 
 		if <-r.HeaderSet {
 			pr := NewParser(p, 1)
-			if err = pr.Init(nil); err != nil {
-				t.Error(err)
-			}
+			pr.Init(nil)
 			pr.ProcessHeader(r.Header)
 
 			writeWg.Add(1)
@@ -2920,4 +2918,61 @@ func TestRuntime(t *testing.T) {
 		readWg.Wait()
 		writeWg.Wait()
 	}
+}
+
+var resultGenSplitBuf []byte
+var resultGenSplitPos []uint32
+
+func Benchmark_GenSplit(b *testing.B) {
+	var v []byte
+	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
+	p := NewParameters()
+	r := NewRuntime(p, bufio.ScanLines)
+	buf := make([]byte, 0, 4*1024*1024)
+	pos := make([]uint32, 0, 1024)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		buf = buf[:0]
+		pos = pos[:0]
+		v, pos = r.genSplit(in, characters.Character_COMMA, -1, util.NoClean, nil)
+	}
+
+	resultGenSplitBuf = v
+	resultGenSplitPos = pos
+}
+
+func Benchmark_GenSplitClean(b *testing.B) {
+	var v []byte
+	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
+	p := NewParameters()
+	r := NewRuntime(p, bufio.ScanLines)
+	buf := make([]byte, 0, 4*1024*1024)
+	pos := make([]uint32, 0, 1024)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		buf = buf[:0]
+		pos = pos[:0]
+		v, pos = r.genSplit(in, characters.Character_COMMA, -1, r.Clean, nil)
+	}
+
+	resultGenSplitBuf = v
+	resultGenSplitPos = pos
+}
+
+func Benchmark_GenSplitCharacterClean(b *testing.B) {
+	var v []byte
+	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
+	p := NewParameters()
+	r := NewRuntime(p, bufio.ScanLines)
+	buf := make([]byte, 0, 4*1024*1024)
+	pos := make([]uint32, 0, 1024)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		buf = buf[:0]
+		pos = pos[:0]
+		v, pos = r.genSplit(in, characters.Character_COMMA, -1, r.p.Characters.Clean, nil)
+	}
+
+	resultGenSplitBuf = v
+	resultGenSplitPos = pos
 }

@@ -3,7 +3,7 @@
 
 package characters
 
-func knownNewlines() []Character {
+func KnownNewlines() []Character {
 	return []Character{
 		Character_CARRIAGE_RETURN_LINE_FEED,
 		Character_LINE_FEED,
@@ -12,10 +12,10 @@ func knownNewlines() []Character {
 }
 
 func GetNewlineNames() []string {
-	return getNames(knownNewlines())
+	return getNames(KnownNewlines())
 }
 
 func DetectNewline(data []byte) Character {
-	nl, _ := detect(data, knownNewlines())
+	nl, _ := detect(data, KnownNewlines())
 	return nl
 }

@@ -18,8 +18,10 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
+	"golang.org/x/term"
 
 	"github.com/terwey/csv2sqlite/characters"
+	"github.com/terwey/csv2sqlite/characters/knownconfigs"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/util"
 	"github.com/terwey/recordwriter/recordwriter"
@@ -66,7 +68,9 @@ type Params struct {
 	// e.g. a tmpfs ramdisk
 	Scratch string
 
-	Characters util.CharacterConfig
+	Characters *util.CharacterConfig
+
+	CSVEnclosureSet int
 }
 
 func NewParameters() *Params {
@@ -77,13 +81,9 @@ func NewParameters() *Params {
 		Output:     "",
 
 		Limit: -1,
-
-		Characters: util.CharacterConfig{
-			Delimiter:      characters.Character_NIL,
-			Enclosure:      characters.Character_NIL,
-			EnclosureClean: true,
-		},
 	}
+
+	p.Characters = util.NewCharacterConfig(characters.Character_NIL, characters.Character_NIL)
 
 	return p
 }
@@ -108,7 +108,7 @@ type Runtime struct {
 	splitFunc bufio.SplitFunc
 
 	scanner *bufio.Scanner
-	w       io.StringWriter
+	w       io.Writer
 
 	RowCounter    RowCount
 	headerPrinted bool
@@ -121,11 +121,16 @@ type Runtime struct {
 	ProcessedHeader []string
 
 	Data        chan [][]byte
+	EmptyData   chan bool
+	StopWorkers chan bool
 	ParserCount int
 
 	sinput [][]byte
 	// scolumns [][]byte
 	sbuf []byte
+	gbuf []byte
+	gpos []uint32
+	rbuf []byte
 
 	hasPrefixEnclosure bool
 	hasSuffixEnclosure bool
@@ -150,6 +155,9 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 
 	r.HeaderSet = make(chan bool)
 	r.Data = make(chan [][]byte, p.ChannelCapacity)
+	r.rbuf = make([]byte, 1*1024*1024)
+	r.EmptyData = make(chan bool)
+	r.StopWorkers = make(chan bool, p.ChannelCapacity)
 
 	return r
 }
@@ -161,6 +169,9 @@ func NewParser(p *Params, parsercount int) *Runtime {
 		Benchmark:     false,
 		ParserCount:   parsercount,
 	}
+
+	r.gbuf = make([]byte, 0, 1*1024*1024)
+	r.gpos = make([]uint32, 0, 1024)
 
 	return r
 }
@@ -176,13 +187,10 @@ func (r *Runtime) debug(format string, v ...interface{}) {
 }
 
 func (r *Runtime) GetPath() string {
-	if sqlwriter, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
-		return sqlwriter.GetPath()
-	}
-	return ""
+	return r.rw.GetPath()
 }
 
-func (r *Runtime) GetWriter() io.StringWriter {
+func (r *Runtime) GetWriter() io.Writer {
 	return r.w
 }
 
@@ -190,7 +198,7 @@ func (r *Runtime) GetScanner() *bufio.Scanner {
 	return r.scanner
 }
 
-func (r *Runtime) Init(input io.Reader) (err error) {
+func (r *Runtime) Init(input io.Reader) {
 	if input != nil {
 		r.f = input
 	}
@@ -216,7 +224,7 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 					r.w = bufio.NewWriterSize(bytes.NewBuffer([]byte{}), r.p.CommitRate)
 				}
 			} else {
-
+				var err error
 				r.fout, err = os.Create(output)
 
 				if err != nil {
@@ -225,7 +233,9 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 				r.w = bufio.NewWriterSize(r.fout, r.p.CommitRate)
 			}
 
-			r.rw = recordwriter.NewCSVWriter(r.w)
+			csv := recordwriter.NewCSVWriter(knownconfigs.CSV(), r.w, output)
+			csv.SetEnclosureSet(r.p.CSVEnclosureSet)
+			r.rw = csv
 		} else {
 			r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, r.ParserCount == 0, r.p.RowID)
 		}
@@ -234,15 +244,9 @@ func (r *Runtime) Init(input io.Reader) (err error) {
 	if r.ParserCount == 0 {
 		r.scanner = r.NewScanner()
 	}
-
-	return nil
 }
 
 func (r *Runtime) Close() error {
-	if file, ok := r.f.(io.ReadCloser); ok {
-		file.Close()
-	}
-
 	return r.CloseDB()
 }
 
@@ -256,6 +260,13 @@ func (r *Runtime) CloseDB() error {
 			}
 		}
 
+		if f, ok := r.w.(*os.File); ok {
+			if !term.IsTerminal(int(f.Fd())) {
+				log.Printf("sync: %s", r.GetPath())
+				f.Sync()
+			}
+		}
+
 		if len(r.p.Output) != 0 {
 			if err = r.fout.Sync(); err != nil {
 				log.Fatalf("Runtime: could not sync writer: %s", err)
@@ -263,11 +274,9 @@ func (r *Runtime) CloseDB() error {
 
 			return r.fout.Close()
 		}
-	} else {
-		return r.rw.Close()
 	}
 
-	return nil
+	return r.rw.Close()
 }
 
 func (r *Runtime) NewScanner() *bufio.Scanner {
@@ -343,6 +352,14 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 }
 
 func (r *Runtime) ProcessHeader(cols [][]byte) {
+	// we do not need to print the header multiple times for CSV
+	if _, ok := r.rw.(*recordwriter.CSVWriter); ok {
+		if r.ParserCount != 0 {
+			r.colCount = len(cols)
+			r.headerPrinted = true
+			return
+		}
+	}
 	if len(r.ProcessedHeader) != 0 {
 		if srw, ok := r.rw.(*recordwriter.SQLiteWriter); ok {
 			srw.SetProcessedHeader(r.ProcessedHeader)
@@ -422,6 +439,47 @@ func PosSliceContainsNoValues(pos []uint32) bool {
 	return true
 }
 
+func (r *Runtime) genSplit(s, sep []byte, n int, fn util.CleanFunc, exclude []int) (data []byte, pos []uint32) {
+	r.gbuf = r.gbuf[:0]
+	r.gpos = r.gpos[:0]
+	return util.GenSplitCore(s, sep, n, fn, exclude, r.gbuf, r.gpos)
+}
+
+func (r *Runtime) colSplitFlat(s []byte, sep characters.Character, enclosure characters.Character, n int, fn util.CleanFunc) (data []byte, pos []uint32) {
+	r.gbuf = r.gbuf[:0]
+	r.gpos = r.gpos[:0]
+	return util.ColSplitFlatCore(s, sep, enclosure, n, fn, r.gbuf, r.gpos)
+}
+
+func (r *Runtime) Clean(data []byte, prefix, suffix bool) []byte {
+	if r.p.Characters.Config.EnclosureClean && bytes.Contains(data, r.p.Characters.Config.Enclosure) {
+		if prefix {
+			data = util.TrimPrefixSkipCheck(data, r.p.Characters.Config.Enclosure)
+		} else {
+			data = bytes.TrimPrefix(data, r.p.Characters.Config.Enclosure)
+		}
+		if suffix {
+			data = util.TrimSuffixSkipCheck(data, r.p.Characters.Config.Enclosure)
+		} else {
+			data = bytes.TrimSuffix(data, r.p.Characters.Config.Enclosure)
+		}
+
+		// we need to clean double quotes
+		if bytes.Contains(data, r.p.Characters.Config.DoubleEnclosure) {
+			data = util.Replace(data, r.p.Characters.Config.DoubleEnclosure, r.p.Characters.Config.Enclosure, r.rbuf, -1)
+		}
+	}
+
+	if bytes.Contains(data, characters.Character_CARRIAGE_RETURN_LINE_FEED) {
+		data = util.Replace(data, characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED, r.rbuf, -1)
+	}
+	if bytes.Contains(data, characters.Character_CARRIAGE_RETURN) {
+		data = util.Replace(data, characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED, r.rbuf, -1)
+	}
+
+	return data
+}
+
 // SplitRow expects a byte slice appended with two counts appended to it in
 // binary encoded format in 32bit, e.g.  binary.LittleEndian.PutUint32(data, 0)
 // unless self is set to true
@@ -432,7 +490,8 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	// amount = columns + 1
 
 	if debug.DebugLog {
-		debug.LogData("[SplitRow] data", data, 4096)
+		debug.LogData("[SplitRow] data", data, 512)
+		debug.Debug("[SplitRow] encl: %s delim: %s", r.p.Characters.Enclosure, r.p.Characters.Delimiter)
 		debug.BreakMe()
 	}
 
@@ -470,7 +529,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	}
 
 	if colCount == count+1-len(r.p.Exclude) || (colCount == 0 && len(r.p.Characters.Enclosure) == 0 && len(r.p.Characters.Delimiter) > 1) {
-		out, pos = util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+		out, pos = r.genSplit(data, r.p.Characters.Delimiter, -1, r.Clean, r.p.Exclude)
 		if debug.DebugLog {
 			debug.Debug("[SplitRow] GenSplit found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
 		}
@@ -501,7 +560,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			if count > 0 {
 				n = count
 			}
-			out, pos = util.ColSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, n, r.p.Characters.Clean)
+			out, pos = r.colSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, n, r.Clean)
 			if debug.DebugLog {
 				debug.Debug("[SplitRow] ColSplitFlat found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
 			}
@@ -556,7 +615,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 			}
 			if err != nil {
 				// last hail mary for broken CSVs, we use a gensplit as we do not care anymore about consistency for these
-				o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+				o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.Clean, r.p.Exclude)
 				if len(o) != 0 {
 					if debug.EnableLogDropped {
 						debug.LogDropped("GoParser could have dropped (delimCounted: %d): \n%s\nfound: \n%s", bytes.Count(data, r.p.Characters.Delimiter), data, util.FlatToMulti(o, p))
@@ -577,7 +636,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 
 				// we have to clean the enclosure if it's not a double quote
 				if !bytes.Equal(r.p.Characters.Enclosure, characters.Character_QUOTATION_MARK) {
-					buf := r.p.Characters.Clean([]byte(col), false, false)
+					buf := r.Clean([]byte(col), false, false)
 					col = string(buf)
 				} else {
 					// we do not have to call a cleanFunc here as the CSV parser of Go already did so
@@ -588,13 +647,13 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 				out = append(out, col...)
 				pos = append(pos, uint32(len(col)))
 			}
+			r.RowCounter.GoParser++
 		}
 
 		if r.colCount != 0 {
 			if debug.DebugLog {
 				debug.LogReader(data, count, colCount)
 			}
-			r.RowCounter.GoParser++
 		}
 
 		if len(pos) != 0 && len(pos) < lowestCount {
@@ -629,7 +688,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 
 	if len(out) == 0 {
 		// last hail mary for broken CSVs
-		o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.p.Characters.Clean, r.p.Exclude)
+		o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.Clean, r.p.Exclude)
 		if len(o) != 0 {
 			if debug.EnableLogDropped {
 				debug.LogDropped("SplitRow could have dropped (delimCounted: %d): \n%s\nfound: \n%s", bytes.Count(data, r.p.Characters.Delimiter), data, util.FlatToMulti(o, p))
@@ -1011,6 +1070,14 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	}
 
 	close(r.Data)
+	// there was no data, tell the workers to not initialize
+	if count == 0 {
+		r.HeaderSet <- false
+	}
+	// when count is one, it was still empty, but stop the workers
+	if count == 1 {
+		r.StopWorkers <- true
+	}
 	pv.Finish()
 	wg.Done()
 }

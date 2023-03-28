@@ -139,6 +139,60 @@ func (c Character) MarshalJSON() ([]byte, error) {
 	})
 }
 
+type Config struct {
+	Delimiter        Character
+	Enclosure        Character
+	EnclosureIsEmpty bool
+	DoubleEnclosure  Character
+	enclosureLength  int
+	EOL              Character
+	EscapeCharacter  Character
+	EscapedEnclosure Character
+
+	EnclosureClean bool
+}
+
+func NewConfig(delimiter, enclosure Character) Config {
+	c := Config{}
+
+	c.SetDelimiter(delimiter)
+	c.SetEnclosure(enclosure)
+
+	return c
+}
+
+func (cc *Config) SetDelimiter(delim Character) {
+	cc.Delimiter = delim
+}
+
+func (cc *Config) SetEnclosure(encl Character) {
+	cc.Enclosure = append(Character{}, encl...)
+	cc.enclosureLength = len(encl)
+
+	// reset
+	cc.DoubleEnclosure = make(Character, 0)
+	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
+	cc.DoubleEnclosure = append(cc.DoubleEnclosure, cc.Enclosure...)
+
+	if len(cc.EscapeCharacter) == 0 {
+		cc.EscapeCharacter = Character("\\")
+	}
+
+	cc.EscapedEnclosure = make(Character, 0)
+	cc.EscapedEnclosure = append(cc.EscapedEnclosure, cc.EscapeCharacter...)
+	cc.EscapedEnclosure = append(cc.EscapedEnclosure, cc.Enclosure...)
+
+	// reset
+	cc.EnclosureClean = true
+	if bytes.Equal(cc.Enclosure, Character_EMPTY) {
+		cc.EnclosureClean = false
+	}
+}
+
+func (c *Config) EnclosureLength() int {
+	return c.enclosureLength
+}
+
 func stringValueForCharacter(d Character) string {
 	allChars := getAllCharacters()
 
