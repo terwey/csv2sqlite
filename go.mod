@@ -6,7 +6,7 @@ require (
 	github.com/felixge/fgprof v0.9.3
 	github.com/google/go-cmp v0.5.9
 	github.com/productsupcom/go-sqlite-lite v0.9.5
-	github.com/terwey/recordwriter v0.5.0-rc
+	github.com/terwey/recordwriter v0.5.1
 	github.com/schollz/progressbar/v3 v3.7.4
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
