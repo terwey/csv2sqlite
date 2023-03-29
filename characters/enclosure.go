@@ -70,6 +70,7 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 
 	var left, right []byte
 	charSize := 1
+loop:
 	for i := range cols {
 		if len(cols[i]) == 0 {
 			continue
@@ -78,6 +79,9 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 			continue
 		}
 		for {
+			if len(cols[i]) < charSize {
+				continue loop
+			}
 			left = make([]byte, charSize)
 			copy(left, cols[i][0:charSize])
 			if !utf8.Valid(left) {
