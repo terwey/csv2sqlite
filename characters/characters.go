@@ -158,6 +158,8 @@ func NewConfig(delimiter, enclosure Character) Config {
 	c.SetDelimiter(delimiter)
 	c.SetEnclosure(enclosure)
 
+	c.enclosureLength = 0
+
 	return c
 }
 

@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,31 +37,8 @@ type RowCount struct {
 }
 
 type Params struct {
-	Input           string
-	Output          string
-	CommitRate      int
-	Buffersize      int
-	Sqlite          bool
-	Drop            bool
-	ChannelCapacity int
-
-	// When set to true the CSV does not have newlines
-	// (CR, LF or CRLF) inside records
-	NewlineDelimited bool
-
-	// starting position of the CSV file
-	// this is needed for Excel to CSV exports
-	// that contain data above the header
-	Start int
-
-	Skip  int // amount of rows to skip AFTER the header
-	Limit int // maximum number of rows to process
-
-	Exclude []int
-
-	// if the order of the incoming CSV matters the RowID
-	// can be set to true and during Scan the RowID will be added
-	RowID bool
+	Input  string
+	Output string
 
 	// the small SQLite files written are normally in the same
 	// target as the output file, for performance reasons (or
@@ -70,7 +48,30 @@ type Params struct {
 
 	Characters *util.CharacterConfig
 
+	CommitRate      int
+	Buffersize      int
+	ChannelCapacity int
+
+	// starting position of the CSV file
+	// this is needed for Excel to CSV exports
+	// that contain data above the header
+	Start           int
+	Skip            int // amount of rows to skip AFTER the header
+	Limit           int // maximum number of rows to process
 	CSVEnclosureSet int
+
+	Exclude []int
+
+	Sqlite bool
+	Drop   bool
+
+	// When set to true the CSV does not have newlines
+	// (CR, LF or CRLF) inside records
+	NewlineDelimited bool
+
+	// if the order of the incoming CSV matters the RowID
+	// can be set to true and during Scan the RowID will be added
+	RowID bool
 }
 
 func NewParameters() *Params {
@@ -88,50 +89,44 @@ func NewParameters() *Params {
 	return p
 }
 
-type Chunk struct {
-	data       []byte
-	delimCount int
+type Buffers struct {
+	gpos     []uint32
+	sinput   [][]byte
+	sbuf     []byte
+	gbuf     []byte
+	rbuf     []byte
+	lbBuffer bytes.Buffer
 }
 
 type Runtime struct {
 	p       *Params
-	readbuf []byte
 	reader  *bufio.Reader
-
-	Benchmark bool
-
-	rw recordwriter.RecordWriter
-
-	f    io.Reader
-	fout *os.File
-
-	splitFunc bufio.SplitFunc
-
+	rw      recordwriter.RecordWriter
+	f       io.Reader
+	fout    *os.File
 	scanner *bufio.Scanner
 	w       io.Writer
 
-	RowCounter    RowCount
-	headerPrinted bool
-	colCount      int
-	inside        bool
+	readbuf []byte
+	Header  [][]byte
 
-	Header    [][]byte
-	HeaderSet chan bool
-
-	ProcessedHeader []string
-
+	HeaderSet   chan bool
 	Data        chan [][]byte
 	EmptyData   chan bool
 	StopWorkers chan bool
+
+	ProcessedHeader []string
+
+	splitFunc  bufio.SplitFunc
+	RowCounter RowCount
+
 	ParserCount int
+	colCount    int
 
-	sinput [][]byte
-	// scolumns [][]byte
-	sbuf []byte
-	gbuf []byte
-	gpos []uint32
-	rbuf []byte
+	*Buffers
 
+	headerPrinted      bool
+	inside             bool
 	hasPrefixEnclosure bool
 	hasSuffixEnclosure bool
 }
@@ -146,32 +141,31 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		p:             p,
 		headerPrinted: false,
 		splitFunc:     fn,
-		Benchmark:     false,
 		ParserCount:   0,
 	}
 
 	recordwriter.DebugLog = RWDebugLog
 	recordwriter.Overflow = Overflow
 
-	r.HeaderSet = make(chan bool)
-	r.Data = make(chan [][]byte, p.ChannelCapacity)
-	r.rbuf = make([]byte, 1*1024*1024)
-	r.EmptyData = make(chan bool)
-	r.StopWorkers = make(chan bool, p.ChannelCapacity)
-
 	return r
+}
+
+func NewBuffers() *Buffers {
+	buf := &Buffers{
+		gbuf: make([]byte, 0, 1*1024*1024),
+		gpos: make([]uint32, 0, 1024),
+		rbuf: make([]byte, 1*1024*1024),
+	}
+
+	return buf
 }
 
 func NewParser(p *Params, parsercount int) *Runtime {
 	r := &Runtime{
 		p:             p,
 		headerPrinted: false,
-		Benchmark:     false,
 		ParserCount:   parsercount,
 	}
-
-	r.gbuf = make([]byte, 0, 1*1024*1024)
-	r.gpos = make([]uint32, 0, 1024)
 
 	return r
 }
@@ -203,47 +197,56 @@ func (r *Runtime) Init(input io.Reader) {
 		r.f = input
 	}
 
-	var output string
-	if r.ParserCount == 0 {
-		output = r.p.Output
-	} else {
-		if r.p.Scratch != "" {
-			output = fmt.Sprintf("%s%s.%d", r.p.Scratch, path.Base(r.p.Output), r.ParserCount)
-		} else {
-			output = fmt.Sprintf("%s.%d", r.p.Output, r.ParserCount)
-		}
-	}
-
-	if r.p.Drop {
-		r.rw = recordwriter.NewDropWriter()
-	} else {
-		if !r.p.Sqlite {
-			if len(r.p.Output) == 0 {
-				r.w = os.Stdout
-				if r.Benchmark {
-					r.w = bufio.NewWriterSize(bytes.NewBuffer([]byte{}), r.p.CommitRate)
-				}
-			} else {
-				var err error
-				r.fout, err = os.Create(output)
-
-				if err != nil {
-					log.Fatalf("Cannot open file for writing: %s", err)
-				}
-				r.w = bufio.NewWriterSize(r.fout, r.p.CommitRate)
-			}
-
-			csv := recordwriter.NewCSVWriter(knownconfigs.CSV(), r.w, output)
-			csv.SetEnclosureSet(r.p.CSVEnclosureSet)
-			r.rw = csv
-		} else {
-			r.rw = recordwriter.NewSQLWriter(output, r.p.CommitRate, r.ParserCount == 0, r.p.RowID)
-		}
-	}
-
 	if r.ParserCount == 0 {
 		r.scanner = r.NewScanner()
+		r.Data = make(chan [][]byte, r.p.ChannelCapacity)
+		r.HeaderSet = make(chan bool)
+
+		r.EmptyData = make(chan bool)
+		r.StopWorkers = make(chan bool, r.p.ChannelCapacity)
 	}
+
+	r.rw = r.newRecordWriter(r.generateOutputPath())
+}
+
+func (r *Runtime) newRecordWriter(output string) recordwriter.RecordWriter {
+	if r.p.Drop {
+		return recordwriter.NewDropWriter()
+	}
+
+	if r.p.Sqlite {
+		return recordwriter.NewSQLWriter(output, r.p.CommitRate, r.ParserCount == 0, r.p.RowID)
+	}
+
+	if len(r.p.Output) == 0 {
+		r.w = os.Stdout
+	} else {
+		var err error
+		r.fout, err = os.Create(output)
+
+		if err != nil {
+			log.Fatalf("Cannot open file for writing: %s", err)
+		}
+		r.w = bufio.NewWriterSize(r.fout, r.p.CommitRate)
+	}
+
+	csv := recordwriter.NewCSVWriter(knownconfigs.CSV(), r.w, output)
+	csv.SetEnclosureSet(r.p.CSVEnclosureSet)
+	return csv
+}
+
+func (r *Runtime) generateOutputPath() string {
+	if r.ParserCount == 0 {
+		return r.p.Output
+	}
+
+	var output string
+	if r.p.Scratch != "" {
+		output = fmt.Sprintf("%s%s.%d", r.p.Scratch, path.Base(r.p.Output), r.ParserCount)
+	} else {
+		output = fmt.Sprintf("%s.%d", r.p.Output, r.ParserCount)
+	}
+	return output
 }
 
 func (r *Runtime) Close() error {
@@ -253,30 +256,33 @@ func (r *Runtime) Close() error {
 // CloseDB is only used for multi-threaded parsing
 func (r *Runtime) CloseDB() error {
 	var err error
-	if !r.p.Sqlite {
-		if out, ok := r.GetWriter().(*bufio.Writer); ok {
-			if err = out.Flush(); err != nil {
-				log.Fatalf("Runtime: could not flush writer: %s", err)
-			}
-		}
 
-		if f, ok := r.w.(*os.File); ok {
-			if !term.IsTerminal(int(f.Fd())) {
-				log.Printf("sync: %s", r.GetPath())
-				f.Sync()
-			}
-		}
+	if r.p.Sqlite {
+		return r.rw.Close()
+	}
 
-		if len(r.p.Output) != 0 {
-			if err = r.fout.Sync(); err != nil {
-				log.Fatalf("Runtime: could not sync writer: %s", err)
-			}
-
-			return r.fout.Close()
+	if out, ok := r.GetWriter().(*bufio.Writer); ok {
+		if err = out.Flush(); err != nil {
+			log.Fatalf("Runtime: could not flush writer: %s", err)
 		}
 	}
 
-	return r.rw.Close()
+	if f, ok := r.w.(*os.File); ok {
+		if !term.IsTerminal(int(f.Fd())) {
+			log.Printf("sync: %s", r.GetPath())
+			f.Sync()
+		}
+	}
+
+	if len(r.p.Output) != 0 {
+		if err = r.fout.Sync(); err != nil {
+			log.Fatalf("Runtime: could not sync writer: %s", err)
+		}
+
+		return r.fout.Close()
+	}
+
+	return nil
 }
 
 func (r *Runtime) NewScanner() *bufio.Scanner {
@@ -470,10 +476,10 @@ func (r *Runtime) Clean(data []byte, prefix, suffix bool) []byte {
 		}
 	}
 
-	if bytes.Contains(data, characters.Character_CARRIAGE_RETURN_LINE_FEED) {
+	if bytes.IndexByte(data, characters.Character_CARRIAGE_RETURN[0]) != -1 {
 		data = util.Replace(data, characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED, r.rbuf, -1)
-	}
-	if bytes.Contains(data, characters.Character_CARRIAGE_RETURN) {
+
+		// check again because it might have been cleaned out
 		data = util.Replace(data, characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED, r.rbuf, -1)
 	}
 
@@ -880,6 +886,8 @@ func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []ui
 }
 
 func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.ProgressBar) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	var err error
 	// var buf []byte
 	var delimSet bool
@@ -893,7 +901,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	if r.p.Characters.EnclosureIsEmpty {
 		enclosureSet = true
 	}
-	if r.p.Start != 0 {
+	if r.p.Start > 1 {
 		r.p.Characters.ReturnEarly = true
 	}
 
@@ -914,7 +922,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 	count := 0
 
 	// used for storing the zeroed 8 delimiterCount
-	bdcZero := util.EncodeCounts(0, 0)
+	bdcZero := util.EncodeCounts(make([]byte, 8), 0, 0)
 
 	var rowIdBuf []byte
 
@@ -932,14 +940,12 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			continue
 		}
 
-		if r.p.Start > 0 && startCounter < r.p.Start {
-			startCounter++
-			if startCounter <= r.p.Start {
-				if startCounter == r.p.Start {
-					r.p.Characters.ReturnEarly = false
-				}
-				continue
+		if r.p.Start > 1 && startCounter < r.p.Start {
+			if startCounter+1 == r.p.Start {
+				r.p.Characters.ReturnEarly = false
 			}
+			startCounter++
+			continue
 		}
 
 		if r.p.Skip > 0 && count != 0 && skipCounter < r.p.Skip {
@@ -1039,7 +1045,7 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 					r.p.Characters.DelimOutsideCounted++
 				}
 			}
-			chunk = append(chunk, util.EncodeCounts(uint32(r.p.Characters.DelimCounted), uint32(r.p.Characters.DelimOutsideCounted))...)
+			chunk = append(chunk, util.EncodeCounts(make([]byte, 8), uint32(r.p.Characters.DelimCounted), uint32(r.p.Characters.DelimOutsideCounted))...)
 			// reset the count
 			r.p.Characters.DelimCounted = 0
 			r.p.Characters.DelimOutsideCounted = 0

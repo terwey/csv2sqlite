@@ -213,7 +213,7 @@ func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 		return -1
 	}
 
-	sn := bytes.Count(s, sep)
+	sn := Count(s, sep)
 	if sn == -1 {
 		return sn
 	}
@@ -224,7 +224,7 @@ func CountOutsideEnclosure(s []byte, sep, enclosure characters.Character) int {
 	}
 
 	// if the enclosure does not appear inside the slice we can use a normal count
-	if bytes.IndexByte(s, sep[0]) == -1 {
+	if bytes.IndexByte(s, enclosure[0]) == -1 {
 		return sn
 	}
 	c := Count(s, enclosure)
@@ -990,11 +990,11 @@ func Count(s, sep []byte) int {
 	if len(sep) == 0 {
 		return 0
 	}
-	if len(sep) == 1 {
-		if bytes.IndexByte(s, sep[0]) == -1 {
-			return 0
-		}
+	// if the first byte of sep doesn't appear the rest won't either
+	if bytes.IndexByte(s, sep[0]) == -1 {
+		return 0
 	}
+
 	return bytes.Count(s, sep)
 }
 
@@ -1003,6 +1003,7 @@ func ReplaceAll(s, old, new []byte) []byte {
 	if !bytes.Contains(s, old) {
 		return s
 	}
+
 	return bytes.ReplaceAll(s, old, new)
 }
 
@@ -1074,14 +1075,19 @@ type DelimiterCounts struct {
 	OutsideCount int
 }
 
-func EncodeCounts(count, outside uint32) []byte {
-	cbc := make([]byte, 4)
-	obc := make([]byte, 4)
+func EncodeCounts(dst []byte, count, outside uint32) []byte {
+	if cap(dst) < 8 {
+		dst = make([]byte, 8)
+	}
+	dst = dst[:8]
+	// cbc := make([]byte, 4)
+	// obc := make([]byte, 4)
 
-	binary.LittleEndian.PutUint32(cbc, count)
-	binary.LittleEndian.PutUint32(obc, outside)
+	binary.LittleEndian.PutUint32(dst[0:], count)
+	binary.LittleEndian.PutUint32(dst[4:], outside)
 
-	return append(cbc, obc...)
+	// return append(cbc, obc...)
+	return dst
 }
 
 func DecodeCounts(v []byte) (count, outside int) {

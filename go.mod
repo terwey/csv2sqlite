@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/felixge/fgprof v0.9.3
 	github.com/google/go-cmp v0.5.9
+	github.com/klauspost/cpuid/v2 v2.2.4
 	github.com/productsupcom/go-sqlite-lite v0.9.5
 	github.com/terwey/recordwriter v0.5.1
 	github.com/schollz/progressbar/v3 v3.7.4
