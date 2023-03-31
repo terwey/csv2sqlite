@@ -2680,6 +2680,7 @@ func TestSplitRow(t *testing.T) {
 			p.Characters.SetEnclosure(tt.enclosure)
 			p.Exclude = tt.exclude
 			r := NewRuntime(p, bufio.ScanLines)
+			r.Buffers = NewBuffers()
 			if tt.colcount != 0 {
 				r.colCount = tt.colcount
 			} else {
@@ -2736,6 +2737,7 @@ func TestSplit(t *testing.T) {
 	p.Characters.SetDelimiter(characters.Character_PIPE)
 	p.Characters.SetEnclosure(characters.Character_QUOTATION_MARK)
 	r := NewRuntime(p, bufio.ScanLines)
+	r.Buffers = NewBuffers()
 	tests := []TestData{
 		{
 			name: "zero",
@@ -2792,6 +2794,7 @@ func TestParseRow(t *testing.T) {
 			p.Characters.SetEnclosure(tt.enclosure)
 			p.Exclude = tt.exclude
 			r := NewRuntime(p, bufio.ScanLines)
+			r.Buffers = NewBuffers()
 			// fake this
 			r.headerPrinted = true
 
@@ -2878,7 +2881,7 @@ func TestRuntime(t *testing.T) {
 
 		defer f.Close()
 
-		r.Init(f)
+		r.Init(f, NewBuffers())
 
 		pv := &progressbar.ProgressBar{}
 
@@ -2889,7 +2892,7 @@ func TestRuntime(t *testing.T) {
 
 		if <-r.HeaderSet {
 			pr := NewParser(p, 1)
-			pr.Init(nil)
+			pr.Init(nil, NewBuffers())
 			pr.ProcessHeader(r.Header)
 
 			writeWg.Add(1)

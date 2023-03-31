@@ -354,7 +354,7 @@ func main() {
 	}
 
 	var mergeWg sync.WaitGroup
-	r.Init(file)
+	r.Init(file, parser.NewBuffers())
 
 	// readWg is used for the main scanner loop and also for the header initialization
 	var readWg sync.WaitGroup
@@ -437,8 +437,7 @@ func main() {
 
 				parserCount++
 				pr := parser.NewParser(p, parserCount)
-				pr.Init(nil)
-				pr.Buffers = bufferPool.Get().(*parser.Buffers)
+				pr.Init(nil, bufferPool.Get().(*parser.Buffers))
 
 				pr.ProcessedHeader = r.ProcessedHeader
 				pr.ProcessHeader(r.Header)

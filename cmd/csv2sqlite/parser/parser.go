@@ -192,10 +192,12 @@ func (r *Runtime) GetScanner() *bufio.Scanner {
 	return r.scanner
 }
 
-func (r *Runtime) Init(input io.Reader) {
+func (r *Runtime) Init(input io.Reader, buffers *Buffers) {
 	if input != nil {
 		r.f = input
 	}
+
+	r.Buffers = buffers
 
 	if r.ParserCount == 0 {
 		r.scanner = r.NewScanner()
