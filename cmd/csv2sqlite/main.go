@@ -31,6 +31,8 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/pflag"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/klauspost/cpuid/v2"
 )
 
 var (
@@ -57,7 +59,7 @@ var (
 	showProgress bool
 
 	pv      *progressbar.ProgressBar
-	threads int = runtime.NumCPU()
+	threads int = cpuid.CPU.PhysicalCores
 
 	parseRoutines []*parser.Runtime
 	readyForMerge chan string
@@ -86,7 +88,7 @@ func getFlags() *pflag.FlagSet {
 	flags.StringVarP(&paramDelimiter, "delimiter", "d", "", "Set the delimiter in case auto-detect should not be used. Can be one of: \n\n - "+strings.Join(characters.GetAllCharacterNames(), "\n - "))
 	flags.StringVarP(&paramEnclosure, "enclosure", "e", "", "Set the enclosure in case auto-detect should not be used, can be one of: \n\n - "+strings.Join(characters.GetAllCharacterNames(), "\n - ")+"\n")
 
-	flags.IntVar(&p.Start, "start", 0, "The starting position where the header is, useful for CSVs produced by Excel.\nOnly works in combination with newline delimited, -nd enabled if set.")
+	flags.IntVar(&p.Start, "start", 1, "The starting position where the header is, useful for CSVs produced by Excel.")
 	flags.IntVar(&p.Skip, "skip", -1, "Rows to skip after the header")
 	flags.IntVar(&p.Limit, "limit", -1, "Amount of rows to process")
 
@@ -299,6 +301,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Could not create heapprofile: %s", err)
 		}
+		runtime.MemProfileRate = 1
 		defer pprof.WriteHeapProfile(f)
 	}
 
@@ -351,7 +354,7 @@ func main() {
 	}
 
 	var mergeWg sync.WaitGroup
-	r.Init(file)
+	r.Init(file, parser.NewBuffers())
 
 	// readWg is used for the main scanner loop and also for the header initialization
 	var readWg sync.WaitGroup
@@ -392,6 +395,12 @@ func main() {
 
 		var stop int
 
+		bufferPool := sync.Pool{
+			New: func() any {
+				return parser.NewBuffers()
+			},
+		}
+
 	twLoop:
 		for {
 			select {
@@ -428,7 +437,7 @@ func main() {
 
 				parserCount++
 				pr := parser.NewParser(p, parserCount)
-				pr.Init(nil)
+				pr.Init(nil, bufferPool.Get().(*parser.Buffers))
 
 				pr.ProcessedHeader = r.ProcessedHeader
 				pr.ProcessHeader(r.Header)
@@ -438,6 +447,8 @@ func main() {
 				threadWorkers.Add(1)
 				go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
 					routine *parser.Runtime, ready chan string, stop int, inserted chan parser.RowCount) {
+					runtime.LockOSThread()
+					defer runtime.UnlockOSThread()
 
 					for {
 						chunk, more := <-chunks
@@ -465,6 +476,8 @@ func main() {
 					ready <- routine.GetPath()
 					sem.Release(1)
 					tw.Done()
+					bufferPool.Put(routine.Buffers)
+					routine = nil
 				}(r.Data, &threadWorkers, sem, pr, readyForMerge, stop, rowCountChan)
 			}
 		}

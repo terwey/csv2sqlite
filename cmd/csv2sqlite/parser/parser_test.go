@@ -2680,6 +2680,7 @@ func TestSplitRow(t *testing.T) {
 			p.Characters.SetEnclosure(tt.enclosure)
 			p.Exclude = tt.exclude
 			r := NewRuntime(p, bufio.ScanLines)
+			r.Buffers = NewBuffers()
 			if tt.colcount != 0 {
 				r.colCount = tt.colcount
 			} else {
@@ -2691,7 +2692,7 @@ func TestSplitRow(t *testing.T) {
 			t.Logf("Name: %s, Colcount: %d (want: %d)", tt.name, r.colCount, len(tt.want))
 
 			// SplitRow expects a count appended to the data set, must be 32bit encoded
-			data := append(tt.args.data, util.EncodeCounts(0, 0)...)
+			data := append(tt.args.data, util.EncodeCounts(make([]byte, 8), 0, 0)...)
 			if got := util.FlatToMulti(r.SplitRow(0, data, false)); !cmp.Equal(got, tt.want) {
 				// if got := util.FlatToMulti(r.ParseUnescapedDelimiter(util.ColSplit(tt.args.data, p.Characters.Delimiter, p.Characters.Enclosure, -1))); !cmp.Equal(got, tt.want) {
 				if len(got) != len(tt.want) {
@@ -2736,6 +2737,7 @@ func TestSplit(t *testing.T) {
 	p.Characters.SetDelimiter(characters.Character_PIPE)
 	p.Characters.SetEnclosure(characters.Character_QUOTATION_MARK)
 	r := NewRuntime(p, bufio.ScanLines)
+	r.Buffers = NewBuffers()
 	tests := []TestData{
 		{
 			name: "zero",
@@ -2792,6 +2794,7 @@ func TestParseRow(t *testing.T) {
 			p.Characters.SetEnclosure(tt.enclosure)
 			p.Exclude = tt.exclude
 			r := NewRuntime(p, bufio.ScanLines)
+			r.Buffers = NewBuffers()
 			// fake this
 			r.headerPrinted = true
 
@@ -2802,7 +2805,7 @@ func TestParseRow(t *testing.T) {
 			}
 
 			// SplitRow expects a count+outsideCount appended to the data set, must be 32bit encoded
-			data := append(tt.args.data, util.EncodeCounts(0, tt.delimCount)...)
+			data := append(tt.args.data, util.EncodeCounts(make([]byte, 8), 0, tt.delimCount)...)
 
 			if got := util.FlatToMulti(r.ParseRow(data)); !cmp.Equal(got, tt.want) {
 				if diff := cmp.Diff(tt.want, got); diff != "" {
@@ -2878,7 +2881,7 @@ func TestRuntime(t *testing.T) {
 
 		defer f.Close()
 
-		r.Init(f)
+		r.Init(f, NewBuffers())
 
 		pv := &progressbar.ProgressBar{}
 
@@ -2889,7 +2892,7 @@ func TestRuntime(t *testing.T) {
 
 		if <-r.HeaderSet {
 			pr := NewParser(p, 1)
-			pr.Init(nil)
+			pr.Init(nil, NewBuffers())
 			pr.ProcessHeader(r.Header)
 
 			writeWg.Add(1)

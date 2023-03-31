@@ -2699,11 +2699,23 @@ func TestEncodeCounts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := EncodeCounts(tt.args.count, tt.args.outside); !reflect.DeepEqual(got, tt.want) {
+			if got := EncodeCounts(make([]byte, 0), tt.args.count, tt.args.outside); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("EncodeCounts() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+var encodeCountsBuf []byte
+
+func Benchmark_EncodeCounts(b *testing.B) {
+	b.ResetTimer()
+	var buf []byte
+	for n := 0; n < b.N; n++ {
+		buf = EncodeCounts(buf, 3, 4)
+	}
+
+	encodeCountsBuf = buf
 }
 
 func TestDecodeCounts(t *testing.T) {

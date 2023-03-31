@@ -7,6 +7,7 @@ import (
 
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
+	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
 	"github.com/terwey/csv2sqlite/sqlitehelper/compare"
 	"github.com/terwey/csv2sqlite/util"
 )
@@ -143,7 +144,7 @@ func Test_main(t *testing.T) {
 			params:    []string{"--rowid"},
 		},
 		{
-			name:      "cff112e3b8d3004086fe28b69c922f2d.csv",
+			name:      "cff112e3b8d3004086fe28b69c922f2d.csv header with a line break",
 			input:     baseDir + "tests/cff112e3b8d3004086fe28b69c922f2d.csv",
 			output:    tmpDir + "cff112e3b8d3004086fe28b69c922f2d.sqlite",
 			want:      baseDir + "tests/cff112e3b8d3004086fe28b69c922f2d.sqlite",
@@ -176,9 +177,11 @@ func Test_main(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
+			p = &parser.Params{}
+			p.Characters = &util.CharacterConfig{}
 			p.Characters.DelimiterCount = 0
 			p.Start = 0
-			p.Characters = &util.CharacterConfig{}
+			p.Limit = 0
 
 			os.Args = []string{
 				"rddb",
