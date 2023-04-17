@@ -766,7 +766,7 @@ func (cc *CharacterConfig) ReplaceBackslashEscapedEnclosure(in []byte) (dst []by
 				// character is not an enclosure, we must replace it
 				// something like \" was found
 				dst = append(dst, cc.DoubleEnclosure...)
-				start += len(cc.Enclosure)
+				// do not increment the start here with the len(cc.Enclosure) as it's already at that point
 			}
 		} else {
 			if start == 0 {
