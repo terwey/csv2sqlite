@@ -328,6 +328,10 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 	}
 
+	// counts how many times the chunk looped around
+	var stuckCount int
+
+findEolIndex:
 	eolIndex = bytes.Index(in, c.EOL)
 	// not enough bytes
 	if eolIndex == -1 {
@@ -421,7 +425,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	var enclosureCount int
 
 	// we want to loop over the possible eolIndex
-	for {
+	for ; ; stuckCount++ {
 		// count the delimiters
 		// if the delimCount matches the c.DelimiterCount it COULD be a full row, it can also have
 		// the delimiter inside a field, we need to check for that too
@@ -542,9 +546,9 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 			}
 		}
 
-		if bytes.Count(in[:eolIndex], c.Delimiter) > c.DelimiterCount {
-			if c.PHP {
-				fmt.Printf("Stuck on chunking: \n+++\n%s\n+++\n", in[:eolIndex])
+		if bytes.Count(in[:eolIndex], c.Delimiter) >= (c.DelimiterCount * 2) {
+			if stuckCount > 100 {
+				fmt.Printf("Stuck (%d) on chunking: \n+++\n%s\n+++\n", stuckCount, in[:eolIndex])
 				fmt.Printf("[SplitCsvInput] eolIndex: %d, c.EOL: %x\tdelimiter count: %d\t"+
 					"delimiters counted in buf: %d\tenclosures (%s) counted in buf: %d\t"+
 					"CountOutsideEnclosure: n %d\tNdMoved: %d\n",
@@ -553,10 +557,13 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 					CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure), c.NdMoved)
 
 				panic("stuck on chunking")
-			} else {
+			}
+
+			if !c.PHP && bytes.Contains(in[:eolIndex], c.EscapeCharacter) {
 				// hail mary
 				c.PHP = true
-				continue
+				// find the eolIndex again
+				goto findEolIndex
 			}
 		}
 
