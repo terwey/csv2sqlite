@@ -6,6 +6,7 @@ package util
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"strings"
 	"unicode/utf8"
@@ -537,6 +538,24 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				}
 				c.Excel = true
 				c.DelimiterCount++
+				continue
+			}
+		}
+
+		if bytes.Count(in[:eolIndex], c.Delimiter) > c.DelimiterCount {
+			if c.PHP {
+				fmt.Printf("Stuck on chunking: \n+++\n%s\n+++\n", in[:eolIndex])
+				fmt.Printf("[SplitCsvInput] eolIndex: %d, c.EOL: %x\tdelimiter count: %d\t"+
+					"delimiters counted in buf: %d\tenclosures (%s) counted in buf: %d\t"+
+					"CountOutsideEnclosure: n %d\tNdMoved: %d\n",
+					eolIndex, c.EOL, c.DelimiterCount,
+					bytes.Count(in[:eolIndex], c.Delimiter), c.Enclosure, bytes.Count(in[:eolIndex], c.Enclosure),
+					CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure), c.NdMoved)
+
+				panic("stuck on chunking")
+			} else {
+				// hail mary
+				c.PHP = true
 				continue
 			}
 		}
