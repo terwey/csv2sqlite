@@ -6,6 +6,7 @@ package util
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"strings"
 	"unicode/utf8"
@@ -327,6 +328,10 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 		}
 	}
 
+	// counts how many times the chunk looped around
+	var stuckCount int
+
+findEolIndex:
 	eolIndex = bytes.Index(in, c.EOL)
 	// not enough bytes
 	if eolIndex == -1 {
@@ -420,7 +425,7 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	var enclosureCount int
 
 	// we want to loop over the possible eolIndex
-	for {
+	for ; ; stuckCount++ {
 		// count the delimiters
 		// if the delimCount matches the c.DelimiterCount it COULD be a full row, it can also have
 		// the delimiter inside a field, we need to check for that too
@@ -538,6 +543,27 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 				c.Excel = true
 				c.DelimiterCount++
 				continue
+			}
+		}
+
+		if bytes.Count(in[:eolIndex], c.Delimiter) >= (c.DelimiterCount * 2) {
+			if stuckCount > 100 {
+				fmt.Printf("Stuck (%d) on chunking: \n+++\n%s\n+++\n", stuckCount, in[:eolIndex])
+				fmt.Printf("[SplitCsvInput] eolIndex: %d, c.EOL: %x\tdelimiter count: %d\t"+
+					"delimiters counted in buf: %d\tenclosures (%s) counted in buf: %d\t"+
+					"CountOutsideEnclosure: n %d\tNdMoved: %d\n",
+					eolIndex, c.EOL, c.DelimiterCount,
+					bytes.Count(in[:eolIndex], c.Delimiter), c.Enclosure, bytes.Count(in[:eolIndex], c.Enclosure),
+					CountOutsideEnclosure(in[:eolIndex], c.Delimiter, c.Enclosure), c.NdMoved)
+
+				panic("stuck on chunking")
+			}
+
+			if !c.PHP && bytes.Contains(in[:eolIndex], c.EscapeCharacter) {
+				// hail mary
+				c.PHP = true
+				// find the eolIndex again
+				goto findEolIndex
 			}
 		}
 
@@ -740,7 +766,7 @@ func (cc *CharacterConfig) ReplaceBackslashEscapedEnclosure(in []byte) (dst []by
 				// character is not an enclosure, we must replace it
 				// something like \" was found
 				dst = append(dst, cc.DoubleEnclosure...)
-				start += len(cc.Enclosure)
+				// do not increment the start here with the len(cc.Enclosure) as it's already at that point
 			}
 		} else {
 			if start == 0 {

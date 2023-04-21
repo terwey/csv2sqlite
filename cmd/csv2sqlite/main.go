@@ -105,7 +105,7 @@ func getFlags() *pflag.FlagSet {
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 15625, "Buffer size for reading from disk in kilobytes")
 	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
-	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 8000, "Buffered channels capacity multiplied by threads")
+	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 25, "Buffered channels capacity multiplied by threads")
 	flags.IntVar(&chunksize, "chunk-size", 10, "Chunksize before pushing the data to the channel")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")

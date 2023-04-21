@@ -142,6 +142,7 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 		headerPrinted: false,
 		splitFunc:     fn,
 		ParserCount:   0,
+		Buffers:       NewBuffers(),
 	}
 
 	recordwriter.DebugLog = RWDebugLog
