@@ -147,6 +147,12 @@ func Test_detectEnclosure(t *testing.T) {
 			debug:     false,
 		},
 		{
+			name:      "Detect quote when values contain quotes",
+			data:      []byte("a,b,c\n\"\"\"x\"\"\",\"\"\"y\"\"\",\"z\"\n\"\"\"p\"\"\",\"\"\"q\"\"\",\"r\""),
+			want:      Character_QUOTATION_MARK,
+			delimiter: Character_COMMA,
+		},
+		{
 			name:      "Detect quote optional",
 			data:      []byte(`1fielda,"2fieldb",3fieldc`),
 			want:      Character_QUOTATION_MARK,

@@ -207,7 +207,7 @@ loop:
 	for key := range detected {
 		buf := make([]byte, len(detected[key].char))
 		copy(buf, detected[key].char)
-		escaped := make([]byte, len(buf)*2)
+		escaped := make([]byte, 0, len(buf)*3)
 		escaped = append(escaped, buf...)
 		escaped = append(escaped, buf...)
 		delete(detected, string(escaped))
