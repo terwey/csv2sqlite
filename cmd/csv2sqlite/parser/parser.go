@@ -490,14 +490,19 @@ func (r *Runtime) colSplitFlat(s []byte, sep characters.Character, enclosure cha
 
 func (r *Runtime) Clean(data []byte, prefix, suffix bool) []byte {
 	if r.p.Characters.Config.EnclosureClean && bytes.Contains(data, r.p.Characters.Config.Enclosure) {
+		// without prefix or suffix set, only a value wrapped on both ends is enclosed;
+		// a lone quote at either end, such as the inch mark in 55", is data
+		enclosed := len(data) >= 2*len(r.p.Characters.Config.Enclosure) &&
+			bytes.HasPrefix(data, r.p.Characters.Config.Enclosure) &&
+			bytes.HasSuffix(data, r.p.Characters.Config.Enclosure)
 		if prefix {
 			data = util.TrimPrefixSkipCheck(data, r.p.Characters.Config.Enclosure)
-		} else {
+		} else if enclosed {
 			data = bytes.TrimPrefix(data, r.p.Characters.Config.Enclosure)
 		}
 		if suffix {
 			data = util.TrimSuffixSkipCheck(data, r.p.Characters.Config.Enclosure)
-		} else {
+		} else if enclosed {
 			data = bytes.TrimSuffix(data, r.p.Characters.Config.Enclosure)
 		}
 
