@@ -438,6 +438,34 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 	return
 }
 
+// excludeExisting keeps the excluded columns the header has, each once and in order;
+// SplitRow expects every index in Exclude to remove exactly one column.
+func (r *Runtime) excludeExisting(header []byte) {
+	if len(r.p.Exclude) == 0 {
+		return
+	}
+
+	delimiters := util.CountOutsideEnclosure(header, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
+	// unbalanced enclosures, count every delimiter instead
+	if delimiters <= 0 {
+		delimiters = util.Count(header, r.p.Characters.Delimiter)
+	}
+	columns := delimiters + 1
+
+	slices.Sort(r.p.Exclude)
+	r.p.Exclude = slices.Compact(r.p.Exclude)
+
+	exclude := r.p.Exclude[:0]
+	for _, i := range r.p.Exclude {
+		if i < 0 || i >= columns {
+			log.Printf("Ignoring --exclude %d, the header has %d columns", i, columns)
+			continue
+		}
+		exclude = append(exclude, i)
+	}
+	r.p.Exclude = exclude
+}
+
 func PosSliceContainsNoValues(pos []uint32) bool {
 	for _, v := range pos {
 		if v != 0 {
@@ -1014,6 +1042,8 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 			if len(util.ReplaceAll(chunk, r.p.Characters.Delimiter, characters.Character_EMPTY)) == 0 {
 				continue
 			}
+
+			r.excludeExisting(chunk)
 
 			chunk = append(chunk, bdcZero...)
 			c, _ := r.ParseRow(chunk)

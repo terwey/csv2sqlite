@@ -35,6 +35,27 @@ func Test_main_storedValues(t *testing.T) {
 			query:  "SELECT name FROM pragma_table_info('data') UNION ALL SELECT b || '|' || c FROM data",
 			want:   [][]string{{"b"}, {"c"}, {"2|3"}, {"5|6"}},
 		},
+		{
+			name:   "exclude beyond the last column is ignored",
+			input:  "a,b,c\n1,2,3\n4,\"x,y\",6\n7,8,9\n",
+			params: []string{"--exclude", "7"},
+			query:  "SELECT a || '|' || b || '|' || c FROM data",
+			want:   [][]string{{"1|2|3"}, {"4|x,y|6"}, {"7|8|9"}},
+		},
+		{
+			name:   "exclude a column twice",
+			input:  "a,b,c\n1,2,3\n4,\"x,y\",6\n7,8,9\n",
+			params: []string{"--exclude", "1,1"},
+			query:  "SELECT a || '|' || c FROM data",
+			want:   [][]string{{"1|3"}, {"4|6"}, {"7|9"}},
+		},
+		{
+			name:   "exclude a negative column is ignored",
+			input:  "a,b,c\n1,2,3\n4,\"x,y\",6\n7,8,9\n",
+			params: []string{"--exclude=-1"},
+			query:  "SELECT a || '|' || b || '|' || c FROM data",
+			want:   [][]string{{"1|2|3"}, {"4|x,y|6"}, {"7|8|9"}},
+		},
 	}
 
 	for _, tt := range tests {
