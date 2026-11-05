@@ -36,6 +36,13 @@ func Test_main_storedValues(t *testing.T) {
 			want:   [][]string{{"b"}, {"c"}, {"2|3"}, {"5|6"}},
 		},
 		{
+			name:   "rowid with a single column header of one byte",
+			input:  "a\nx1\nx2\nx3\n",
+			params: []string{"--rowid"},
+			query:  "SELECT name FROM pragma_table_info('data') UNION ALL SELECT a FROM data",
+			want:   [][]string{{"a"}, {"x1"}, {"x2"}, {"x3"}},
+		},
+		{
 			name:   "exclude beyond the last column is ignored",
 			input:  "a,b,c\n1,2,3\n4,\"x,y\",6\n7,8,9\n",
 			params: []string{"--exclude", "7"},

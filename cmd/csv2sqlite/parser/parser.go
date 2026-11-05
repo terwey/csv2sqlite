@@ -318,12 +318,12 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 	if len(cols) == 0 {
 		return []byte{}, []uint32{}
 	}
-	// only rowid has been set
-	if r.p.RowID && len(cols) == 1 {
+	// only rowid has been set, the header has no rowid
+	if r.p.RowID && r.headerPrinted && len(cols) == 1 {
 		return []byte{}, []uint32{}
 	}
 	if !r.headerPrinted {
-		if len(cols) == 1 {
+		if len(pos) == 1 {
 			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
 		}
 		var header [][]byte
