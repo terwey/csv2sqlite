@@ -43,6 +43,20 @@ func Test_main_storedValues(t *testing.T) {
 			want:   [][]string{{"a"}, {"x1"}, {"x2"}, {"x3"}},
 		},
 		{
+			name:   "enclosure NIL is EMPTY",
+			input:  "name,city\nNILSSON,Vanil\n\"Bob\",Berlin\n",
+			params: []string{"--enclosure", "NIL"},
+			query:  "SELECT name || '|' || city FROM data",
+			want:   [][]string{{"NILSSON|Vanil"}, {"\"Bob\"|Berlin"}},
+		},
+		{
+			name:   "enclosure empty in lowercase",
+			input:  "name,city\nNILSSON,Vanil\n\"Bob\",Berlin\n",
+			params: []string{"--enclosure", "empty"},
+			query:  "SELECT name || '|' || city FROM data",
+			want:   [][]string{{"NILSSON|Vanil"}, {"\"Bob\"|Berlin"}},
+		},
+		{
 			name:   "exclude beyond the last column is ignored",
 			input:  "a,b,c\n1,2,3\n4,\"x,y\",6\n7,8,9\n",
 			params: []string{"--exclude", "7"},

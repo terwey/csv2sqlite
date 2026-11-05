@@ -217,6 +217,10 @@ func main() {
 		p.Characters.SetEnclosure(characters.Character(literalEnclosure))
 	}
 	if paramEnclosure != `` {
+		// NIL is another name for EMPTY, CharacterFromString does not know it
+		if strings.EqualFold(paramEnclosure, "NIL") {
+			paramEnclosure = "EMPTY"
+		}
 		encl, err := characters.CharacterFromString(paramEnclosure)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error()+"\n")
@@ -224,7 +228,7 @@ func main() {
 			os.Exit(100)
 		}
 		p.Characters.SetEnclosure(encl)
-		if paramEnclosure == "EMPTY" || paramEnclosure == "NIL" {
+		if strings.EqualFold(paramEnclosure, "EMPTY") {
 			p.Characters.EnclosureIsEmpty = true
 			p.NewlineDelimited = true
 		}
