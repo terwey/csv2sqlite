@@ -36,6 +36,12 @@ func Test_main_storedValues(t *testing.T) {
 			want:   [][]string{{"b"}, {"c"}, {"2|3"}, {"5|6"}},
 		},
 		{
+			name:  "a header ending with a delimiter has no unnamed last column",
+			input: "a,b,\n1,2,\n4,5,\n",
+			query: "SELECT name FROM pragma_table_info('data') UNION ALL SELECT a || '|' || b FROM data",
+			want:  [][]string{{"a"}, {"b"}, {"1|2"}, {"4|5"}},
+		},
+		{
 			name:   "rowid with a single column header of one byte",
 			input:  "a\nx1\nx2\nx3\n",
 			params: []string{"--rowid"},
