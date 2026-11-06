@@ -109,6 +109,13 @@ func Test_main_storedValues(t *testing.T) {
 			want:   [][]string{{"NILSSON|Vanil"}, {"\"Bob\"|Berlin"}},
 		},
 		{
+			name:   "literal enclosure takes precedence over enclosure",
+			input:  "a,b\n'x,y',2\n",
+			params: []string{"--literal-enclosure", "'", "--enclosure", "QUOTATION_MARK"},
+			query:  "SELECT a || '|' || b FROM data",
+			want:   [][]string{{"x,y|2"}},
+		},
+		{
 			name:   "exclude beyond the last column is ignored",
 			input:  "a,b,c\n1,2,3\n4,\"x,y\",6\n7,8,9\n",
 			params: []string{"--exclude", "7"},

@@ -211,8 +211,7 @@ func main() {
 
 	if literale {
 		p.Characters.SetEnclosure(characters.Character(literalEnclosure))
-	}
-	if paramEnclosure != `` {
+	} else if paramEnclosure != `` {
 		// NIL is another name for EMPTY, CharacterFromString does not know it
 		if strings.EqualFold(paramEnclosure, "NIL") {
 			paramEnclosure = "EMPTY"
