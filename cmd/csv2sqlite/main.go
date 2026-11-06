@@ -173,7 +173,7 @@ func main() {
 		stdin = false
 	}
 
-	if p.Input != "" && p.Input == p.Output {
+	if p.Input != "" && samePath(p.Input, p.Output) {
 		fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
 		os.Exit(100)
 	}
@@ -590,6 +590,24 @@ func main() {
 		os.Exit(1)
 	}
 
+}
+
+// samePath reports whether a and b name the same file, also through ./a.csv or a symlink.
+func samePath(a, b string) bool {
+	if a == b {
+		return true
+	}
+
+	statA, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	statB, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+
+	return os.SameFile(statA, statB)
 }
 
 type Report struct {
