@@ -255,7 +255,8 @@ func main() {
 		p.Sqlite = true
 	}
 
-	if p.Sqlite && threads < 2 {
+	// one thread is reserved for merging, parsing needs at least one more
+	if threads < 2 {
 		log.Printf("Threads is set below 2, changing to 2")
 		threads = 2
 	}
