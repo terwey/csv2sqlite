@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -225,7 +226,7 @@ func Test_main(t *testing.T) {
 			main()
 
 			if tt.want != "" {
-				if err := compare.CompareFiles("data", tt.want, tt.output, tt.null); err != nil {
+				if err := compare.CompareFiles("data", copyFixture(t, tt.want), tt.output, tt.null); err != nil {
 					t.Errorf("CompareFiles() %s: error: %s", tt.name, err)
 				}
 
@@ -235,6 +236,22 @@ func Test_main(t *testing.T) {
 			}
 		})
 	}
+}
+
+// copyFixture copies a committed fixture into a temporary directory, CompareFiles writes an index
+// into both files it compares.
+func copyFixture(t *testing.T, path string) string {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(t.TempDir(), filepath.Base(path))
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dst
 }
 
 func Test_docs(t *testing.T) {
