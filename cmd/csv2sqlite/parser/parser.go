@@ -11,7 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -245,7 +245,7 @@ func (r *Runtime) generateOutputPath() string {
 
 	var output string
 	if r.p.Scratch != "" {
-		output = fmt.Sprintf("%s%s.%d", r.p.Scratch, path.Base(r.p.Output), r.ParserCount)
+		output = fmt.Sprintf("%s.%d", filepath.Join(r.p.Scratch, filepath.Base(r.p.Output)), r.ParserCount)
 	} else {
 		output = fmt.Sprintf("%s.%d", r.p.Output, r.ParserCount)
 	}
