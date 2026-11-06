@@ -127,24 +127,31 @@ func main() {
 	compare.ProgressEnabled = showProgress
 
 	err := compare.CompareFiles("data", a, b, null)
+	// an accepted difference passes, its reason goes into the .passed file
+	var accepted string
 	if err != nil {
-		if write {
-			log.Printf("%s.failed written\n", a)
-			os.WriteFile(a+".failed", []byte(err.Error()), 0666)
-		}
 		if errors.Is(err, compare.StillHasRows) && compare.RowCountDifference == -1 {
 			fmt.Fprintf(os.Stderr, "Difference was acceptable: %s\n", err)
 		} else if errors.Is(err, compare.IncorrectParsing) {
 			fmt.Fprintf(os.Stderr, "Incorrect parsing detected: %s\n", err)
 		} else {
+			if write {
+				log.Printf("%s.failed written\n", a)
+				os.WriteFile(a+".failed", []byte(err.Error()), 0666)
+			}
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
+		accepted = err.Error()
 	}
 
 	if write {
 		log.Printf("%s.passed written\n", a)
-		os.WriteFile(a+".passed", []byte(""), 0666)
+		os.WriteFile(a+".passed", []byte(accepted), 0666)
+	}
+	if accepted != "" {
+		log.Printf("Only accepted differences found")
+		return
 	}
 	log.Printf("No differences found")
 }
