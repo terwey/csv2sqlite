@@ -522,8 +522,10 @@ findEolIndex:
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 			}
 
-			// it is possible that the enclosure is simply optional
-			if c.DelimiterCount > 1 && c.DelimCounted == c.DelimiterCount && enclosureCount%2 != 0 && c.NdMoved == 0 {
+			// it is possible that the enclosure is simply optional, unless the last field opens one:
+			// that is a value with a line break in the last column
+			if c.DelimiterCount > 1 && c.DelimCounted == c.DelimiterCount && enclosureCount%2 != 0 && c.NdMoved == 0 &&
+				!c.openLastField(in[:eolIndex]) {
 				if debug.DebugLog {
 					debug.LogData("[SplitCsvInput] DelimCounted == DelimiterCount AND c.Enclosure count not even", in[:eolIndex], 4096)
 					debug.BreakMe()
@@ -684,6 +686,19 @@ func (c *CharacterConfig) strayEnclosure(in []byte, eolIndex int, atEOF bool) bo
 		}
 		return c.endsField(rest[pos:])
 	}
+}
+
+// openLastField reports whether the field after the last delimiter of line starts with an
+// enclosure that the line does not close.
+func (c *CharacterConfig) openLastField(line []byte) bool {
+	last := line
+	if i := bytes.LastIndex(line, c.Delimiter); i != -1 {
+		last = line[i+len(c.Delimiter):]
+	}
+	if !bytes.HasPrefix(last, c.Enclosure) {
+		return false
+	}
+	return bytes.Count(last, c.Enclosure)%2 != 0
 }
 
 // startsField reports whether a field starts right after before.

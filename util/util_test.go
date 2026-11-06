@@ -560,6 +560,20 @@ func getTestData() []TestData {
 			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
+			name: "multi-line value in the last of three columns",
+			in:   []byte("id,title,description\n1,Foo,\"line one\nline two\"\n2,Bar,baz\n3,Qux,quux"),
+			multiOut: [][]byte{
+				[]byte("id,title,description"),
+				[]byte("1,Foo,\"line one\nline two\""),
+				[]byte("2,Bar,baz"),
+				[]byte("3,Qux,quux"),
+			},
+			advance:   21,
+			out:       []byte("id,title,description"),
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+		},
+		{
 			name: "unclosed quote in the last of two columns",
 			in:   []byte("id,title\n1,\"Foo\"\n2,\"Bar\n3,Row3\n4,\"Baz\"\n5,Last"),
 			multiOut: [][]byte{
