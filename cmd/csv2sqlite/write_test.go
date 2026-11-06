@@ -42,6 +42,12 @@ func Test_main_storedValues(t *testing.T) {
 			want:  [][]string{{"Foo"}, {"TV 55\""}, {"Lamp, red"}},
 		},
 		{
+			name:  "a quote at the start of an unquoted value is data",
+			input: "id,title,price\n1,\"Foo\",10\n2,\"TV 55,20\n3,\"Lamp, red\",30\n",
+			query: "SELECT title FROM data",
+			want:  [][]string{{"Foo"}, {"\"TV 55"}, {"Lamp, red"}},
+		},
+		{
 			name:  "a header ending with a delimiter has no unnamed last column",
 			input: "a,b,\n1,2,\n4,5,\n",
 			query: "SELECT name FROM pragma_table_info('data') UNION ALL SELECT a || '|' || b FROM data",
