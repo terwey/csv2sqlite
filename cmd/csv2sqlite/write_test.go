@@ -63,6 +63,12 @@ func Test_main_storedValues(t *testing.T) {
 			want:   [][]string{{"1|foo \" bar\nbaz|3"}, {"4|5|6"}},
 		},
 		{
+			name:  "php escaped enclosure leaves one extra delimiter outside enclosures",
+			input: "id,name,note\n1,\"a\",x\n2,\"text \\\"quote, more\\\"\",y\n3,\"b\",z\n4,c,w\n",
+			query: "SELECT id || '|' || name || '|' || note FROM data",
+			want:  [][]string{{"1|a|x"}, {"2|text \"quote, more\"|y"}, {"3|b|z"}, {"4|c|w"}},
+		},
+		{
 			name:  "an unclosed quote keeps the rows after it",
 			input: "id,title\n1,\"Foo\"\n2,\"Bar\n3,Row3\n4,\"Baz\"\n5,Last\n",
 			query: "SELECT id || '|' || title FROM data",

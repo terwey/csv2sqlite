@@ -545,6 +545,21 @@ func getTestData() []TestData {
 			php:       true,
 		},
 		{
+			name: "php escaped enclosure leaves one extra delimiter outside enclosures",
+			in:   []byte("id,name,note\n1,\"a\",x\n2,\"text \\\"quote, more\\\"\",y\n3,\"b\",z\n4,c,w"),
+			multiOut: [][]byte{
+				[]byte("id,name,note"),
+				[]byte("1,\"a\",x"),
+				[]byte("2,\"text \"\"quote, more\"\"\",y"),
+				[]byte("3,\"b\",z"),
+				[]byte("4,c,w"),
+			},
+			advance:   13,
+			out:       []byte("id,name,note"),
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+		},
+		{
 			name: "unclosed quote in the last of two columns",
 			in:   []byte("id,title\n1,\"Foo\"\n2,\"Bar\n3,Row3\n4,\"Baz\"\n5,Last"),
 			multiOut: [][]byte{

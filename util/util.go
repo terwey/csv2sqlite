@@ -545,6 +545,14 @@ findEolIndex:
 			// we cannot compare with the c.DelimCount as that number is ALWAYS higher than c.DelimOutsideCount
 			// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
 			if !c.Excel && c.DelimOutsideCounted-c.DelimiterCount == 1 {
+				// a backslash escaped enclosure explains the extra delimiter as well, PHP mode goes first
+				if !c.PHP && bytes.Contains(in[:eolIndex], c.EscapedEnclosure) {
+					if debug.DebugLog {
+						debug.Debug("[SplitCsvInput] PHP mode enabled instead of Excel mode")
+					}
+					c.PHP = true
+					goto findEolIndex
+				}
 				if debug.DebugLog {
 					debug.Debug("[SplitCsvInput] Excel mode enabled: c.DelimOutsideCounted (%d) - c.DelimiterCount (%d)", c.DelimOutsideCounted, c.DelimiterCount)
 				}
