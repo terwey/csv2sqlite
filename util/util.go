@@ -331,6 +331,9 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	// counts how many times the chunk looped around
 	var stuckCount int
 
+	// end of the first line, before the index moves to a following EOL
+	var firstEolIndex int
+
 findEolIndex:
 	eolIndex = bytes.Index(in, c.EOL)
 	// not enough bytes
@@ -340,6 +343,7 @@ findEolIndex:
 		}
 		return 0, nil, nil
 	}
+	firstEolIndex = eolIndex
 
 	if len(in[:eolIndex]) == 0 {
 		return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -523,6 +527,17 @@ findEolIndex:
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 			}
 
+			// a full row with an open enclosure, and the next enclosure encloses a field of its own
+			if eolIndex == firstEolIndex && !c.PHP && c.DelimCounted == c.DelimiterCount &&
+				(enclosureCount-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 != 0 &&
+				c.strayEnclosure(in, eolIndex, atEOF) {
+				if debug.DebugLog {
+					debug.LogData("[SplitCsvInput] stray enclosure, the next enclosure encloses a field", in[:eolIndex], 4096)
+					debug.BreakMe()
+				}
+				return eolIndex + len(c.EOL), in[:eolIndex], nil
+			}
+
 			// we cannot compare with the c.DelimCount as that number is ALWAYS higher than c.DelimOutsideCount
 			// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
 			if !c.Excel && c.DelimOutsideCounted-c.DelimiterCount == 1 {
@@ -619,6 +634,58 @@ findEolIndex:
 
 	// not enough bytes
 	return 0, nil, nil
+}
+
+// strayEnclosure reports whether the open enclosure on the line ending at eolIndex has no
+// partner: the next enclosure starts a field and the enclosure after it ends that field,
+// or at EOF no enclosure follows. It returns false while in holds too little to tell.
+func (c *CharacterConfig) strayEnclosure(in []byte, eolIndex int, atEOF bool) bool {
+	if len(in) < eolIndex+len(c.EOL) {
+		return false
+	}
+	rest := in[eolIndex+len(c.EOL):]
+
+	open := bytes.Index(rest, c.Enclosure)
+	if open == -1 {
+		return atEOF
+	}
+	if !c.startsField(rest[:open]) {
+		return false
+	}
+
+	pos := open + len(c.Enclosure)
+	for {
+		i := bytes.Index(rest[pos:], c.Enclosure)
+		if i == -1 {
+			return false
+		}
+		pos += i + len(c.Enclosure)
+
+		// a doubled enclosure is an escaped one inside the field
+		if i != 0 && bytes.HasPrefix(rest[pos:], c.Enclosure) {
+			pos += len(c.Enclosure)
+			continue
+		}
+
+		if pos == len(rest) {
+			return atEOF
+		}
+		return c.endsField(rest[pos:])
+	}
+}
+
+// startsField reports whether a field starts right after before.
+func (c *CharacterConfig) startsField(before []byte) bool {
+	if len(before) == 0 {
+		return true
+	}
+	last := before[len(before)-1]
+	return bytes.HasSuffix(before, c.Delimiter) || last == '\n' || last == '\r'
+}
+
+// endsField reports whether a field ends right before after.
+func (c *CharacterConfig) endsField(after []byte) bool {
+	return bytes.HasPrefix(after, c.Delimiter) || after[0] == '\n' || after[0] == '\r'
 }
 
 func (cc *CharacterConfig) DetectDelimiterAndEnclosureInChunk(in []byte, eolIndex int) {

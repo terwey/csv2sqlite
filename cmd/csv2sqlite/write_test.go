@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -46,6 +47,19 @@ func Test_main_storedValues(t *testing.T) {
 			input: "id,title,price\n1,\"Foo\",10\n2,\"TV 55,20\n3,\"Lamp, red\",30\n",
 			query: "SELECT title FROM data",
 			want:  [][]string{{"Foo"}, {"\"TV 55"}, {"Lamp, red"}},
+		},
+		{
+			name:  "an unclosed quote keeps the rows after it",
+			input: "id,title\n1,\"Foo\"\n2,\"Bar\n3,Row3\n4,\"Baz\"\n5,Last\n",
+			query: "SELECT id || '|' || title FROM data",
+			want:  [][]string{{"1|Foo"}, {"2|\"Bar"}, {"3|Row3"}, {"4|Baz"}, {"5|Last"}},
+		},
+		{
+			name:   "an unclosed quote is found before the buffer is full",
+			input:  "id,title\n1,\"Foo\"\n2,\"Bar\n3,\"Baz\"\n" + strings.Repeat("9,Row\n", 400),
+			params: []string{"--buffer-size", "1"},
+			query:  "SELECT count(*), (SELECT title FROM data WHERE CAST(id AS TEXT) = '2') FROM data",
+			want:   [][]string{{"403", "\"Bar"}},
 		},
 		{
 			name:  "a header ending with a delimiter has no unnamed last column",
