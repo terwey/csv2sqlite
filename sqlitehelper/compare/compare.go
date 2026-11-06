@@ -177,6 +177,20 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		return Information{}, fmt.Errorf("Conn B has zero rows")
 	}
 
+	maxRowid, err := Count(info.table, a, true)
+	if err != nil {
+		return Information{}, fmt.Errorf("Count(A): %w", err)
+	}
+
+	maxRowidB, err := Count(info.table, b, true)
+	if err != nil {
+		return Information{}, fmt.Errorf("Count(B): %w", err)
+	}
+
+	if maxRowidB > maxRowid {
+		maxRowid = maxRowidB
+	}
+
 	if countA != countB {
 		RowCountDifference = countA - countB
 		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d\nDifference: (A-B) %d", countA, countB, RowCountDifference)
@@ -216,6 +230,7 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		fileA:     info.fileA,
 		fileB:     info.fileB,
 		count:     countA,
+		maxRowid:  maxRowid,
 		rawNames:  rawColNames,
 		usedCols:  usedCols,
 		indexName: indexNameA,
@@ -228,6 +243,7 @@ type Information struct {
 	fileA     string
 	fileB     string
 	count     int
+	maxRowid  int
 	rawNames  []string
 	usedCols  []string
 	indexName string
@@ -281,6 +297,10 @@ func Compare(info Information, a, b *sqlite3.Conn, null bool) error {
 	limit := 0
 	offset := 0
 	left := info.count
+	// without an ORDER BY the rows are read in rowid ranges, and rowids can have gaps
+	if NoSort || len(info.usedCols) == 0 {
+		left = info.maxRowid + 1
+	}
 
 	errs, _ := errgroup.WithContext(context.Background())
 	errs.SetLimit(MaxWorkers)
@@ -554,7 +574,6 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 								buf.WriteString("\n\n")
 								fmt.Fprintf(os.Stderr, "%s\n", buf.String())
 								return IncorrectParsing
-								goto end
 							}
 						}
 					}
@@ -607,7 +626,6 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			}
 		}
 
-	end:
 		pv.Add(1)
 	}
 

@@ -63,6 +63,8 @@ func DetectEnclosureWithDelimiter(data []byte, delimiter Character) (Character, 
 	cols := bytes.Split(data, delimiter)
 	var prevLeft []byte
 	var prevLeftKnown []byte
+	// openKnown is a known enclosure that opened a value no column has closed yet
+	var openKnown []byte
 
 	if debug.DebugLog {
 		debug.BreakMe()
@@ -95,6 +97,11 @@ loop:
 
 		if unicode.IsSpace(Character(left).Rune()) || bytes.Equal(left, []byte("?")) {
 			left = make([]byte, 0)
+		}
+
+		// a doubled enclosure inside an open value is an escaped one, the value is closed later
+		if len(openKnown) > 0 && bytes.HasPrefix(cols[i], append(append([]byte{}, openKnown...), openKnown...)) {
+			continue
 		}
 
 		if len(left) > 0 {
@@ -148,7 +155,14 @@ loop:
 			copy(left, prevLeftKnown)
 		}
 
-		if len(left) > 0 && bytes.Equal(left, right) {
+		closed := len(left) > 0 && bytes.Equal(left, right)
+		if closed {
+			openKnown = nil
+		} else if isKnownEnclosure(left) && bytes.HasPrefix(cols[i], left) {
+			openKnown = append([]byte{}, left...)
+		}
+
+		if closed {
 			if debug.DebugLog {
 				debug.Debug("[DetectEnclosureWithDelimiter] match left and right = +%s+\ncol: %s", left, cols[i])
 			}
@@ -207,7 +221,7 @@ loop:
 	for key := range detected {
 		buf := make([]byte, len(detected[key].char))
 		copy(buf, detected[key].char)
-		escaped := make([]byte, len(buf)*2)
+		escaped := make([]byte, 0, len(buf)*3)
 		escaped = append(escaped, buf...)
 		escaped = append(escaped, buf...)
 		delete(detected, string(escaped))

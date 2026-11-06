@@ -173,17 +173,19 @@ func main() {
 		stdin = false
 	}
 
-	if p.Input != "" && p.Input == p.Output {
+	if p.Input != "" && samePath(p.Input, p.Output) {
 		fmt.Fprintf(os.Stderr, "Input and Output are the same path\n")
 		os.Exit(100)
 	}
 
-	if p.Output != "" {
-		go os.Remove(p.Output)
-	}
-
 	if cpuprofile != "" && cpuprofile == heapprofile {
 		fmt.Fprintf(os.Stderr, "cpu-profile and heap-profile are the same path\n")
+		os.Exit(100)
+	}
+
+	// the first worker only starts once the data channel holds a chunk
+	if p.ChannelCapacity < 1 {
+		fmt.Fprintf(os.Stderr, "channel-capacity must be at least 1\n")
 		os.Exit(100)
 	}
 
@@ -215,8 +217,11 @@ func main() {
 
 	if literale {
 		p.Characters.SetEnclosure(characters.Character(literalEnclosure))
-	}
-	if paramEnclosure != `` {
+	} else if paramEnclosure != `` {
+		// NIL is another name for EMPTY, CharacterFromString does not know it
+		if strings.EqualFold(paramEnclosure, "NIL") {
+			paramEnclosure = "EMPTY"
+		}
 		encl, err := characters.CharacterFromString(paramEnclosure)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error()+"\n")
@@ -224,7 +229,7 @@ func main() {
 			os.Exit(100)
 		}
 		p.Characters.SetEnclosure(encl)
-		if paramEnclosure == "EMPTY" || paramEnclosure == "NIL" {
+		if strings.EqualFold(paramEnclosure, "EMPTY") {
 			p.Characters.EnclosureIsEmpty = true
 			p.NewlineDelimited = true
 		}
@@ -255,7 +260,8 @@ func main() {
 		p.Sqlite = true
 	}
 
-	if p.Sqlite && threads < 2 {
+	// one thread is reserved for merging, parsing needs at least one more
+	if threads < 2 {
 		log.Printf("Threads is set below 2, changing to 2")
 		threads = 2
 	}
@@ -267,13 +273,6 @@ func main() {
 
 	// multiple channel capacity by threads
 	p.ChannelCapacity = p.ChannelCapacity * threads
-
-	// we need to increase the numbers in Exclude with 1
-	if p.RowID && len(p.Exclude) != 0 {
-		for i := range p.Exclude {
-			p.Exclude[i]++
-		}
-	}
 
 	// convert to kb
 	p.Buffersize *= 1024
@@ -353,6 +352,13 @@ func main() {
 		file = os.Stdin
 	}
 
+	// the previous output is only removed once the input is open
+	if p.Output != "" {
+		if err := os.Remove(p.Output); err != nil && !os.IsNotExist(err) {
+			log.Fatalf("Cannot remove previous output: %s", err)
+		}
+	}
+
 	var mergeWg sync.WaitGroup
 	r.Init(file, parser.NewBuffers())
 
@@ -368,6 +374,13 @@ func main() {
 	conversionStart := time.Now()
 	var insertWg sync.WaitGroup
 	if <-r.HeaderSet {
+		// the header has been split without a rowid column, the rows carry it as their first column
+		if p.RowID {
+			for i := range p.Exclude {
+				p.Exclude[i]++
+			}
+		}
+
 		// close the original file if not sqlite
 		if !p.Sqlite {
 			r.Close()
@@ -481,6 +494,12 @@ func main() {
 				}(r.Data, &threadWorkers, sem, pr, readyForMerge, stop, rowCountChan)
 			}
 		}
+
+		if p.RowID {
+			for i := range p.Exclude {
+				p.Exclude[i]--
+			}
+		}
 	}
 
 	readWg.Wait()
@@ -530,12 +549,6 @@ func main() {
 				chunksize*p.ChannelCapacity*threads,
 			)
 		} else {
-			// we need to decrease the numbers in Exclude with 1 again for the report
-			if p.RowID && len(p.Exclude) != 0 {
-				for i := range p.Exclude {
-					p.Exclude[i]--
-				}
-			}
 			report := Report{
 				Parser:    "csv2sqlite",
 				Version:   version,
@@ -582,6 +595,24 @@ func main() {
 		os.Exit(1)
 	}
 
+}
+
+// samePath reports whether a and b name the same file, also through ./a.csv or a symlink.
+func samePath(a, b string) bool {
+	if a == b {
+		return true
+	}
+
+	statA, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	statB, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+
+	return os.SameFile(statA, statB)
 }
 
 type Report struct {

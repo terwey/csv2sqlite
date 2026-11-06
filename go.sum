@@ -24,10 +24,6 @@ github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db/go.mod h1:l0
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/productsupcom/go-sqlite-lite v0.6.1 h1:odqbXEHJ+Pl32vROeI1+/SQPJ+VFJGvtibj3yCvAcks=
-github.com/productsupcom/go-sqlite-lite v0.9.5 h1:f6uhjwO7FMaKUoXycZxDyEsk1QzRxNCzxXWle+uOXng=
-github.com/productsupcom/go-sqlite-lite v0.9.5/go.mod h1:YGo4yOO2y2flqZf3JzIQu2EePVUCgvSnoS0J7xk4KxQ=
-github.com/terwey/recordwriter v0.5.1 h1:P0DyjK0XUph6xYZIfAjy5msRhBaprvJUptqbh62RIzU=
-github.com/terwey/recordwriter v0.5.1/go.mod h1:YrT4+4W/JFv/bldwaDt0vvc1kSe0pWyFd/9TMEfe7bE=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
@@ -41,6 +37,10 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
+github.com/terwey/go-sqlite-lite v0.9.6 h1:HGTzhucQNW1YEH6RnbhkkUY0l2DTo6N0a5Ic/Zfj5iE=
+github.com/terwey/go-sqlite-lite v0.9.6/go.mod h1:YGo4yOO2y2flqZf3JzIQu2EePVUCgvSnoS0J7xk4KxQ=
+github.com/terwey/recordwriter v0.6.0 h1:vl6DjLSCrhjZ8NY1W+gzIBNuQB0EJRgNAIQy2s3+KOc=
+github.com/terwey/recordwriter v0.6.0/go.mod h1:YrT4+4W/JFv/bldwaDt0vvc1kSe0pWyFd/9TMEfe7bE=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad h1:DN0cp81fZ3njFcrLCytUHRSUkqBjfTo4Tx9RJTWs0EY=
 golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad/go.mod h1:jdWPYTVW3xRLrWPugEBEK3UY2ZEsg3UU495nc5E+M+I=

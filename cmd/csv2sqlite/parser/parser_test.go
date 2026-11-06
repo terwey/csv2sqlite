@@ -84,6 +84,19 @@ func GetTests() []TestData {
 			exclude:   []int{1},
 		},
 		{
+			name: "short row with a delimiter inside enclosure",
+			args: TestArgs{
+				data: []byte(`"a,b",c`),
+			},
+			want: [][]byte{
+				[]byte(`a,b`),
+				[]byte(`c`),
+			},
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+			colcount:  3,
+		},
+		{
 			name: "one delimiter inside enclosure",
 			args: TestArgs{
 				data: []byte(`"8190926091450104"|"Foo | Bar"|""|""|""`),
@@ -2956,6 +2969,26 @@ func Benchmark_GenSplitClean(b *testing.B) {
 		buf = buf[:0]
 		pos = pos[:0]
 		v, pos = r.genSplit(in, characters.Character_COMMA, -1, r.Clean, nil)
+	}
+
+	resultGenSplitBuf = v
+	resultGenSplitPos = pos
+}
+
+func Benchmark_SplitRow(b *testing.B) {
+	var v []byte
+	var pos []uint32
+	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89",""`)
+	p := NewParameters()
+	p.Characters.SetDelimiter(characters.Character_COMMA)
+	p.Characters.SetEnclosure(characters.Character_QUOTATION_MARK)
+	r := NewRuntime(p, bufio.ScanLines)
+	r.Buffers = NewBuffers()
+	r.colCount = 10
+	data := append(in, util.EncodeCounts(make([]byte, 8), 9, 0)...)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		v, pos = r.SplitRow(0, data, false)
 	}
 
 	resultGenSplitBuf = v

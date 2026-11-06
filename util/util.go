@@ -331,6 +331,12 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	// counts how many times the chunk looped around
 	var stuckCount int
 
+	// NdMoved counts the line breaks inside the record being split, the next record starts at zero
+	c.NdMoved = 0
+
+	// end of the first line, before the index moves to a following EOL
+	var firstEolIndex int
+
 findEolIndex:
 	eolIndex = bytes.Index(in, c.EOL)
 	// not enough bytes
@@ -340,6 +346,7 @@ findEolIndex:
 		}
 		return 0, nil, nil
 	}
+	firstEolIndex = eolIndex
 
 	if len(in[:eolIndex]) == 0 {
 		return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -434,8 +441,12 @@ findEolIndex:
 		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
 
 		// if the source was produced by PHP we must clean that up, check the chunk we are now looking at
+		// in place, the data after eolIndex is still needed when the row continues on the next line;
+		// a replacement that changes the length would shift every index, it is skipped
 		if c.PHP && bytes.Contains(in[:eolIndex], c.EscapedEnclosure) {
-			in = c.ReplaceBackslashEscapedEnclosure(in[:eolIndex])
+			if replaced := c.ReplaceBackslashEscapedEnclosure(in[:eolIndex]); len(replaced) == eolIndex {
+				copy(in, replaced)
+			}
 		}
 
 		if debug.DebugLog {
@@ -484,8 +495,13 @@ findEolIndex:
 		if c.EnclosureLength() != 0 {
 			// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 			// it COULD be a row, more tests will proof otherwise
-			if c.DelimCounted == c.DelimiterCount &&
-				((enclosureCount-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 == 0) {
+			// a backslash before an enclosure only escapes it in PHP mode, in RFC 4180 data it
+			// precedes the first enclosure of a doubled pair
+			escapedCount := 0
+			if c.PHP {
+				escapedCount = bytes.Count(in[:eolIndex], c.EscapedEnclosure)
+			}
+			if c.DelimCounted == c.DelimiterCount && (enclosureCount-escapedCount)%2 == 0 {
 				// test is not good enough, but the delimiters are equal, so should be correct
 				// if c.DelimCounted == c.DelimiterCount {
 				if debug.DebugLog {
@@ -514,10 +530,23 @@ findEolIndex:
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
 			}
 
-			// it is possible that the enclosure is simply optional
-			if c.DelimiterCount > 1 && c.DelimCounted == c.DelimiterCount && enclosureCount%2 != 0 && c.NdMoved == 0 {
+			// it is possible that the enclosure is simply optional, unless the last field opens one:
+			// that is a value with a line break in the last column
+			if c.DelimiterCount > 1 && c.DelimCounted == c.DelimiterCount && enclosureCount%2 != 0 && c.NdMoved == 0 &&
+				!c.openLastField(in[:eolIndex]) {
 				if debug.DebugLog {
 					debug.LogData("[SplitCsvInput] DelimCounted == DelimiterCount AND c.Enclosure count not even", in[:eolIndex], 4096)
+					debug.BreakMe()
+				}
+				return eolIndex + len(c.EOL), in[:eolIndex], nil
+			}
+
+			// a full row with an open enclosure, and the next enclosure encloses a field of its own
+			if eolIndex == firstEolIndex && !c.PHP && c.DelimCounted == c.DelimiterCount &&
+				(enclosureCount-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 != 0 &&
+				c.strayEnclosure(in, eolIndex, atEOF) {
+				if debug.DebugLog {
+					debug.LogData("[SplitCsvInput] stray enclosure, the next enclosure encloses a field", in[:eolIndex], 4096)
 					debug.BreakMe()
 				}
 				return eolIndex + len(c.EOL), in[:eolIndex], nil
@@ -526,6 +555,14 @@ findEolIndex:
 			// we cannot compare with the c.DelimCount as that number is ALWAYS higher than c.DelimOutsideCount
 			// and previously, a locally scoped delimCount var was overwritten by the result from CountOutsideEnclosure
 			if !c.Excel && c.DelimOutsideCounted-c.DelimiterCount == 1 {
+				// a backslash escaped enclosure explains the extra delimiter as well, PHP mode goes first
+				if !c.PHP && bytes.Contains(in[:eolIndex], c.EscapedEnclosure) {
+					if debug.DebugLog {
+						debug.Debug("[SplitCsvInput] PHP mode enabled instead of Excel mode")
+					}
+					c.PHP = true
+					goto findEolIndex
+				}
 				if debug.DebugLog {
 					debug.Debug("[SplitCsvInput] Excel mode enabled: c.DelimOutsideCounted (%d) - c.DelimiterCount (%d)", c.DelimOutsideCounted, c.DelimiterCount)
 				}
@@ -619,6 +656,71 @@ findEolIndex:
 
 	// not enough bytes
 	return 0, nil, nil
+}
+
+// strayEnclosure reports whether the open enclosure on the line ending at eolIndex has no
+// partner: the next enclosure starts a field and the enclosure after it ends that field,
+// or at EOF no enclosure follows. It returns false while in holds too little to tell.
+func (c *CharacterConfig) strayEnclosure(in []byte, eolIndex int, atEOF bool) bool {
+	if len(in) < eolIndex+len(c.EOL) {
+		return false
+	}
+	rest := in[eolIndex+len(c.EOL):]
+
+	open := bytes.Index(rest, c.Enclosure)
+	if open == -1 {
+		return atEOF
+	}
+	if !c.startsField(rest[:open]) {
+		return false
+	}
+
+	pos := open + len(c.Enclosure)
+	for {
+		i := bytes.Index(rest[pos:], c.Enclosure)
+		if i == -1 {
+			return false
+		}
+		pos += i + len(c.Enclosure)
+
+		// a doubled enclosure is an escaped one inside the field
+		if i != 0 && bytes.HasPrefix(rest[pos:], c.Enclosure) {
+			pos += len(c.Enclosure)
+			continue
+		}
+
+		if pos == len(rest) {
+			return atEOF
+		}
+		return c.endsField(rest[pos:])
+	}
+}
+
+// openLastField reports whether the field after the last delimiter of line starts with an
+// enclosure that the line does not close.
+func (c *CharacterConfig) openLastField(line []byte) bool {
+	last := line
+	if i := bytes.LastIndex(line, c.Delimiter); i != -1 {
+		last = line[i+len(c.Delimiter):]
+	}
+	if !bytes.HasPrefix(last, c.Enclosure) {
+		return false
+	}
+	return bytes.Count(last, c.Enclosure)%2 != 0
+}
+
+// startsField reports whether a field starts right after before.
+func (c *CharacterConfig) startsField(before []byte) bool {
+	if len(before) == 0 {
+		return true
+	}
+	last := before[len(before)-1]
+	return bytes.HasSuffix(before, c.Delimiter) || last == '\n' || last == '\r'
+}
+
+// endsField reports whether a field ends right before after.
+func (c *CharacterConfig) endsField(after []byte) bool {
+	return bytes.HasPrefix(after, c.Delimiter) || after[0] == '\n' || after[0] == '\r'
 }
 
 func (cc *CharacterConfig) DetectDelimiterAndEnclosureInChunk(in []byte, eolIndex int) {

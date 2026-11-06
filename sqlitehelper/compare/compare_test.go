@@ -3,6 +3,8 @@ package compare
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -189,19 +191,34 @@ func TestCompareNoEscapedIgnore(t *testing.T) {
 }
 
 func TestCompareFiles(t *testing.T) {
-	err := CompareFiles("data", "../tests/head.sqlite", "../tests/528874.sqlite", false)
+	err := CompareFiles("data", copyFixture(t, "../../tests/head.sqlite"), copyFixture(t, "../../tests/528874.sqlite"), false)
 	if err == nil {
 		t.Errorf("CompareFiles() did not return err")
 	}
 }
 
 func TestCompareFiles_512034_11822895(t *testing.T) {
-	err := CompareFiles("data",
-		"../../tests/csvSample.512034.11822895.sqlite",
-		"../../tests/csvSample.512034.11822895.sqlite", false)
+	fixture := copyFixture(t, "../../tests/csvSample.512034.11822895.sqlite")
+	err := CompareFiles("data", fixture, fixture, false)
 	if err != nil {
 		t.Errorf("CompareFiles() returned error: %s", err)
 	}
+}
+
+// copyFixture copies a committed fixture into a temporary directory, CompareFiles writes an index
+// into both files it compares.
+func copyFixture(t *testing.T, path string) string {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(t.TempDir(), filepath.Base(path))
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dst
 }
 
 func Test_intersect(t *testing.T) {

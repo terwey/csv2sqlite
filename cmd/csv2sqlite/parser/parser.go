@@ -11,7 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -129,6 +129,9 @@ type Runtime struct {
 	inside             bool
 	hasPrefixEnclosure bool
 	hasSuffixEnclosure bool
+
+	// keepLastColumn keeps an unnamed last header column, the rows have values in it
+	keepLastColumn bool
 }
 
 var (
@@ -245,7 +248,7 @@ func (r *Runtime) generateOutputPath() string {
 
 	var output string
 	if r.p.Scratch != "" {
-		output = fmt.Sprintf("%s%s.%d", r.p.Scratch, path.Base(r.p.Output), r.ParserCount)
+		output = fmt.Sprintf("%s.%d", filepath.Join(r.p.Scratch, filepath.Base(r.p.Output)), r.ParserCount)
 	} else {
 		output = fmt.Sprintf("%s.%d", r.p.Output, r.ParserCount)
 	}
@@ -318,12 +321,12 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 	if len(cols) == 0 {
 		return []byte{}, []uint32{}
 	}
-	// only rowid has been set
-	if r.p.RowID && len(cols) == 1 {
+	// only rowid has been set, the header has no rowid
+	if r.p.RowID && r.headerPrinted && len(cols) == 1 {
 		return []byte{}, []uint32{}
 	}
 	if !r.headerPrinted {
-		if len(cols) == 1 {
+		if len(pos) == 1 {
 			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
 		}
 		var header [][]byte
@@ -333,7 +336,7 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 		header = append(header, util.FlatToMulti(cols, pos)...)
 
 		// we gotta check if the last column in the header is set, if not drop it
-		if len(header[len(header)-1]) == 0 {
+		if len(header[len(header)-1]) == 0 && !r.keepLastColumn {
 			header = header[:len(header)-1]
 			r.p.Characters.Excel = true
 		}
@@ -438,6 +441,34 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 	return
 }
 
+// excludeExisting keeps the excluded columns the header has, each once and in order;
+// SplitRow expects every index in Exclude to remove exactly one column.
+func (r *Runtime) excludeExisting(header []byte) {
+	if len(r.p.Exclude) == 0 {
+		return
+	}
+
+	delimiters := util.CountOutsideEnclosure(header, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
+	// unbalanced enclosures, count every delimiter instead
+	if delimiters <= 0 {
+		delimiters = util.Count(header, r.p.Characters.Delimiter)
+	}
+	columns := delimiters + 1
+
+	slices.Sort(r.p.Exclude)
+	r.p.Exclude = slices.Compact(r.p.Exclude)
+
+	exclude := r.p.Exclude[:0]
+	for _, i := range r.p.Exclude {
+		if i < 0 || i >= columns {
+			log.Printf("Ignoring --exclude %d, the header has %d columns", i, columns)
+			continue
+		}
+		exclude = append(exclude, i)
+	}
+	r.p.Exclude = exclude
+}
+
 func PosSliceContainsNoValues(pos []uint32) bool {
 	for _, v := range pos {
 		if v != 0 {
@@ -462,14 +493,19 @@ func (r *Runtime) colSplitFlat(s []byte, sep characters.Character, enclosure cha
 
 func (r *Runtime) Clean(data []byte, prefix, suffix bool) []byte {
 	if r.p.Characters.Config.EnclosureClean && bytes.Contains(data, r.p.Characters.Config.Enclosure) {
+		// without prefix or suffix set, only a value wrapped on both ends is enclosed;
+		// a lone quote at either end, such as the inch mark in 55", is data
+		enclosed := len(data) >= 2*len(r.p.Characters.Config.Enclosure) &&
+			bytes.HasPrefix(data, r.p.Characters.Config.Enclosure) &&
+			bytes.HasSuffix(data, r.p.Characters.Config.Enclosure)
 		if prefix {
 			data = util.TrimPrefixSkipCheck(data, r.p.Characters.Config.Enclosure)
-		} else {
+		} else if enclosed {
 			data = bytes.TrimPrefix(data, r.p.Characters.Config.Enclosure)
 		}
 		if suffix {
 			data = util.TrimSuffixSkipCheck(data, r.p.Characters.Config.Enclosure)
-		} else {
+		} else if enclosed {
 			data = bytes.TrimSuffix(data, r.p.Characters.Config.Enclosure)
 		}
 
@@ -537,7 +573,16 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		count--
 	}
 
-	if colCount == count+1-len(r.p.Exclude) || (colCount == 0 && len(r.p.Characters.Enclosure) == 0 && len(r.p.Characters.Delimiter) > 1) {
+	plain := colCount == count+1-len(r.p.Exclude)
+	// a short row can reach the expected count with delimiters inside an enclosure
+	if plain && len(r.p.Characters.Enclosure) != 0 && delimiterInsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure) {
+		if outside := util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure); outside > 0 && outside < count {
+			plain = false
+			lowestCount = outside
+		}
+	}
+
+	if plain || (colCount == 0 && len(r.p.Characters.Enclosure) == 0 && len(r.p.Characters.Delimiter) > 1) {
 		out, pos = r.genSplit(data, r.p.Characters.Delimiter, -1, r.Clean, r.p.Exclude)
 		if debug.DebugLog {
 			debug.Debug("[SplitRow] GenSplit found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
@@ -711,6 +756,38 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	}
 
 	return out, pos
+}
+
+// delimiterInsideEnclosure reports whether a delimiter sits between an enclosure and the next one.
+func delimiterInsideEnclosure(data []byte, delimiter, enclosure characters.Character) bool {
+	if len(delimiter) == 1 && len(enclosure) == 1 {
+		inside := false
+		for _, c := range data {
+			if c == enclosure[0] {
+				inside = !inside
+			} else if inside && c == delimiter[0] {
+				return true
+			}
+		}
+		return false
+	}
+
+	for {
+		open := bytes.Index(data, enclosure)
+		if open == -1 {
+			return false
+		}
+		data = data[open+len(enclosure):]
+
+		end := bytes.Index(data, enclosure)
+		if end == -1 {
+			return false
+		}
+		if bytes.Contains(data[:end], delimiter) {
+			return true
+		}
+		data = data[end+len(enclosure):]
+	}
 }
 
 func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []uint32) {
@@ -929,6 +1006,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 
 	var rowIdBuf []byte
 
+	// a header ending with a delimiter waits for the first row
+	var pendingHeader []byte
+
 	// amount of bytes the chunksize is occupying
 	var chunksSize int
 	for scanner.Scan() {
@@ -1005,13 +1085,19 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		// we have to process a header once
 		if count == 0 {
 			// a trim would have been sufficient but turns out some files have multiple
-			// remove \uFEFF used as BOM
-			chunk = util.ReplaceAll(chunk, characters.BOM_UTF16_BE, []byte{})
-			// remove \uEFBBBF used as BOM
 			chunk = util.ReplaceAll(chunk, characters.BOM_UTF8, []byte{})
 
 			// some files have empty cols before the header, we should drop them, slight speed impact but worth the fix
 			if len(util.ReplaceAll(chunk, r.p.Characters.Delimiter, characters.Character_EMPTY)) == 0 {
+				continue
+			}
+
+			r.excludeExisting(chunk)
+
+			// an unnamed last column is an Excel export only when the first row ends with a delimiter as well
+			if bytes.HasSuffix(chunk, r.p.Characters.Delimiter) {
+				pendingHeader = chunk
+				count++
 				continue
 			}
 
@@ -1021,6 +1107,15 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 				count++
 			}
 			continue
+		}
+
+		if pendingHeader != nil {
+			r.keepLastColumn = !bytes.HasSuffix(chunk, r.p.Characters.Delimiter)
+			r.ParseRow(append(pendingHeader, bdcZero...))
+			pendingHeader = nil
+			if r.p.Characters.Excel {
+				chunk = bytes.TrimSuffix(chunk, r.p.Characters.Delimiter)
+			}
 		}
 
 		if len(chunks) >= chunkCount {
@@ -1070,6 +1165,11 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		} else {
 			log.Fatalf("Runtime: scanner error after loop: %s", err)
 		}
+	}
+
+	// a file without rows keeps the Excel reading of a header ending with a delimiter
+	if pendingHeader != nil {
+		r.ParseRow(append(pendingHeader, bdcZero...))
 	}
 
 	if len(chunks) != 0 {
