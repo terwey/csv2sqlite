@@ -11,9 +11,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/spf13/pflag"
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
-	"github.com/spf13/pflag"
 	"golang.org/x/exp/slices"
 )
 
@@ -112,8 +112,8 @@ type CharacterConfig struct {
 }
 
 func NewCharacterConfig(delimiter, enclosure characters.Character) *CharacterConfig {
-	cc := CharacterConfig{}
-	cc.Config = characters.NewConfig(delimiter, enclosure)
+	cc := CharacterConfig{
+		Config: characters.NewConfig(delimiter, enclosure)}
 
 	return &cc
 }

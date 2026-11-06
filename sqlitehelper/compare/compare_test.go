@@ -26,7 +26,7 @@ func CreateMemoryTable(table string, rows int) (*sqlite3.Conn, error) {
 		return nil, fmt.Errorf("failed to create table: %s", err)
 	}
 
-	for i := 0; i < rows; i++ {
+	for i := range rows {
 		err = conn.Exec(fmt.Sprintf("INSERT INTO %s (id, foo, baz) VALUES ('%d', '%s', '')", table, i, "foo"))
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert: %s", err)

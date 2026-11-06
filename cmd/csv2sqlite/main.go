@@ -25,11 +25,11 @@ import (
 	"time"
 
 	"github.com/felixge/fgprof"
+	"github.com/schollz/progressbar/v3"
+	"github.com/spf13/pflag"
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
-	"github.com/schollz/progressbar/v3"
-	"github.com/spf13/pflag"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/klauspost/cpuid/v2"

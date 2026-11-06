@@ -1,0 +1,63 @@
+name: build
+
+# Builds csv2sqlite for linux and darwin on amd64 and arm64. go-sqlite-lite compiles SQLite with cgo,
+# so every target builds on a runner of its own OS and architecture instead of cross-compiling.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Version written into the binary with -X main.version
+        type: string
+        required: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-24.04
+          - goos: linux
+            goarch: arm64
+            runner: ubuntu-24.04-arm
+          - goos: darwin
+            goarch: amd64
+            runner: macos-15-intel
+          - goos: darwin
+            goarch: arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27'
+
+      - name: Build
+        env:
+          CGO_ENABLED: '1'
+          CGO_CFLAGS: -O3 -DSQLITE_MAX_COLUMN=32767
+          VERSION: ${{ inputs.version }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          tags=sqlite_omit_load_extension
+          ldflags="-X main.version=$VERSION -X main.minversion=$(date -u +%Y-%m-%d.%H:%M:%S)"
+          # linux binaries are static, netgo and osusergo keep glibc's resolver out of them
+          if [ "$GOOS" = linux ]; then
+            tags="$tags,netgo,osusergo"
+            ldflags="$ldflags -extldflags=-static"
+          fi
+          mkdir -p dist
+          go build -trimpath -tags "$tags" -ldflags "$ldflags" -o dist/csv2sqlite ./cmd/csv2sqlite
+          ./dist/csv2sqlite --version
+          tar -C dist -czf "csv2sqlite_${VERSION}_${GOOS}_${GOARCH}.tar.gz" csv2sqlite
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: csv2sqlite_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: csv2sqlite_*.tar.gz
+          if-no-files-found: error

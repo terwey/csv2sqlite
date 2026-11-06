@@ -24,6 +24,7 @@ github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db/go.mod h1:l0
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/productsupcom/go-sqlite-lite v0.6.1 h1:odqbXEHJ+Pl32vROeI1+/SQPJ+VFJGvtibj3yCvAcks=
+github.com/productsupcom/go-sqlite-lite v0.6.1/go.mod h1:lO+n2R11uEdMV57/DY69qC0ePSo45OFVlSq28gRmPH8=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=

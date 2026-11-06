@@ -21,12 +21,12 @@ import (
 	"golang.org/x/exp/slices"
 	"golang.org/x/term"
 
+	"github.com/schollz/progressbar/v3"
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/characters/knownconfigs"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/util"
 	"github.com/terwey/recordwriter/recordwriter"
-	"github.com/schollz/progressbar/v3"
 )
 
 type RowCount struct {
@@ -180,7 +180,7 @@ func (r *Runtime) Merge(ready <-chan string, wg *sync.WaitGroup, duration chan t
 	// }
 }
 
-func (r *Runtime) debug(format string, v ...interface{}) {
+func (r *Runtime) debug(format string, v ...any) {
 	debug.Debug("parser: "+format, v...)
 }
 

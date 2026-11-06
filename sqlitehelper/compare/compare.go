@@ -147,9 +147,9 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		fmt.Fprintf(os.Stderr, "Columns B: %v\n", namesB.Names())
 		msg := fmt.Sprintf("Compare() Columns mismatch (-a +b):\n%s", diff)
 		if NoColumnIntersect {
-			return Information{}, fmt.Errorf(msg)
+			return Information{}, errors.New(msg)
 		} else {
-			fmt.Fprintf(os.Stderr, msg+"\n")
+			fmt.Fprintln(os.Stderr, msg)
 			rawColNames = intersect(namesA.RawNames(), namesB.RawNames())
 			log.Printf("intersecting columns: %s", rawColNames)
 		}
@@ -195,7 +195,7 @@ func Preflight(info Information, a, b *sqlite3.Conn, null bool) (Information, er
 		RowCountDifference = countA - countB
 		msg := fmt.Sprintf("Rowcount for tables do not match. A: %d B: %d\nDifference: (A-B) %d", countA, countB, RowCountDifference)
 		if !IgnoreCount {
-			return Information{}, fmt.Errorf(msg)
+			return Information{}, errors.New(msg)
 		}
 
 		log.Printf("WARN: %s", msg)
@@ -450,8 +450,8 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			break
 		}
 
-		outA := make([]interface{}, 0, cols)
-		for i := 0; i < cols; i++ {
+		outA := make([]any, 0, cols)
+		for i := range cols {
 			val, ok, err := stmtA.ColumnText(i)
 			if err != nil {
 				return fmt.Errorf("ColumnRawBytes(A): %w", err)
@@ -469,8 +469,8 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			}
 		}
 
-		outB := make([]interface{}, 0, cols)
-		for i := 0; i < cols; i++ {
+		outB := make([]any, 0, cols)
+		for i := range cols {
 			val, ok, err := stmtB.ColumnText(i)
 			if err != nil {
 				return fmt.Errorf("ColumnRawBytes(B): %w", err)
@@ -488,8 +488,8 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 		}
 
 		if diff := cmp.Diff(outA, outB); diff != "" {
-			bufA := make([]interface{}, len(outA))
-			bufB := make([]interface{}, len(outB))
+			bufA := make([]any, len(outA))
+			bufB := make([]any, len(outB))
 			copy(bufA, outA)
 			copy(bufB, outB)
 			if !NoCRLFIgnore {
