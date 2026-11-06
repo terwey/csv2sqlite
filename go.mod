@@ -7,9 +7,9 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/klauspost/cpuid/v2 v2.2.4
 	github.com/productsupcom/go-sqlite-lite v0.9.5
-	github.com/terwey/recordwriter v0.5.1
 	github.com/schollz/progressbar/v3 v3.7.4
 	github.com/spf13/pflag v1.0.5
+	github.com/terwey/recordwriter v0.6.0
 	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
 	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.6.0
@@ -28,3 +28,5 @@ require (
 // the upstream seems unmaintained
 replace github.com/bvinc/go-sqlite-lite v0.6.1 => github.com/productsupcom/go-sqlite-lite v0.6.1
 
+// the fork carries the padding and leak fixes of bind_multibytes
+replace github.com/productsupcom/go-sqlite-lite => github.com/terwey/go-sqlite-lite v0.9.6

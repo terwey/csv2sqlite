@@ -23,6 +23,29 @@ func Test_main_storedValues(t *testing.T) {
 		want   [][]string
 	}{
 		{
+			name:  "short rows are padded and every value is text",
+			input: "a,b,c\n1,,3\n4,5\n6,7,8\n9\n",
+			query: "SELECT a, b, c, typeof(a), typeof(b), typeof(c) FROM data ORDER BY a",
+			want: [][]string{
+				{"1", "", "3", "text", "text", "text"},
+				{"4", "5", "", "text", "text", "text"},
+				{"6", "7", "8", "text", "text", "text"},
+				{"9", "", "", "text", "text", "text"},
+			},
+		},
+		{
+			name:   "short rows are padded and every value is text with rowid",
+			input:  "a,b,c\n1,,3\n4,5\n6,7,8\n9\n",
+			params: []string{"--rowid"},
+			query:  "SELECT rowid, typeof(rowid), a, b, c, typeof(a), typeof(b), typeof(c) FROM data ORDER BY rowid",
+			want: [][]string{
+				{"1", "integer", "1", "", "3", "text", "text", "text"},
+				{"2", "integer", "4", "5", "", "text", "text", "text"},
+				{"3", "integer", "6", "7", "8", "text", "text", "text"},
+				{"4", "integer", "9", "", "", "text", "text", "text"},
+			},
+		},
+		{
 			name:   "exclude with rowid drops the same column from the header and the rows",
 			input:  "a,b,c\n1,2,3\n4,5,6\n",
 			params: []string{"--rowid", "--exclude", "1"},
