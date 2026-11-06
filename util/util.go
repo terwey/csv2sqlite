@@ -492,8 +492,13 @@ findEolIndex:
 		if c.EnclosureLength() != 0 {
 			// if delimCount is larger then DelimiterCount _AND_ encloCount is even
 			// it COULD be a row, more tests will proof otherwise
-			if c.DelimCounted == c.DelimiterCount &&
-				((enclosureCount-bytes.Count(in[:eolIndex], c.EscapedEnclosure))%2 == 0) {
+			// a backslash before an enclosure only escapes it in PHP mode, in RFC 4180 data it
+			// precedes the first enclosure of a doubled pair
+			escapedCount := 0
+			if c.PHP {
+				escapedCount = bytes.Count(in[:eolIndex], c.EscapedEnclosure)
+			}
+			if c.DelimCounted == c.DelimiterCount && (enclosureCount-escapedCount)%2 == 0 {
 				// test is not good enough, but the delimiters are equal, so should be correct
 				// if c.DelimCounted == c.DelimiterCount {
 				if debug.DebugLog {

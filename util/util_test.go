@@ -574,6 +574,19 @@ func getTestData() []TestData {
 			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
+			name: "backslash before a doubled quote, then a multi-line last value",
+			in:   []byte("a,b,c\n4,\"x\\\"\"y\",\"line one\nline two\"\n7,8,9"),
+			multiOut: [][]byte{
+				[]byte("a,b,c"),
+				[]byte("4,\"x\\\"\"y\",\"line one\nline two\""),
+				[]byte("7,8,9"),
+			},
+			advance:   6,
+			out:       []byte("a,b,c"),
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+		},
+		{
 			name: "unclosed quote in the last of two columns",
 			in:   []byte("id,title\n1,\"Foo\"\n2,\"Bar\n3,Row3\n4,\"Baz\"\n5,Last"),
 			multiOut: [][]byte{
