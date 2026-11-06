@@ -331,6 +331,9 @@ func (c *CharacterConfig) SplitCsvInput(in []byte, atEOF bool) (advance int, tok
 	// counts how many times the chunk looped around
 	var stuckCount int
 
+	// NdMoved counts the line breaks inside the record being split, the next record starts at zero
+	c.NdMoved = 0
+
 	// end of the first line, before the index moves to a following EOL
 	var firstEolIndex int
 

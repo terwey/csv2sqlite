@@ -587,6 +587,21 @@ func getTestData() []TestData {
 			enclosure: characters.Character_QUOTATION_MARK,
 		},
 		{
+			name: "short row after a multi-line value",
+			in:   []byte("a,b,c\n1,\"multi\nline\",3\n4,5\n6,7,8\n9,10,11"),
+			multiOut: [][]byte{
+				[]byte("a,b,c"),
+				[]byte("1,\"multi\nline\",3"),
+				[]byte("4,5"),
+				[]byte("6,7,8"),
+				[]byte("9,10,11"),
+			},
+			advance:   6,
+			out:       []byte("a,b,c"),
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+		},
+		{
 			name: "unclosed quote in the last of two columns",
 			in:   []byte("id,title\n1,\"Foo\"\n2,\"Bar\n3,Row3\n4,\"Baz\"\n5,Last"),
 			multiOut: [][]byte{
