@@ -450,8 +450,8 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			break
 		}
 
-		outA := make([]interface{}, 0, cols)
-		for i := 0; i < cols; i++ {
+		outA := make([]any, 0, cols)
+		for i := range cols {
 			val, ok, err := stmtA.ColumnText(i)
 			if err != nil {
 				return fmt.Errorf("ColumnRawBytes(A): %w", err)
@@ -469,8 +469,8 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			}
 		}
 
-		outB := make([]interface{}, 0, cols)
-		for i := 0; i < cols; i++ {
+		outB := make([]any, 0, cols)
+		for i := range cols {
 			val, ok, err := stmtB.ColumnText(i)
 			if err != nil {
 				return fmt.Errorf("ColumnRawBytes(B): %w", err)
@@ -488,8 +488,8 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 		}
 
 		if diff := cmp.Diff(outA, outB); diff != "" {
-			bufA := make([]interface{}, len(outA))
-			bufB := make([]interface{}, len(outB))
+			bufA := make([]any, len(outA))
+			bufB := make([]any, len(outB))
 			copy(bufA, outA)
 			copy(bufB, outB)
 			if !NoCRLFIgnore {

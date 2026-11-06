@@ -27,13 +27,13 @@ func LogData(name string, data []byte, max int) {
 	}
 }
 
-func Debug(format string, v ...interface{}) {
+func Debug(format string, v ...any) {
 	if DebugLog {
 		fmt.Fprintf(os.Stderr, format+"\n----\n", v...)
 	}
 }
 
-func Printf(format string, v ...interface{}) {
+func Printf(format string, v ...any) {
 	Debug(format, v...)
 }
 
@@ -51,7 +51,7 @@ func DebugColumns(cols [][]byte) {
 	}
 }
 
-func LogDropped(format string, v ...interface{}) {
+func LogDropped(format string, v ...any) {
 	if EnableLogDropped {
 		fmt.Fprintf(os.Stderr, format+"\n----\n", v...)
 	}

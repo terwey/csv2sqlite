@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/schollz/progressbar/v3"
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/util"
-	"github.com/schollz/progressbar/v3"
 )
 
 func Benchmark_SplitUnescapedDelimiter(b *testing.B) {

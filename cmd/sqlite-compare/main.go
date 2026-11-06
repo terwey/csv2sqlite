@@ -10,9 +10,9 @@ import (
 	"os"
 	"runtime/pprof"
 
+	"github.com/spf13/pflag"
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/sqlitehelper/compare"
-	"github.com/spf13/pflag"
 )
 
 var (

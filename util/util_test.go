@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
+	"os"
 	"path"
 	"reflect"
 	"testing"
@@ -358,11 +358,9 @@ func Benchmark_GenSplitClean(b *testing.B) {
 	var pos []uint32
 	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
 	c := CharacterConfig{
-		Config: characters.Config{
-			Enclosure:       characters.Character_QUOTATION_MARK,
-			DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
-			EnclosureClean:  true,
-		},
+		Enclosure:       characters.Character_QUOTATION_MARK,
+		DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
+		EnclosureClean:  true,
 	}
 
 	b.ResetTimer()
@@ -381,11 +379,9 @@ var CleanerIn []byte = []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI"
 func Benchmark_Cleaner(b *testing.B) {
 	var out []byte
 	c := CharacterConfig{
-		Config: characters.Config{
-			Enclosure:       characters.Character_QUOTATION_MARK,
-			DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
-			EnclosureClean:  true,
-		},
+		Enclosure:       characters.Character_QUOTATION_MARK,
+		DoubleEnclosure: characters.Character_QUOTATION_MARK_DOUBLE,
+		EnclosureClean:  true,
 	}
 
 	b.ResetTimer()
@@ -2276,7 +2272,7 @@ func getTestDataFromBolTestfile() TestData {
 
 	base := "/home/yt/csv2sqlite/testfiles"
 	td.name = "example.com head.csv"
-	td.in, err = ioutil.ReadFile(path.Join(base, "bol_input.csv"))
+	td.in, err = os.ReadFile(path.Join(base, "bol_input.csv"))
 	td.delimiter = characters.Character_PIPE
 	td.debug = false
 	if err != nil {
@@ -2285,7 +2281,7 @@ func getTestDataFromBolTestfile() TestData {
 	}
 
 	for i := 1; i <= 10; i++ {
-		buf, err := ioutil.ReadFile(path.Join(base, fmt.Sprintf("bol_out_%02d.csv", i)))
+		buf, err := os.ReadFile(path.Join(base, fmt.Sprintf("bol_out_%02d.csv", i)))
 		if err != nil {
 			debug.Debug("err: %s", err)
 			return TestData{}
@@ -2303,7 +2299,7 @@ func getTestLineFromFile(hash string, encl, delim characters.Character, doDebug 
 
 	base := "/home/yt/csv2sqlite/testfiles"
 	td.name = hash
-	td.in, err = ioutil.ReadFile(path.Join(base, fmt.Sprintf("%s_input.csv", hash)))
+	td.in, err = os.ReadFile(path.Join(base, fmt.Sprintf("%s_input.csv", hash)))
 	td.delimiter = delim
 	td.enclosure = encl
 	td.debug = doDebug
@@ -2314,7 +2310,7 @@ func getTestLineFromFile(hash string, encl, delim characters.Character, doDebug 
 	}
 
 	for i := 1; i <= 10; i++ {
-		buf, err := ioutil.ReadFile(path.Join(base, fmt.Sprintf("%s_out_%02d.csv", hash, i)))
+		buf, err := os.ReadFile(path.Join(base, fmt.Sprintf("%s_out_%02d.csv", hash, i)))
 		if err != nil {
 			continue
 		}
