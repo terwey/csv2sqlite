@@ -38,7 +38,7 @@ func Test_stringValueForCharacter(t *testing.T) {
 		t.Errorf("wrong character returned: %s", o)
 	}
 
-	t.Logf(Character_EMPTY.String())
+	t.Log(Character_EMPTY.String())
 }
 
 func Test_detectDelimiter(t *testing.T) {
