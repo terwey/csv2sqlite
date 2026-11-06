@@ -2975,6 +2975,26 @@ func Benchmark_GenSplitClean(b *testing.B) {
 	resultGenSplitPos = pos
 }
 
+func Benchmark_SplitRow(b *testing.B) {
+	var v []byte
+	var pos []uint32
+	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89",""`)
+	p := NewParameters()
+	p.Characters.SetDelimiter(characters.Character_COMMA)
+	p.Characters.SetEnclosure(characters.Character_QUOTATION_MARK)
+	r := NewRuntime(p, bufio.ScanLines)
+	r.Buffers = NewBuffers()
+	r.colCount = 10
+	data := append(in, util.EncodeCounts(make([]byte, 8), 9, 0)...)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		v, pos = r.SplitRow(0, data, false)
+	}
+
+	resultGenSplitBuf = v
+	resultGenSplitPos = pos
+}
+
 func Benchmark_GenSplitCharacterClean(b *testing.B) {
 	var v []byte
 	in := []byte(`"2189","97998848","007-04-8133","FCFO","DC_FZXMI","2022-03-11T21:46:09N","9999-12-31T00:00:00N","9.89","9.89","","[{""exftqvytk_id"":""I007CCK"",""xfa_mswb"":""2021-08-15"",""gtctd"":""01"",""zpjlv"":""R"",""eamrd"":""35"",""xzdjwnv"":""1"",""bwjeamwtgug_mswb"":""2022-08-14""}]"`)
