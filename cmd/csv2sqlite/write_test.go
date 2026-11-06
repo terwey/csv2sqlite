@@ -88,6 +88,12 @@ func Test_main_storedValues(t *testing.T) {
 			want:  [][]string{{"a"}, {"b"}, {"1|2"}, {"4|5"}},
 		},
 		{
+			name:  "an unnamed last header column keeps the values the rows have in it",
+			input: "a,b,\n1,2,3\n4,5,6\n",
+			query: "SELECT name FROM pragma_table_info('data') UNION ALL SELECT a || '|' || b || '|' || empty_column FROM data",
+			want:  [][]string{{"a"}, {"b"}, {"empty_column"}, {"1|2|3"}, {"4|5|6"}},
+		},
+		{
 			name:   "rowid with a single column header of one byte",
 			input:  "a\nx1\nx2\nx3\n",
 			params: []string{"--rowid"},

@@ -129,6 +129,9 @@ type Runtime struct {
 	inside             bool
 	hasPrefixEnclosure bool
 	hasSuffixEnclosure bool
+
+	// keepLastColumn keeps an unnamed last header column, the rows have values in it
+	keepLastColumn bool
 }
 
 var (
@@ -333,7 +336,7 @@ func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
 		header = append(header, util.FlatToMulti(cols, pos)...)
 
 		// we gotta check if the last column in the header is set, if not drop it
-		if len(header[len(header)-1]) == 0 {
+		if len(header[len(header)-1]) == 0 && !r.keepLastColumn {
 			header = header[:len(header)-1]
 			r.p.Characters.Excel = true
 		}
@@ -1003,6 +1006,9 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 
 	var rowIdBuf []byte
 
+	// a header ending with a delimiter waits for the first row
+	var pendingHeader []byte
+
 	// amount of bytes the chunksize is occupying
 	var chunksSize int
 	for scanner.Scan() {
@@ -1088,12 +1094,28 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 
 			r.excludeExisting(chunk)
 
+			// an unnamed last column is an Excel export only when the first row ends with a delimiter as well
+			if bytes.HasSuffix(chunk, r.p.Characters.Delimiter) {
+				pendingHeader = chunk
+				count++
+				continue
+			}
+
 			chunk = append(chunk, bdcZero...)
 			c, _ := r.ParseRow(chunk)
 			if len(c) != 0 {
 				count++
 			}
 			continue
+		}
+
+		if pendingHeader != nil {
+			r.keepLastColumn = !bytes.HasSuffix(chunk, r.p.Characters.Delimiter)
+			r.ParseRow(append(pendingHeader, bdcZero...))
+			pendingHeader = nil
+			if r.p.Characters.Excel {
+				chunk = bytes.TrimSuffix(chunk, r.p.Characters.Delimiter)
+			}
 		}
 
 		if len(chunks) >= chunkCount {
@@ -1143,6 +1165,11 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		} else {
 			log.Fatalf("Runtime: scanner error after loop: %s", err)
 		}
+	}
+
+	// a file without rows keeps the Excel reading of a header ending with a delimiter
+	if pendingHeader != nil {
+		r.ParseRow(append(pendingHeader, bdcZero...))
 	}
 
 	if len(chunks) != 0 {
