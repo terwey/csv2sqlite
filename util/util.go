@@ -438,8 +438,12 @@ findEolIndex:
 		// NB: enclosures are OPTIONAL, meaning there e.g. could be six fields but only 2 enclosures
 
 		// if the source was produced by PHP we must clean that up, check the chunk we are now looking at
+		// in place, the data after eolIndex is still needed when the row continues on the next line;
+		// a replacement that changes the length would shift every index, it is skipped
 		if c.PHP && bytes.Contains(in[:eolIndex], c.EscapedEnclosure) {
-			in = c.ReplaceBackslashEscapedEnclosure(in[:eolIndex])
+			if replaced := c.ReplaceBackslashEscapedEnclosure(in[:eolIndex]); len(replaced) == eolIndex {
+				copy(in, replaced)
+			}
 		}
 
 		if debug.DebugLog {

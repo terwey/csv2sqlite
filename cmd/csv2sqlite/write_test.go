@@ -49,6 +49,20 @@ func Test_main_storedValues(t *testing.T) {
 			want:  [][]string{{"Foo"}, {"\"TV 55"}, {"Lamp, red"}},
 		},
 		{
+			name:   "php mode enabled automatically on a multi-line field",
+			input:  "a,b\n\"x\\\"\"y,p,q\nz\",1\n2,3\n",
+			params: []string{"-d", "COMMA", "-e", "QUOTATION_MARK"},
+			query:  "SELECT a || '|' || b FROM data",
+			want:   [][]string{{"x\\\"y,p,q\nz|1"}, {"2|3"}},
+		},
+		{
+			name:   "php escaped enclosure on the first line of a multi-line field",
+			input:  "\"a\",\"b\",\"c\"\n1,\"foo \\\" bar\nbaz\",3\n4,5,6\n",
+			params: []string{"--php"},
+			query:  "SELECT a || '|' || b || '|' || c FROM data",
+			want:   [][]string{{"1|foo \" bar\nbaz|3"}, {"4|5|6"}},
+		},
+		{
 			name:  "an unclosed quote keeps the rows after it",
 			input: "id,title\n1,\"Foo\"\n2,\"Bar\n3,Row3\n4,\"Baz\"\n5,Last\n",
 			query: "SELECT id || '|' || title FROM data",

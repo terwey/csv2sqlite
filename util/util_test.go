@@ -405,6 +405,7 @@ type TestData struct {
 	debug     bool
 	delimiter characters.Character
 	enclosure characters.Character
+	php       bool
 }
 
 func getTestData() []TestData {
@@ -515,6 +516,33 @@ func getTestData() []TestData {
 			delimiter: characters.Character_COMMA,
 			enclosure: characters.Character_QUOTATION_MARK,
 			debug:     false,
+		},
+		{
+			name: "php mode enabled automatically on a multi-line field",
+			in:   []byte("a,b\n\"x\\\"\"y,p,q\nz\",1\n2,3"),
+			multiOut: [][]byte{
+				[]byte("a,b"),
+				[]byte("\"x\\\"\"y,p,q\nz\",1"),
+				[]byte("2,3"),
+			},
+			advance:   4,
+			out:       []byte("a,b"),
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+		},
+		{
+			name: "php escaped enclosure on the first line of a multi-line field",
+			in:   []byte("\"a\",\"b\",\"c\"\n1,\"foo \\\" bar\nbaz\",3\n4,5,6"),
+			multiOut: [][]byte{
+				[]byte("\"a\",\"b\",\"c\""),
+				[]byte("1,\"foo \"\" bar\nbaz\",3"),
+				[]byte("4,5,6"),
+			},
+			advance:   12,
+			out:       []byte("\"a\",\"b\",\"c\""),
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+			php:       true,
 		},
 		{
 			name: "unclosed quote in the last of two columns",
@@ -2249,6 +2277,7 @@ func Test_ScanWithSplitCSV(t *testing.T) {
 			cc.SetDelimiter(td.delimiter)
 			cc.SetEnclosure(td.enclosure)
 			cc.EOL = characters.Character_NIL
+			cc.PHP = td.php
 
 			// normally the code is not re-run so we need to manually set the DelimiterCount to zero again
 			cc.DelimiterCount = 0
