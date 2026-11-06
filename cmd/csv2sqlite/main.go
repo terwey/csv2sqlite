@@ -178,10 +178,6 @@ func main() {
 		os.Exit(100)
 	}
 
-	if p.Output != "" {
-		go os.Remove(p.Output)
-	}
-
 	if cpuprofile != "" && cpuprofile == heapprofile {
 		fmt.Fprintf(os.Stderr, "cpu-profile and heap-profile are the same path\n")
 		os.Exit(100)
@@ -348,6 +344,13 @@ func main() {
 	} else {
 		pv = progressbar.NewOptions64(-1, pvOptions...)
 		file = os.Stdin
+	}
+
+	// the previous output is only removed once the input is open
+	if p.Output != "" {
+		if err := os.Remove(p.Output); err != nil && !os.IsNotExist(err) {
+			log.Fatalf("Cannot remove previous output: %s", err)
+		}
 	}
 
 	var mergeWg sync.WaitGroup
