@@ -574,7 +574,6 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 								buf.WriteString("\n\n")
 								fmt.Fprintf(os.Stderr, "%s\n", buf.String())
 								return IncorrectParsing
-								goto end
 							}
 						}
 					}
@@ -627,7 +626,6 @@ func compareStmts(stmtA, stmtB *sqlite3.Stmt, cols int, null bool, columnNames [
 			}
 		}
 
-	end:
 		pv.Add(1)
 	}
 
