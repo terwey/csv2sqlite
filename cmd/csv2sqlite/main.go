@@ -183,6 +183,12 @@ func main() {
 		os.Exit(100)
 	}
 
+	// the first worker only starts once the data channel holds a chunk
+	if p.ChannelCapacity < 1 {
+		fmt.Fprintf(os.Stderr, "channel-capacity must be at least 1\n")
+		os.Exit(100)
+	}
+
 	literald := false
 	literale := false
 
