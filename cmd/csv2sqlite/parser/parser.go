@@ -1079,9 +1079,6 @@ func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.Prog
 		// we have to process a header once
 		if count == 0 {
 			// a trim would have been sufficient but turns out some files have multiple
-			// remove \uFEFF used as BOM
-			chunk = util.ReplaceAll(chunk, characters.BOM_UTF16_BE, []byte{})
-			// remove \uEFBBBF used as BOM
 			chunk = util.ReplaceAll(chunk, characters.BOM_UTF8, []byte{})
 
 			// some files have empty cols before the header, we should drop them, slight speed impact but worth the fix
