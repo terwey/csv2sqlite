@@ -572,7 +572,7 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 
 	plain := colCount == count+1-len(r.p.Exclude)
 	// a short row can reach the expected count with delimiters inside an enclosure
-	if plain && len(r.p.Characters.Enclosure) != 0 && bytes.Contains(data, r.p.Characters.Enclosure) {
+	if plain && len(r.p.Characters.Enclosure) != 0 && delimiterInsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure) {
 		if outside := util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure); outside > 0 && outside < count {
 			plain = false
 			lowestCount = outside
@@ -753,6 +753,38 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 	}
 
 	return out, pos
+}
+
+// delimiterInsideEnclosure reports whether a delimiter sits between an enclosure and the next one.
+func delimiterInsideEnclosure(data []byte, delimiter, enclosure characters.Character) bool {
+	if len(delimiter) == 1 && len(enclosure) == 1 {
+		inside := false
+		for _, c := range data {
+			if c == enclosure[0] {
+				inside = !inside
+			} else if inside && c == delimiter[0] {
+				return true
+			}
+		}
+		return false
+	}
+
+	for {
+		open := bytes.Index(data, enclosure)
+		if open == -1 {
+			return false
+		}
+		data = data[open+len(enclosure):]
+
+		end := bytes.Index(data, enclosure)
+		if end == -1 {
+			return false
+		}
+		if bytes.Contains(data[:end], delimiter) {
+			return true
+		}
+		data = data[end+len(enclosure):]
+	}
 }
 
 func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []uint32) {
