@@ -570,7 +570,16 @@ func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, po
 		count--
 	}
 
-	if colCount == count+1-len(r.p.Exclude) || (colCount == 0 && len(r.p.Characters.Enclosure) == 0 && len(r.p.Characters.Delimiter) > 1) {
+	plain := colCount == count+1-len(r.p.Exclude)
+	// a short row can reach the expected count with delimiters inside an enclosure
+	if plain && len(r.p.Characters.Enclosure) != 0 && bytes.Contains(data, r.p.Characters.Enclosure) {
+		if outside := util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure); outside > 0 && outside < count {
+			plain = false
+			lowestCount = outside
+		}
+	}
+
+	if plain || (colCount == 0 && len(r.p.Characters.Enclosure) == 0 && len(r.p.Characters.Delimiter) > 1) {
 		out, pos = r.genSplit(data, r.p.Characters.Delimiter, -1, r.Clean, r.p.Exclude)
 		if debug.DebugLog {
 			debug.Debug("[SplitRow] GenSplit found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)

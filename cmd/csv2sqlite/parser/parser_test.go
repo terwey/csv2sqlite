@@ -84,6 +84,19 @@ func GetTests() []TestData {
 			exclude:   []int{1},
 		},
 		{
+			name: "short row with a delimiter inside enclosure",
+			args: TestArgs{
+				data: []byte(`"a,b",c`),
+			},
+			want: [][]byte{
+				[]byte(`a,b`),
+				[]byte(`c`),
+			},
+			delimiter: characters.Character_COMMA,
+			enclosure: characters.Character_QUOTATION_MARK,
+			colcount:  3,
+		},
+		{
 			name: "one delimiter inside enclosure",
 			args: TestArgs{
 				data: []byte(`"8190926091450104"|"Foo | Bar"|""|""|""`),
