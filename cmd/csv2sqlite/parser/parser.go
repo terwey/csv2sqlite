@@ -42,9 +42,8 @@ type Params struct {
 
 	Characters *util.CharacterConfig
 
-	CommitRate      int
-	Buffersize      int
-	ChannelCapacity int
+	CommitRate int
+	Buffersize int
 
 	// starting position of the CSV file
 	// this is needed for Excel to CSV exports

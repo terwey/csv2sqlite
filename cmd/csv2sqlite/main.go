@@ -68,8 +68,6 @@ var (
 	logHeader     int
 	csvReport     bool
 
-	chunksize int
-
 	// version is set during build
 	version    = "undefined"
 	minversion = "undefined"
@@ -104,8 +102,6 @@ func getFlags() *pflag.FlagSet {
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 15625, "Buffer size for reading from disk in kilobytes")
 	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
-	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 25, "Buffered channels capacity multiplied by threads")
-	flags.IntVar(&chunksize, "chunk-size", 10, "Chunksize before pushing the data to the channel")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
 	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
@@ -179,12 +175,6 @@ func main() {
 
 	if cpuprofile != "" && cpuprofile == heapprofile {
 		fmt.Fprintf(os.Stderr, "cpu-profile and heap-profile are the same path\n")
-		os.Exit(100)
-	}
-
-	// the first worker only starts once the data channel holds a chunk
-	if p.ChannelCapacity < 1 {
-		fmt.Fprintf(os.Stderr, "channel-capacity must be at least 1\n")
 		os.Exit(100)
 	}
 
@@ -268,9 +258,6 @@ func main() {
 	if len(p.Output) == 0 && !p.Drop {
 		threads = 2
 	}
-
-	// multiple channel capacity by threads
-	p.ChannelCapacity = p.ChannelCapacity * threads
 
 	// convert to kb
 	p.Buffersize *= 1024
@@ -437,10 +424,10 @@ func main() {
 
 		if csvReport {
 			if logHeader == 1 {
-				fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader, capacity\n")
+				fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, buffer-size, commit-rate, break-count, go csv reader\n")
 			}
 
-			fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d, %d\n",
+			fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d\n",
 				totalTime.Round(time.Millisecond),
 				conversionElapsed.Round(time.Millisecond),
 				merged.Round(time.Millisecond),
@@ -450,13 +437,10 @@ func main() {
 				threads,
 				p.Characters.Enclosure.Name(),
 				p.Characters.Delimiter.Name(),
-				chunksize,
 				p.Buffersize/1024,
 				p.CommitRate,
 				stopCount,
-				p.ChannelCapacity,
 				rowCountTotal.GoParser,
-				chunksize*p.ChannelCapacity*threads,
 			)
 		} else {
 			report := Report{
@@ -486,9 +470,7 @@ func main() {
 				Ops:           ops.Round(time.Microsecond).String(),
 				RowsPerSecond: math.Floor(rows),
 				Threads:       threads,
-				Chunksize:     chunksize,
 				BreakCount:    stopCount,
-				Capacity:      chunksize * p.ChannelCapacity * threads,
 			}
 
 			out, err := json.Marshal(report)
@@ -689,8 +671,6 @@ type Performance struct {
 	Ops           string
 	RowsPerSecond float64
 	Threads       int
-	Chunksize     int
 	BreakCount    int
 	GoCsvReader   uint64
-	Capacity      int
 }
