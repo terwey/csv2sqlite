@@ -9,8 +9,8 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -21,6 +21,7 @@ import (
 	"runtime/trace"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -30,7 +31,7 @@ import (
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/parser"
-	"golang.org/x/sync/semaphore"
+	dsv "github.com/terwey/dsv-parser"
 
 	"github.com/klauspost/cpuid/v2"
 )
@@ -61,15 +62,11 @@ var (
 	pv      *progressbar.ProgressBar
 	threads int = cpuid.CPU.PhysicalCores
 
-	parseRoutines []*parser.Runtime
 	readyForMerge chan string
-	rowCountChan  chan parser.RowCount
 	rowCountTotal parser.RowCount
 	stopCount     int
 	logHeader     int
 	csvReport     bool
-
-	chunksize int
 
 	// version is set during build
 	version    = "undefined"
@@ -105,8 +102,6 @@ func getFlags() *pflag.FlagSet {
 	flags.IntVarP(&p.CommitRate, "commit-rate", "r", 5000, "Flush rate for comitting rows to disk")
 	flags.IntVarP(&p.Buffersize, "buffer-size", "b", 15625, "Buffer size for reading from disk in kilobytes")
 	flags.IntVar(&threads, "threads", threads, "Threads to use when writing output, default is set to the amount of cores")
-	flags.IntVar(&p.ChannelCapacity, "channel-capacity", 25, "Buffered channels capacity multiplied by threads")
-	flags.IntVar(&chunksize, "chunk-size", 10, "Chunksize before pushing the data to the channel")
 	flags.StringVar(&cpuprofile, "cpu-profile", "", "Filename for a cpu-profile ouput for pprof")
 	flags.StringVar(&heapprofile, "heap-profile", "", "Filename for a heap-profile ouput for pprof")
 	flags.StringVar(&traceprofile, "trace-profile", "", "Filename for a trace profile for go tool trace")
@@ -183,12 +178,6 @@ func main() {
 		os.Exit(100)
 	}
 
-	// the first worker only starts once the data channel holds a chunk
-	if p.ChannelCapacity < 1 {
-		fmt.Fprintf(os.Stderr, "channel-capacity must be at least 1\n")
-		os.Exit(100)
-	}
-
 	literald := false
 	literale := false
 
@@ -242,7 +231,6 @@ func main() {
 	pv = progressbar.DefaultBytes(-1, "Processing")
 
 	readyForMerge = make(chan string, 1000)
-	rowCountChan = make(chan parser.RowCount)
 
 	if newline != "" {
 		switch strings.ToUpper(newline) {
@@ -270,9 +258,6 @@ func main() {
 	if len(p.Output) == 0 && !p.Drop {
 		threads = 2
 	}
-
-	// multiple channel capacity by threads
-	p.ChannelCapacity = p.ChannelCapacity * threads
 
 	// convert to kb
 	p.Buffersize *= 1024
@@ -319,12 +304,7 @@ func main() {
 		parser.Overflow = true
 	}
 
-	// init the first runtimes, only one will scan
-	if p.NewlineDelimited {
-		r = parser.NewRuntime(p, bufio.ScanLines)
-	} else {
-		r = parser.NewRuntime(p, p.Characters.SplitCsvInput)
-	}
+	r = parser.NewRuntime(p)
 
 	pvOptions := []progressbar.Option{
 		progressbar.OptionSetDescription("Reading"),
@@ -334,7 +314,7 @@ func main() {
 		pvOptions = append(pvOptions, progressbar.OptionSetVisibility(false))
 	}
 
-	var file io.ReadSeeker
+	var file io.Reader
 	if !stdin {
 		f, err := os.OpenFile(p.Input, os.O_RDONLY|syscall.MADV_DONTNEED, 0644)
 		if err != nil {
@@ -359,151 +339,68 @@ func main() {
 		}
 	}
 
-	var mergeWg sync.WaitGroup
-	r.Init(file, parser.NewBuffers())
+	r.Init()
 
-	// readWg is used for the main scanner loop and also for the header initialization
-	var readWg sync.WaitGroup
-	readWg.Add(1)
-	go r.Parse(&readWg, chunksize, pv)
+	reader := dsv.NewReader(&progressReader{input: file, pv: pv}, readerOptions()...)
 
 	var merged time.Duration
-	var parserCount int
-	var threadWorkers sync.WaitGroup
-	mergeElapsed := make(chan time.Duration, 1)
 	conversionStart := time.Now()
-	var insertWg sync.WaitGroup
-	if <-r.HeaderSet {
-		// the header has been split without a rowid column, the rows carry it as their first column
-		if p.RowID {
-			for i := range p.Exclude {
-				p.Exclude[i]++
-			}
+
+	header, err := reader.Header()
+	if err != nil && err != io.EOF {
+		readerFailed(err)
+	}
+	if err == nil {
+		if len(header) == 1 {
+			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
 		}
+		if p.RowID {
+			header = append([][]byte{[]byte("rowid")}, header...)
+		}
+		r.ProcessHeader(header)
 
 		// close the original file if not sqlite
 		if !p.Sqlite {
 			r.Close()
 		}
 
-		insertWg.Add(1)
-		go func(rowCountChan <-chan parser.RowCount, wg *sync.WaitGroup) {
-			defer wg.Done()
-			for rc := range rowCountChan {
-				rowCountTotal.Inserted += rc.Inserted
-				rowCountTotal.GoParser += rc.GoParser
-				rowCountTotal.GoParserDropped += rc.GoParserDropped
-				rowCountTotal.Dropped += rc.Dropped
-			}
-		}(rowCountChan, &insertWg)
-
+		var mergeWg sync.WaitGroup
+		mergeElapsed := make(chan time.Duration, 1)
 		mergeWg.Add(1)
 		go r.Merge(readyForMerge, &mergeWg, mergeElapsed)
 
-		// we use a semaphore to release/acquire threads so we can start and shutdown
-		// the parsers as needed while merging
-		// threads-1 because we need 1 thread for merging ;)
-		sem := semaphore.NewWeighted(int64(threads - 1))
-		ctx := context.Background()
+		parts := &parts{ready: readyForMerge}
+		err = reader.Run(func() (dsv.Handler, error) {
+			return &partWriter{parts: parts}, nil
+		})
 
-		var stop int
+		close(readyForMerge)
+		mergeWg.Wait()
+		merged = <-mergeElapsed
 
-		bufferPool := sync.Pool{
-			New: func() any {
-				return parser.NewBuffers()
-			},
+		if err != nil {
+			readerFailed(err)
 		}
 
-	twLoop:
-		for {
-			select {
-			case <-r.StopWorkers:
-				threadWorkers.Wait()
-				close(rowCountChan)
-				close(readyForMerge)
-				mergeWg.Wait()
-				merged = <-mergeElapsed
-				break twLoop
-			default:
-				if err := sem.Acquire(ctx, 1); err != nil {
-					log.Printf("Cannot acquire semaphore")
-					continue
-				}
-
-				if parserCount == 0 {
-					// to prevent from starting a new thread when it's not needed
-					// check if r.data is empty and just go back to the select
-					if len(r.Data) == 0 {
-						time.Sleep(50 * time.Microsecond)
-						sem.Release(1)
-						continue
-					}
-				}
-
-				stop = stopCount
-				// start the merge early
-				if parserCount == 0 {
-					stop = 100
-				} else if parserCount < threads-1 {
-					stop = stopCount / 3
-				}
-
-				parserCount++
-				pr := parser.NewParser(p, parserCount)
-				pr.Init(nil, bufferPool.Get().(*parser.Buffers))
-
-				pr.ProcessedHeader = r.ProcessedHeader
-				pr.ProcessHeader(r.Header)
-				// prevent GC
-				parseRoutines = append(parseRoutines, pr)
-
-				threadWorkers.Add(1)
-				go func(chunks <-chan [][]byte, tw *sync.WaitGroup, sem *semaphore.Weighted,
-					routine *parser.Runtime, ready chan string, stop int, inserted chan parser.RowCount) {
-					runtime.LockOSThread()
-					defer runtime.UnlockOSThread()
-
-					for {
-						chunk, more := <-chunks
-
-						for i := range chunk {
-							routine.ProcessRow(routine.ParseRow(chunk[i]))
-						}
-
-						if routine.RowCounter.Inserted > uint64(stop) {
-							break
-						}
-
-						if !more {
-							r.StopWorkers <- true
-							break
-						}
-					}
-
-					inserted <- routine.RowCounter
-					err := routine.Close()
-					if err != nil {
-						log.Fatalf("Could not close runtime in routine: %s", err)
-					}
-
-					ready <- routine.GetPath()
-					sem.Release(1)
-					tw.Done()
-					bufferPool.Put(routine.Buffers)
-					routine = nil
-				}(r.Data, &threadWorkers, sem, pr, readyForMerge, stop, rowCountChan)
-			}
-		}
-
-		if p.RowID {
-			for i := range p.Exclude {
-				p.Exclude[i]--
-			}
-		}
+		rowCountTotal.Inserted += parts.inserted.Load()
+		rowCountTotal.GoParser += reader.RowCounter.GoParser
+		rowCountTotal.GoParserDropped += reader.RowCounter.GoParserDropped
+		rowCountTotal.Dropped += reader.RowCounter.Dropped
 	}
+	reader.Close()
+	pv.Finish()
 
-	readWg.Wait()
-	insertWg.Wait()
+	// the report names the characters the reader ended up with
+	found := reader.Characters()
+	if len(found.Delimiter) != 0 {
+		p.Characters.SetDelimiter(characters.Character(found.Delimiter))
+	}
+	if len(found.Enclosure) != 0 {
+		p.Characters.SetEnclosure(characters.Character(found.Enclosure))
+	}
+	p.Characters.EOL = characters.Character(found.EOL)
+	p.Characters.PHP = found.PHP
+	p.Characters.Excel = found.Excel
 
 	conversionElapsed = time.Since(conversionStart)
 
@@ -527,10 +424,10 @@ func main() {
 
 		if csvReport {
 			if logHeader == 1 {
-				fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, chunksize, buffer-size, commit-rate, break-count, channel-capacity, go csv reader, capacity\n")
+				fmt.Fprintf(os.Stderr, "Total, Conversion, Merge, rows, op/s, rows/s, threads, enclosure, delimiter, buffer-size, commit-rate, break-count, go csv reader\n")
 			}
 
-			fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d, %d, %d, %d\n",
+			fmt.Fprintf(os.Stderr, "%s, %s, %s, %d, %s, %.f, %d, %s, %s, %d, %d, %d, %d\n",
 				totalTime.Round(time.Millisecond),
 				conversionElapsed.Round(time.Millisecond),
 				merged.Round(time.Millisecond),
@@ -540,13 +437,10 @@ func main() {
 				threads,
 				p.Characters.Enclosure.Name(),
 				p.Characters.Delimiter.Name(),
-				chunksize,
 				p.Buffersize/1024,
 				p.CommitRate,
 				stopCount,
-				p.ChannelCapacity,
 				rowCountTotal.GoParser,
-				chunksize*p.ChannelCapacity*threads,
 			)
 		} else {
 			report := Report{
@@ -576,9 +470,7 @@ func main() {
 				Ops:           ops.Round(time.Microsecond).String(),
 				RowsPerSecond: math.Floor(rows),
 				Threads:       threads,
-				Chunksize:     chunksize,
 				BreakCount:    stopCount,
-				Capacity:      chunksize * p.ChannelCapacity * threads,
 			}
 
 			out, err := json.Marshal(report)
@@ -595,6 +487,143 @@ func main() {
 		os.Exit(1)
 	}
 
+}
+
+// readerOptions returns the flags as options of the reader.
+func readerOptions() []dsv.Option {
+	// one thread is reserved for merging
+	opts := []dsv.Option{
+		dsv.WithWorkers(threads - 1),
+		dsv.WithBufferSize(p.Buffersize),
+		dsv.WithStart(p.Start),
+		dsv.WithSkip(p.Skip),
+		dsv.WithLimit(p.Limit),
+	}
+
+	if len(p.Characters.Delimiter) != 0 {
+		opts = append(opts, dsv.WithDelimiter(p.Characters.Delimiter))
+	}
+	if p.Characters.EnclosureIsEmpty {
+		opts = append(opts, dsv.WithEnclosure(nil))
+	} else if len(p.Characters.Enclosure) != 0 {
+		opts = append(opts, dsv.WithEnclosure(p.Characters.Enclosure))
+	}
+	if p.NewlineDelimited {
+		opts = append(opts, dsv.WithNewlineDelimited())
+	}
+	if p.Characters.PHP {
+		opts = append(opts, dsv.WithPHP())
+	}
+	if len(p.Characters.EOL) != 0 {
+		opts = append(opts, dsv.WithLineEnding(p.Characters.EOL))
+	}
+	if p.Characters.FixedEOL {
+		opts = append(opts, dsv.WithFixedLineEnding())
+	}
+	if len(p.Exclude) != 0 {
+		opts = append(opts, dsv.WithExclude(p.Exclude...))
+	}
+
+	return opts
+}
+
+// readerFailed reports an error of the reader and exits.
+func readerFailed(err error) {
+	if errors.Is(err, bufio.ErrTooLong) {
+		fmt.Fprintf(os.Stderr, "This error could also occur due to incorrectly configured delimiter (%s) or enclosure (%s)\n", p.Characters.Delimiter, p.Characters.Enclosure)
+		fmt.Fprintf(os.Stderr, "Scanner error (%s), try increasing the `--buffer-size` (current value: %d kb)\n", err, p.Buffersize/1024)
+		os.Exit(1)
+	}
+	log.Fatalf("Runtime: scanner error after loop: %s", err)
+}
+
+// progressReader moves the progress bar by what is read from the input.
+type progressReader struct {
+	input io.Reader
+	pv    *progressbar.ProgressBar
+}
+
+func (r *progressReader) Read(b []byte) (int, error) {
+	n, err := r.input.Read(b)
+	r.pv.Add(n)
+	return n, err
+}
+
+// parts hands out the parts of the output the workers write: every part is a
+// file of its own that the merge moves into the output.
+type parts struct {
+	mu    sync.Mutex
+	count int
+
+	ready    chan<- string
+	inserted atomic.Uint64
+}
+
+// next opens the next part and returns it with the number of rows it takes.
+func (ps *parts) next() (*parser.Runtime, int) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	stop := stopCount
+	// start the merge early
+	if ps.count == 0 {
+		stop = 100
+	} else if ps.count < threads-1 {
+		stop = stopCount / 3
+	}
+
+	ps.count++
+	pr := parser.NewParser(p, ps.count)
+	pr.Init()
+	pr.ProcessedHeader = r.ProcessedHeader
+	pr.ProcessHeader(r.Header)
+
+	return pr, stop
+}
+
+// partWriter is the dsv.Handler of one worker. It writes the records it is
+// given to one part after another.
+type partWriter struct {
+	parts   *parts
+	routine *parser.Runtime
+	stop    int
+	locked  bool
+}
+
+func (w *partWriter) Record(row uint64, flat []byte, lengths []uint32) error {
+	if w.routine == nil {
+		if !w.locked {
+			runtime.LockOSThread()
+			w.locked = true
+		}
+		w.routine, w.stop = w.parts.next()
+	}
+
+	w.routine.ProcessRow(row, flat, lengths)
+
+	if w.routine.RowCounter.Inserted > uint64(w.stop) {
+		return w.finish()
+	}
+	return nil
+}
+
+func (w *partWriter) Close() error {
+	return w.finish()
+}
+
+// finish closes the part and hands it to the merge.
+func (w *partWriter) finish() error {
+	if w.routine == nil {
+		return nil
+	}
+
+	w.parts.inserted.Add(w.routine.RowCounter.Inserted)
+	if err := w.routine.Close(); err != nil {
+		return fmt.Errorf("could not close runtime in routine: %w", err)
+	}
+	w.parts.ready <- w.routine.GetPath()
+	w.routine = nil
+	return nil
 }
 
 // samePath reports whether a and b name the same file, also through ./a.csv or a symlink.
@@ -642,8 +671,6 @@ type Performance struct {
 	Ops           string
 	RowsPerSecond float64
 	Threads       int
-	Chunksize     int
 	BreakCount    int
 	GoCsvReader   uint64
-	Capacity      int
 }

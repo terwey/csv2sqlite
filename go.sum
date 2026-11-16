@@ -38,6 +38,8 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
+github.com/terwey/dsv-parser v0.1.0 h1:r9phx6N0ygo0c5ZS9/Fhco5ufsz6wvww4LdnQdg69gM=
+github.com/terwey/dsv-parser v0.1.0/go.mod h1:1PnlAhedLmfwoC8oIzKf165JYe6zCgrjxRN25ShBUcY=
 github.com/terwey/go-sqlite-lite v0.9.6 h1:HGTzhucQNW1YEH6RnbhkkUY0l2DTo6N0a5Ic/Zfj5iE=
 github.com/terwey/go-sqlite-lite v0.9.6/go.mod h1:YGo4yOO2y2flqZf3JzIQu2EePVUCgvSnoS0J7xk4KxQ=
 github.com/terwey/recordwriter v0.6.0 h1:vl6DjLSCrhjZ8NY1W+gzIBNuQB0EJRgNAIQy2s3+KOc=

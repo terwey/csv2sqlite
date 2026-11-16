@@ -5,23 +5,17 @@ package parser
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/csv"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"golang.org/x/exp/slices"
 	"golang.org/x/term"
 
-	"github.com/schollz/progressbar/v3"
 	"github.com/terwey/csv2sqlite/characters"
 	"github.com/terwey/csv2sqlite/characters/knownconfigs"
 	"github.com/terwey/csv2sqlite/cmd/csv2sqlite/debug"
@@ -48,9 +42,8 @@ type Params struct {
 
 	Characters *util.CharacterConfig
 
-	CommitRate      int
-	Buffersize      int
-	ChannelCapacity int
+	CommitRate int
+	Buffersize int
 
 	// starting position of the CSV file
 	// this is needed for Excel to CSV exports
@@ -89,49 +82,23 @@ func NewParameters() *Params {
 	return p
 }
 
-type Buffers struct {
-	gpos     []uint32
-	sinput   [][]byte
-	sbuf     []byte
-	gbuf     []byte
-	rbuf     []byte
-	lbBuffer bytes.Buffer
-}
-
+// Runtime writes the records of one output: the output itself when
+// ParserCount is 0, and otherwise the part of it a worker fills.
 type Runtime struct {
-	p       *Params
-	reader  *bufio.Reader
-	rw      recordwriter.RecordWriter
-	f       io.Reader
-	fout    *os.File
-	scanner *bufio.Scanner
-	w       io.Writer
+	p    *Params
+	rw   recordwriter.RecordWriter
+	fout *os.File
+	w    io.Writer
 
-	readbuf []byte
-	Header  [][]byte
-
-	HeaderSet   chan bool
-	Data        chan [][]byte
-	EmptyData   chan bool
-	StopWorkers chan bool
-
+	Header          [][]byte
 	ProcessedHeader []string
 
-	splitFunc  bufio.SplitFunc
 	RowCounter RowCount
 
 	ParserCount int
 	colCount    int
 
-	*Buffers
-
-	headerPrinted      bool
-	inside             bool
-	hasPrefixEnclosure bool
-	hasSuffixEnclosure bool
-
-	// keepLastColumn keeps an unnamed last header column, the rows have values in it
-	keepLastColumn bool
+	rowID []byte
 }
 
 var (
@@ -139,13 +106,10 @@ var (
 	Overflow   bool
 )
 
-func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
+func NewRuntime(p *Params) *Runtime {
 	r := &Runtime{
-		p:             p,
-		headerPrinted: false,
-		splitFunc:     fn,
-		ParserCount:   0,
-		Buffers:       NewBuffers(),
+		p:           p,
+		ParserCount: 0,
 	}
 
 	recordwriter.DebugLog = RWDebugLog
@@ -154,21 +118,10 @@ func NewRuntime(p *Params, fn bufio.SplitFunc) *Runtime {
 	return r
 }
 
-func NewBuffers() *Buffers {
-	buf := &Buffers{
-		gbuf: make([]byte, 0, 1*1024*1024),
-		gpos: make([]uint32, 0, 1024),
-		rbuf: make([]byte, 1*1024*1024),
-	}
-
-	return buf
-}
-
 func NewParser(p *Params, parsercount int) *Runtime {
 	r := &Runtime{
-		p:             p,
-		headerPrinted: false,
-		ParserCount:   parsercount,
+		p:           p,
+		ParserCount: parsercount,
 	}
 
 	return r
@@ -180,10 +133,6 @@ func (r *Runtime) Merge(ready <-chan string, wg *sync.WaitGroup, duration chan t
 	// }
 }
 
-func (r *Runtime) debug(format string, v ...any) {
-	debug.Debug("parser: "+format, v...)
-}
-
 func (r *Runtime) GetPath() string {
 	return r.rw.GetPath()
 }
@@ -192,26 +141,7 @@ func (r *Runtime) GetWriter() io.Writer {
 	return r.w
 }
 
-func (r *Runtime) GetScanner() *bufio.Scanner {
-	return r.scanner
-}
-
-func (r *Runtime) Init(input io.Reader, buffers *Buffers) {
-	if input != nil {
-		r.f = input
-	}
-
-	r.Buffers = buffers
-
-	if r.ParserCount == 0 {
-		r.scanner = r.NewScanner()
-		r.Data = make(chan [][]byte, r.p.ChannelCapacity)
-		r.HeaderSet = make(chan bool)
-
-		r.EmptyData = make(chan bool)
-		r.StopWorkers = make(chan bool, r.p.ChannelCapacity)
-	}
-
+func (r *Runtime) Init() {
 	r.rw = r.newRecordWriter(r.generateOutputPath())
 }
 
@@ -291,84 +221,13 @@ func (r *Runtime) CloseDB() error {
 	return nil
 }
 
-func (r *Runtime) NewScanner() *bufio.Scanner {
-	r.readbuf = make([]byte, 0, r.p.Buffersize)
-
-	r.reader = bufio.NewReaderSize(r.f, r.p.Buffersize)
-
-	if _, err := io.ReadFull(r.reader, r.readbuf); err != nil && err != io.ErrUnexpectedEOF {
-		log.Fatalf("r.NewScanner(): %s", err)
-	}
-
-	scanner := bufio.NewScanner(r.reader)
-	scanner.Buffer(r.readbuf, r.p.Buffersize)
-	scanner.Split(r.splitFunc)
-
-	return scanner
-}
-
-func (r *Runtime) ParseRow(data []byte) (cols []byte, pos []uint32) {
-	if len(data) == 0 {
-		return []byte{}, []uint32{}
-	}
-
-	// replace CRLN/LN with space in header
-	if !r.headerPrinted {
-		data = bytes.ReplaceAll(data, characters.Character_CARRIAGE_RETURN_LINE_FEED, []byte(" "))
-		data = bytes.ReplaceAll(data, characters.Character_LINE_FEED, []byte(" "))
-	}
-	cols, pos = r.SplitRow(0, data, false)
-	if len(cols) == 0 {
-		return []byte{}, []uint32{}
-	}
-	// only rowid has been set, the header has no rowid
-	if r.p.RowID && r.headerPrinted && len(cols) == 1 {
-		return []byte{}, []uint32{}
-	}
-	if !r.headerPrinted {
-		if len(pos) == 1 {
-			log.Printf("Only 1 column for header found, make sure the delimiter is set properly.")
-		}
-		var header [][]byte
-		if r.p.RowID {
-			header = append(header, []byte("rowid"))
-		}
-		header = append(header, util.FlatToMulti(cols, pos)...)
-
-		// we gotta check if the last column in the header is set, if not drop it
-		if len(header[len(header)-1]) == 0 && !r.keepLastColumn {
-			header = header[:len(header)-1]
-			r.p.Characters.Excel = true
-		}
-
-		emptyCount := 1
-		for i := range header {
-			if len(header[i]) == 0 {
-				if emptyCount > 1 {
-					header[i] = []byte("empty_column__")
-					header[i] = strconv.AppendInt(header[i], int64(emptyCount), 10)
-				} else {
-					header[i] = []byte("empty_column")
-				}
-				emptyCount++
-			}
-		}
-
-		r.ProcessHeader(header)
-		// we should not output the header to the sqlite file, return nothing as it'll be skipped
-		// return []byte{}, []uint32{}
-		return cols, pos
-	}
-
-	return cols, pos
-}
-
+// ProcessHeader writes the header: the names of the columns, with rowid as the
+// first one when the rows carry a row id.
 func (r *Runtime) ProcessHeader(cols [][]byte) {
 	// we do not need to print the header multiple times for CSV
 	if _, ok := r.rw.(*recordwriter.CSVWriter); ok {
 		if r.ParserCount != 0 {
 			r.colCount = len(cols)
-			r.headerPrinted = true
 			return
 		}
 	}
@@ -386,21 +245,16 @@ func (r *Runtime) ProcessHeader(cols [][]byte) {
 	}
 	if r.ParserCount == 0 {
 		r.Header = cols // needed for the second runtime
-		r.ProcessedHeader = r.rw.FinalizeHeader()
-		r.HeaderSet <- true
-	} else {
-		r.ProcessedHeader = r.rw.FinalizeHeader()
 	}
+	r.ProcessedHeader = r.rw.FinalizeHeader()
 	r.colCount = len(cols)
-	r.headerPrinted = true
 }
 
-func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
+// ProcessRow writes one record: v holds its fields back to back and pos the
+// length of each. row is its number in the input, written as the row id when
+// the rows carry one.
+func (r *Runtime) ProcessRow(row uint64, v []byte, pos []uint32) {
 	if len(v) == 0 {
-		return
-	}
-
-	if r.p.RowID && PosSliceContainsNoValues(pos[1:]) {
 		return
 	}
 
@@ -419,15 +273,16 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 		return
 	}
 
+	if r.p.RowID {
+		r.rowID = strconv.AppendUint(r.rowID[:0], row, 10)
+		r.rw.Write(string(r.rowID))
+	}
+
 	cols := util.FlatToMulti(v, pos)
 	for i, col := range cols {
 		if len(col) == 0 {
 			r.rw.Skip()
 		} else {
-			if r.p.RowID && i == 0 {
-				r.rw.Write(string(col))
-				continue
-			}
 			r.rw.WriteByte(col)
 		}
 		if i != len(cols)-1 {
@@ -438,755 +293,4 @@ func (r *Runtime) ProcessRow(v []byte, pos []uint32) {
 	r.RowCounter.Inserted++
 
 	r.rw.EOR(r.colCount)
-	return
-}
-
-// excludeExisting keeps the excluded columns the header has, each once and in order;
-// SplitRow expects every index in Exclude to remove exactly one column.
-func (r *Runtime) excludeExisting(header []byte) {
-	if len(r.p.Exclude) == 0 {
-		return
-	}
-
-	delimiters := util.CountOutsideEnclosure(header, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
-	// unbalanced enclosures, count every delimiter instead
-	if delimiters <= 0 {
-		delimiters = util.Count(header, r.p.Characters.Delimiter)
-	}
-	columns := delimiters + 1
-
-	slices.Sort(r.p.Exclude)
-	r.p.Exclude = slices.Compact(r.p.Exclude)
-
-	exclude := r.p.Exclude[:0]
-	for _, i := range r.p.Exclude {
-		if i < 0 || i >= columns {
-			log.Printf("Ignoring --exclude %d, the header has %d columns", i, columns)
-			continue
-		}
-		exclude = append(exclude, i)
-	}
-	r.p.Exclude = exclude
-}
-
-func PosSliceContainsNoValues(pos []uint32) bool {
-	for _, v := range pos {
-		if v != 0 {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (r *Runtime) genSplit(s, sep []byte, n int, fn util.CleanFunc, exclude []int) (data []byte, pos []uint32) {
-	r.gbuf = r.gbuf[:0]
-	r.gpos = r.gpos[:0]
-	return util.GenSplitCore(s, sep, n, fn, exclude, r.gbuf, r.gpos)
-}
-
-func (r *Runtime) colSplitFlat(s []byte, sep characters.Character, enclosure characters.Character, n int, fn util.CleanFunc) (data []byte, pos []uint32) {
-	r.gbuf = r.gbuf[:0]
-	r.gpos = r.gpos[:0]
-	return util.ColSplitFlatCore(s, sep, enclosure, n, fn, r.gbuf, r.gpos)
-}
-
-func (r *Runtime) Clean(data []byte, prefix, suffix bool) []byte {
-	if r.p.Characters.Config.EnclosureClean && bytes.Contains(data, r.p.Characters.Config.Enclosure) {
-		// without prefix or suffix set, only a value wrapped on both ends is enclosed;
-		// a lone quote at either end, such as the inch mark in 55", is data
-		enclosed := len(data) >= 2*len(r.p.Characters.Config.Enclosure) &&
-			bytes.HasPrefix(data, r.p.Characters.Config.Enclosure) &&
-			bytes.HasSuffix(data, r.p.Characters.Config.Enclosure)
-		if prefix {
-			data = util.TrimPrefixSkipCheck(data, r.p.Characters.Config.Enclosure)
-		} else if enclosed {
-			data = bytes.TrimPrefix(data, r.p.Characters.Config.Enclosure)
-		}
-		if suffix {
-			data = util.TrimSuffixSkipCheck(data, r.p.Characters.Config.Enclosure)
-		} else if enclosed {
-			data = bytes.TrimSuffix(data, r.p.Characters.Config.Enclosure)
-		}
-
-		// we need to clean double quotes
-		if bytes.Contains(data, r.p.Characters.Config.DoubleEnclosure) {
-			data = util.Replace(data, r.p.Characters.Config.DoubleEnclosure, r.p.Characters.Config.Enclosure, r.rbuf, -1)
-		}
-	}
-
-	if bytes.IndexByte(data, characters.Character_CARRIAGE_RETURN[0]) != -1 {
-		data = util.Replace(data, characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED, r.rbuf, -1)
-
-		// check again because it might have been cleaned out
-		data = util.Replace(data, characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED, r.rbuf, -1)
-	}
-
-	return data
-}
-
-// SplitRow expects a byte slice appended with two counts appended to it in
-// binary encoded format in 32bit, e.g.  binary.LittleEndian.PutUint32(data, 0)
-// unless self is set to true
-func (r *Runtime) SplitRow(colCount int, data []byte, self bool) (out []byte, pos []uint32) {
-	// we need to check first if inside the data the delimiter occurs
-	// we can count the amount of occurences of the delimiter and compare
-	// if that matches the amount we expect
-	// amount = columns + 1
-
-	if debug.DebugLog {
-		debug.LogData("[SplitRow] data", data, 512)
-		debug.Debug("[SplitRow] encl: %s delim: %s", r.p.Characters.Enclosure, r.p.Characters.Delimiter)
-		debug.BreakMe()
-	}
-
-	if colCount == 0 {
-		colCount = r.colCount
-	}
-
-	lowestCount := colCount
-
-	var count, outsideCount int
-	provided := false
-
-	// we appended the delimiterCount to the chunk
-	// we must extract it and remove it, it's 4 bytes long
-
-	if !self {
-		// the incoming count is a delimiterCount and _not_ a columnCount
-
-		count, outsideCount = util.DecodeCounts(data[len(data)-8:])
-
-		// increment incoming by one due to previous count looked at delimiters
-		// and now we look at columns
-		data = data[:len(data)-8]
-	}
-	if count != 0 || outsideCount != 0 {
-		provided = true
-	}
-
-	if !provided {
-		count = util.Count(data, r.p.Characters.Delimiter)
-	}
-
-	if r.p.Characters.Excel {
-		count--
-	}
-
-	plain := colCount == count+1-len(r.p.Exclude)
-	// a short row can reach the expected count with delimiters inside an enclosure
-	if plain && len(r.p.Characters.Enclosure) != 0 && delimiterInsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure) {
-		if outside := util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure); outside > 0 && outside < count {
-			plain = false
-			lowestCount = outside
-		}
-	}
-
-	if plain || (colCount == 0 && len(r.p.Characters.Enclosure) == 0 && len(r.p.Characters.Delimiter) > 1) {
-		out, pos = r.genSplit(data, r.p.Characters.Delimiter, -1, r.Clean, r.p.Exclude)
-		if debug.DebugLog {
-			debug.Debug("[SplitRow] GenSplit found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
-		}
-		return
-	}
-
-	if debug.DebugLog {
-		debug.BreakMe()
-	}
-
-	// no point counting outside enclosure when it doesn't exist
-	if len(r.p.Characters.Enclosure) != 0 {
-		if !provided {
-			outsideCount = util.CountOutsideEnclosure(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure)
-			if outsideCount != 0 && outsideCount < lowestCount {
-				lowestCount = outsideCount
-			}
-		}
-
-		if r.p.Characters.Excel {
-			outsideCount--
-		}
-
-		// CountOutsideEnclosure returns the amount of delimiters, not columns so add 1
-		if colCount == outsideCount+1-len(r.p.Exclude) {
-			// we should pass the result from `util.Count` to this func for a speedup
-			n := -1
-			if count > 0 {
-				n = count
-			}
-			out, pos = r.colSplitFlat(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, n, r.Clean)
-			if debug.DebugLog {
-				debug.Debug("[SplitRow] ColSplitFlat found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
-			}
-			if len(pos) == colCount {
-				return out, pos
-			}
-			if len(pos) != 0 && len(pos) < lowestCount {
-				lowestCount = len(pos)
-			}
-		}
-	} else {
-		if count != 0 && count < lowestCount {
-			lowestCount = count
-		}
-	}
-
-	// r.colCount is set to non-zero on header creation
-	// TODO: fix that the header gets parsed by our code too
-	if r.colCount != 0 {
-		// count := Count(data, r.p.Delimiter)
-		// if the count is correct we can just simply do a normal split and skip this logic
-		if count > colCount {
-			out, pos = r.ParseUnescapedDelimiter(util.ColSplit(data, r.p.Characters.Delimiter, r.p.Characters.Enclosure, -1))
-			if debug.DebugLog {
-				debug.Debug("[SplitRow] ParseUnescapedDelimiter found %d columns (r.colCount: %d, colCount: %d)", len(pos), r.colCount, colCount)
-			}
-			if len(pos) == colCount {
-				return out, pos
-			}
-			if len(pos) != 0 && len(pos) < lowestCount {
-				lowestCount = len(pos)
-			}
-		}
-	}
-
-	out = make([]byte, 0)
-	pos = make([]uint32, 0)
-
-	// the SplitUnescapedDelimiter didn't work properly, use slow method
-	// NOTE: it does not support other enclosures that QUOTATION_MARK
-	if count > colCount {
-		// for simplicity sake we use the Go's build in CSV parser when the
-		// delimiter occurs within the quotation
-		// the reason for not always using it, is simply speed.
-		csvReader := csv.NewReader(bytes.NewReader(data))
-		csvReader.Comma = r.p.Characters.Delimiter.Rune()
-
-		for {
-			record, err := csvReader.Read()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				// last hail mary for broken CSVs, we use a gensplit as we do not care anymore about consistency for these
-				o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.Clean, r.p.Exclude)
-				if len(o) != 0 {
-					if debug.EnableLogDropped {
-						debug.LogDropped("GoParser could have dropped (delimCounted: %d): \n%s\nfound: \n%s", bytes.Count(data, r.p.Characters.Delimiter), data, util.FlatToMulti(o, p))
-					}
-					return o, p
-				}
-				if debug.EnableLogDropped {
-					debug.LogDropped("GoParser dropped (delimCounted: %d): \n%s", bytes.Count(data, r.p.Characters.Delimiter), data)
-				}
-				r.RowCounter.GoParserDropped++
-				return nil, nil
-			}
-
-			for i, col := range record {
-				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
-					continue
-				}
-
-				// we have to clean the enclosure if it's not a double quote
-				if !bytes.Equal(r.p.Characters.Enclosure, characters.Character_QUOTATION_MARK) {
-					buf := r.Clean([]byte(col), false, false)
-					col = string(buf)
-				} else {
-					// we do not have to call a cleanFunc here as the CSV parser of Go already did so
-					// we do have to clean the \r\n
-					col = strings.ReplaceAll(col, characters.Character_CARRIAGE_RETURN_LINE_FEED.String(), characters.Character_LINE_FEED.String())
-					col = strings.ReplaceAll(col, characters.Character_CARRIAGE_RETURN.String(), characters.Character_LINE_FEED.String())
-				}
-				out = append(out, col...)
-				pos = append(pos, uint32(len(col)))
-			}
-			r.RowCounter.GoParser++
-		}
-
-		if r.colCount != 0 {
-			if debug.DebugLog {
-				debug.LogReader(data, count, colCount)
-			}
-		}
-
-		if len(pos) != 0 && len(pos) < lowestCount {
-			lowestCount = len(pos)
-		}
-		if len(pos) == colCount {
-			return out, pos
-		}
-
-		// first pass for the header
-		if r.colCount == 0 {
-			return out, pos
-		}
-	}
-
-	if !self {
-		if debug.DebugLog {
-			debug.Debug("looping (sep: %s delim: %s) (r.colCount: %d lowestCount: %d): \n%s\n", r.p.Characters.Enclosure,
-				r.p.Characters.Delimiter, r.colCount, lowestCount, data)
-		}
-		return r.SplitRow(lowestCount+1, data, true)
-	}
-
-	if debug.DebugLog {
-		if len(out) == 0 {
-			debug.Debug("dropping (sep: %s delim: %s) (r.colCount: %d lowestCount: %d): \n%s\n", r.p.Characters.Enclosure,
-				r.p.Characters.Delimiter, r.colCount, lowestCount, data)
-		} else {
-			debug.Debug("returning: \n%v\n%v\n", out, pos)
-		}
-	}
-
-	if len(out) == 0 {
-		// last hail mary for broken CSVs
-		o, p := util.GenSplit(data, r.p.Characters.Delimiter, -1, r.Clean, r.p.Exclude)
-		if len(o) != 0 {
-			if debug.EnableLogDropped {
-				debug.LogDropped("SplitRow could have dropped (delimCounted: %d): \n%s\nfound: \n%s", bytes.Count(data, r.p.Characters.Delimiter), data, util.FlatToMulti(o, p))
-			}
-			return o, p
-		}
-		if debug.EnableLogDropped {
-			debug.LogDropped("SplitRow dropped (delimCounted: %d): \n%s", bytes.Count(data, r.p.Characters.Delimiter), data)
-		}
-		r.RowCounter.Dropped++
-	}
-
-	return out, pos
-}
-
-// delimiterInsideEnclosure reports whether a delimiter sits between an enclosure and the next one.
-func delimiterInsideEnclosure(data []byte, delimiter, enclosure characters.Character) bool {
-	if len(delimiter) == 1 && len(enclosure) == 1 {
-		inside := false
-		for _, c := range data {
-			if c == enclosure[0] {
-				inside = !inside
-			} else if inside && c == delimiter[0] {
-				return true
-			}
-		}
-		return false
-	}
-
-	for {
-		open := bytes.Index(data, enclosure)
-		if open == -1 {
-			return false
-		}
-		data = data[open+len(enclosure):]
-
-		end := bytes.Index(data, enclosure)
-		if end == -1 {
-			return false
-		}
-		if bytes.Contains(data[:end], delimiter) {
-			return true
-		}
-		data = data[end+len(enclosure):]
-	}
-}
-
-func (r *Runtime) ParseUnescapedDelimiter(input [][]byte) (data []byte, pos []uint32) {
-	cleanFunc := r.p.Characters.Clean
-	// NOTE: this method  doesn't work on optional enclosures.
-
-	// we need to seek through the data and find the first Enclosure and escape the delimiter
-
-	// we first split on the delimiter and then check if two Enclosures are available
-	r.sbuf = make([]byte, 0)
-	enclosurecheck := false
-
-	// debug.DebugColumns(input)
-
-	for i := range input {
-		// debug.Debug("input[i]: >>>%s<<<", input[i])
-		// debug.Debug("buf: %s", r.sbuf)
-		// debug.DebugColumns(util.FlatToMulti(data, pos))
-
-		// if debug.DebugLog {
-		// 	debug.BreakMe()
-		// }
-
-		count := 0
-		counted := false
-
-		if !r.inside {
-			count = util.Count(input[i], r.p.Characters.Enclosure)
-			counted = true
-			if count != 0 {
-				r.inside = true
-			}
-		}
-
-		// debug.Debug("inside: %v, enclosurecheck: %v", r.inside, enclosurecheck)
-
-		// there is a case where the last buf can end with """ or similar
-		// we need to check if the NEXT starts with a " if so, move buf to columns and continue happily with life
-		if enclosurecheck {
-			if len(input[i]) == 1 {
-				// data was something like `|"foo|"|`
-				r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
-				// add the "empty" data, anti-slipmat func ;)
-				// check if input is r.p.Enclosure
-				if !bytes.Equal(input[i], r.p.Characters.Enclosure) {
-					r.sbuf = append(r.sbuf, input[i]...)
-				}
-			}
-			if bytes.HasPrefix(input[i], r.p.Characters.Enclosure) {
-				r.sbuf = cleanFunc(r.sbuf, false, false)
-				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
-				} else {
-					data = append(data, r.sbuf...)
-					pos = append(pos, uint32(len(r.sbuf)))
-				}
-				r.sbuf = make([]byte, 0)
-				r.inside = false
-				enclosurecheck = false
-			}
-			if len(input[i]) == 1 {
-				continue
-			}
-		}
-
-		// unEnclosured column
-		if len(input[i]) == 0 {
-			// delimiter inside an enclosure
-			if r.inside {
-				r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
-				continue
-			}
-			if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
-				continue
-			} else {
-				input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN_LINE_FEED, characters.Character_LINE_FEED)
-				input[i] = util.ReplaceAll(input[i], characters.Character_CARRIAGE_RETURN, characters.Character_LINE_FEED)
-				data = append(data, input[i]...)
-				pos = append(pos, uint32(len(input[i])))
-			}
-			continue
-		}
-
-		if len(input[i]) == 1 {
-			if len(r.sbuf) != 0 && bytes.Equal(input[i], r.p.Characters.Enclosure) {
-				if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
-				} else {
-					// the delimiter appears at the end, finalize the column
-					r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
-
-					// TODO: it's unsure if here the suffix should be removed too
-					// the tests all work so should be fine, however originally
-					// here there was no trimsuffix (which is part of cleanFunc)
-					r.sbuf = cleanFunc(r.sbuf, false, false)
-
-					data = append(data, r.sbuf...)
-					pos = append(pos, uint32(len(r.sbuf)))
-				}
-				r.sbuf = make([]byte, 0)
-				continue
-			}
-
-			// in the case it is NOT an Enclosure, place a delimiter and append the buffer
-			if !bytes.Equal(input[i], r.p.Characters.Enclosure) {
-				r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
-			}
-			r.sbuf = append(r.sbuf, input[i]...)
-
-			continue
-		}
-
-		// if we counted the enclosures before we don't have to check if there is a prefix or suffix
-		if counted && count == 0 {
-			r.hasPrefixEnclosure = false
-			r.hasSuffixEnclosure = false
-		} else {
-			r.hasPrefixEnclosure = bytes.HasPrefix(input[i], r.p.Characters.Enclosure)
-			r.hasSuffixEnclosure = bytes.HasSuffix(input[i], r.p.Characters.Enclosure)
-		}
-
-		// debug.Debug("r.hasPrefixEnclosure: %v, r.hasSuffixEnclosure: %v, count: %d", r.hasPrefixEnclosure, r.hasSuffixEnclosure, count)
-
-		if !r.hasPrefixEnclosure || !r.hasSuffixEnclosure {
-			if len(r.sbuf) != 0 {
-				r.sbuf = append(r.sbuf, r.p.Characters.Delimiter...)
-				r.sbuf = append(r.sbuf, input[i]...)
-
-				if r.hasSuffixEnclosure && !bytes.HasSuffix(input[i], r.p.Characters.DoubleEnclosure) {
-					if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
-					} else {
-						// we know for sure that the suffix exists
-						r.sbuf = cleanFunc(r.sbuf, false, true)
-						data = append(data, r.sbuf...)
-						pos = append(pos, uint32(len(r.sbuf)))
-					}
-					r.sbuf = make([]byte, 0)
-					r.inside = false
-					enclosurecheck = false
-				} else {
-					enclosurecheck = true
-				}
-			} else {
-				// we are missing the second Enclosure, add to the r.sbuf
-				r.sbuf = append(r.sbuf, input[i]...)
-			}
-			continue
-		}
-
-		if count%2 == 0 && r.hasPrefixEnclosure && r.hasSuffixEnclosure {
-			if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
-			} else {
-				// we know for sure it has a prefix and suffix
-				input[i] = cleanFunc(input[i], true, true)
-				data = append(data, input[i]...)
-				pos = append(pos, uint32(len(input[i])))
-			}
-			r.inside = false
-			continue
-		}
-
-		// edge-case where ""| appears
-		// or where count%2 != 0
-		if count != 2 {
-			r.sbuf = append(r.sbuf, input[i]...)
-			continue
-		}
-
-		if r.p.Exclude != nil && slices.Contains(r.p.Exclude, i) {
-		} else {
-			input[i] = cleanFunc(input[i], false, false)
-			data = append(data, input[i]...)
-			pos = append(pos, uint32(len(input[i])))
-		}
-	}
-
-	return
-}
-
-func (r *Runtime) Parse(wg *sync.WaitGroup, chunkCount int, pv *progressbar.ProgressBar) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	var err error
-	// var buf []byte
-	var delimSet bool
-	var enclosureSet bool
-	if r.p.Characters.Delimiter != nil {
-		delimSet = true
-	}
-	if r.p.Characters.Enclosure != nil {
-		enclosureSet = true
-	}
-	if r.p.Characters.EnclosureIsEmpty {
-		enclosureSet = true
-	}
-	if r.p.Start > 1 {
-		r.p.Characters.ReturnEarly = true
-	}
-
-	scanner := r.GetScanner()
-
-	var chunks [][]byte
-	chunks = make([][]byte, 0, chunkCount)
-	var chunk []byte
-
-	var enclDetectCount int
-
-	// used for p.Start
-	startCounter := 1
-
-	// used for p.Skip
-	skipCounter := 0
-
-	count := 0
-
-	// used for storing the zeroed 8 delimiterCount
-	bdcZero := util.EncodeCounts(make([]byte, 8), 0, 0)
-
-	var rowIdBuf []byte
-
-	// a header ending with a delimiter waits for the first row
-	var pendingHeader []byte
-
-	// amount of bytes the chunksize is occupying
-	var chunksSize int
-	for scanner.Scan() {
-		if err = scanner.Err(); err != nil {
-			close(r.Data)
-			wg.Done()
-			log.Fatalf("Runtime: scanner error during loop: %s", err)
-		}
-
-		size := len(scanner.Bytes())
-		if size == 0 {
-			continue
-		}
-
-		if r.p.Start > 1 && startCounter < r.p.Start {
-			if startCounter+1 == r.p.Start {
-				r.p.Characters.ReturnEarly = false
-			}
-			startCounter++
-			continue
-		}
-
-		if r.p.Skip > 0 && count != 0 && skipCounter < r.p.Skip {
-			skipCounter++
-			if skipCounter <= r.p.Skip {
-				continue
-			}
-		}
-
-		if count != 0 && r.p.Limit == count-1 {
-			break
-		}
-
-		// make chunk large enough to also fit the delimCount as bytes
-		chunk = make([]byte, size, size+8)
-		copy(chunk, scanner.Bytes())
-
-		chunksSize += size
-		if r.p.Characters.Excel {
-			chunk = bytes.TrimSuffix(chunk, r.p.Characters.Delimiter)
-		}
-		// only clean the PHP characters in the scanner when using Nd
-		if r.p.NewlineDelimited && r.p.Characters.PHP {
-			chunk = r.p.Characters.ReplaceBackslashEscapedEnclosure(chunk)
-		}
-		// if no delimiter was set we detect it once
-		if !delimSet && len(r.p.Characters.Delimiter) == 0 {
-			r.p.Characters.SetDelimiter(characters.DetectDelimiter(chunk))
-		}
-
-		if !enclosureSet && len(r.p.Characters.Enclosure) == 0 {
-			prevCount := enclDetectCount
-			var encl characters.Character
-			encl, enclDetectCount, _ = characters.DetectEnclosureWithDelimiter(chunk, r.p.Characters.Delimiter)
-			if prevCount < enclDetectCount || enclDetectCount != -1 {
-				if debug.DebugLog {
-					debug.Debug("prevCount (%d) < enclDetectCount (%d): %s < %s", prevCount, enclDetectCount, r.p.Characters.Enclosure, encl)
-				}
-				r.p.Characters.SetEnclosure(encl)
-			}
-			if r.p.Characters.DelimiterCount != 0 {
-				enclosureSet = true
-			}
-		}
-
-		// header has to be set once
-		if r.p.Characters.DelimiterCount == 0 {
-			// we have to count the delimiters in the header to know for row scanning
-			// how many fields we need
-			r.p.Characters.DelimiterCount = bytes.Count(chunk, r.p.Characters.Delimiter)
-			delimSet = true
-		}
-
-		// we have to process a header once
-		if count == 0 {
-			// a trim would have been sufficient but turns out some files have multiple
-			chunk = util.ReplaceAll(chunk, characters.BOM_UTF8, []byte{})
-
-			// some files have empty cols before the header, we should drop them, slight speed impact but worth the fix
-			if len(util.ReplaceAll(chunk, r.p.Characters.Delimiter, characters.Character_EMPTY)) == 0 {
-				continue
-			}
-
-			r.excludeExisting(chunk)
-
-			// an unnamed last column is an Excel export only when the first row ends with a delimiter as well
-			if bytes.HasSuffix(chunk, r.p.Characters.Delimiter) {
-				pendingHeader = chunk
-				count++
-				continue
-			}
-
-			chunk = append(chunk, bdcZero...)
-			c, _ := r.ParseRow(chunk)
-			if len(c) != 0 {
-				count++
-			}
-			continue
-		}
-
-		if pendingHeader != nil {
-			r.keepLastColumn = !bytes.HasSuffix(chunk, r.p.Characters.Delimiter)
-			r.ParseRow(append(pendingHeader, bdcZero...))
-			pendingHeader = nil
-			if r.p.Characters.Excel {
-				chunk = bytes.TrimSuffix(chunk, r.p.Characters.Delimiter)
-			}
-		}
-
-		if len(chunks) >= chunkCount {
-			r.Data <- chunks
-			pv.Add(chunksSize)
-			chunksSize = 0
-			chunks = make([][]byte, 0, chunkCount)
-		}
-
-		if r.p.RowID {
-			// we have to make this a user configurable switch
-			rowIdBuf = append(rowIdBuf, []byte(strconv.Itoa(count))...)
-			rowIdBuf = append(rowIdBuf, r.p.Characters.Delimiter...)
-			chunk = append(rowIdBuf, chunk...)
-			rowIdBuf = make([]byte, 0)
-		}
-
-		if r.p.Characters.DelimCounted != 0 || r.p.Characters.DelimOutsideCounted != 0 {
-			// when we use a rowid we must increase it with one as we added it
-			if r.p.RowID {
-				if r.p.Characters.DelimCounted != 0 {
-					r.p.Characters.DelimCounted++
-				}
-				if r.p.Characters.DelimOutsideCounted != 0 {
-					r.p.Characters.DelimOutsideCounted++
-				}
-			}
-			chunk = append(chunk, util.EncodeCounts(make([]byte, 8), uint32(r.p.Characters.DelimCounted), uint32(r.p.Characters.DelimOutsideCounted))...)
-			// reset the count
-			r.p.Characters.DelimCounted = 0
-			r.p.Characters.DelimOutsideCounted = 0
-		} else {
-			chunk = append(chunk, bdcZero...)
-		}
-
-		chunks = append(chunks, chunk)
-		count++
-	}
-
-	if err = scanner.Err(); err != nil {
-		close(r.Data)
-		wg.Done()
-		if err == bufio.ErrTooLong {
-			fmt.Fprintf(os.Stderr, "This error could also occur due to incorrectly configured delimiter (%s) or enclosure (%s)\n", r.p.Characters.Delimiter, r.p.Characters.Enclosure)
-			fmt.Fprintf(os.Stderr, "Scanner error (%s), try increasing the `--buffer-size` (current value: %d kb)\n", err, r.p.Buffersize/1024)
-			os.Exit(1)
-		} else {
-			log.Fatalf("Runtime: scanner error after loop: %s", err)
-		}
-	}
-
-	// a file without rows keeps the Excel reading of a header ending with a delimiter
-	if pendingHeader != nil {
-		r.ParseRow(append(pendingHeader, bdcZero...))
-	}
-
-	if len(chunks) != 0 {
-		// send over the last chunks
-		r.Data <- chunks
-		chunks = make([][]byte, 0)
-	}
-
-	close(r.Data)
-	// there was no data, tell the workers to not initialize
-	if count == 0 {
-		r.HeaderSet <- false
-	}
-	// when count is one, it was still empty, but stop the workers
-	if count == 1 {
-		r.StopWorkers <- true
-	}
-	pv.Finish()
-	wg.Done()
 }
