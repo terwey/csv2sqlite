@@ -24,7 +24,7 @@ debug:
 	#@upx -9 csv2sqlite_debug
 
 markdown:
-	@asciidoctor docs/readme.adoc -b docbook -a leveloffset=+1 -o - | pandoc  --atx-headers --wrap=preserve -t gfm -f docbook - > README.md
+	@asciidoctor docs/readme.adoc -b docbook -a leveloffset=+1 -o - | pandoc  --markdown-headings=atx --wrap=preserve -t gfm -f docbook - > README.md
 
 man:
 	@asciidoctor -a version=${GIT_VERSION_NAME} -b manpage docs/csv2sqlite.7.adoc

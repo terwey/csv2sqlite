@@ -5,5 +5,6 @@
 * Delimiters and enclosures can be any Unicode string: `<#>`, an emoji, a multi-byte invisible separator. They're detected automatically, along with the line ending.
 * Fast, with low memory usage.
 * Handles extremely large files.
+* Reads its input with https://github.com/terwey/dsv-parser[dsv-parser], the parser of this repository as a Go library of its own.
 
 *sqlite-compare* checks two SQLite files against each other and stops at the first difference.
